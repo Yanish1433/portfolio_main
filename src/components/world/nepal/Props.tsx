@@ -1,13 +1,12 @@
 "use client";
 
-// Instanced props: bells, diyo oil lamps, lanterns, skill pots, marigold
+// Instanced props: bells, diyo oil lamps, lanterns, decorative pots, marigold
 // garlands, trees, pigeons and fireflies. Each kind is one draw call.
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { playerPos } from "../input";
 import { DHARA, TEA_STALL, TREES } from "../zones";
-import { potGeo } from "../skills/potGeo";
 import { lathe, sag, seeded } from "./geom";
 import { getMaterials } from "./materials";
 import { getTextures } from "./textures";
@@ -47,6 +46,8 @@ function white<G extends THREE.BufferGeometry>(g: G): G {
   return g;
 }
 
+// decorative clay pot (0.6 m wide, 0.58 m tall at scale 1)
+const potGeo = white(lathe([[0, 0], [0.18, 0], [0.27, 0.12], [0.3, 0.26], [0.22, 0.42], [0.13, 0.5], [0.15, 0.56], [0.13, 0.58]], 10));
 const bellGeo = white(lathe([[0, 0.14], [0.03, 0.13], [0.05, 0.06], [0.06, 0], [0, 0]], 5));
 const bowlGeo = white(lathe([[0, 0], [0.07, 0.0], [0.1, 0.035], [0.09, 0.05], [0, 0.03]], 6));
 const flameGeo = new THREE.ConeGeometry(0.028, 0.09, 5, 1, true).translate(0, 0.09, 0);
@@ -90,11 +91,11 @@ export default function Props({ lite, reducedMotion }: { lite: boolean; reducedM
     useMemo(() => lanterns.map((l) => ({ p: l.p, s: new THREE.Vector3(0.75, 0.7, 0.75) })), [lanterns]),
   );
 
-  // ---- decorative stacks of drying pots (the skill pots are skills/SkillPots.tsx)
+  // ---- decorative stacks of drying pots around the tea stall (the skills are the prayer wheels, wheels/WheelGallery.tsx)
   const pots = useMemo(() => {
     const out: { p: THREE.Vector3; s: number; r: number; c: string }[] = [];
     const r = seeded(77);
-    // stacked pyramids of drying pots around the square and the tea stall
+    // stacked pyramids of drying pots
     const stack = (x: number, z: number, layers: number) => {
       for (let l = 0; l < layers; l++) {
         const n = layers - l;
@@ -108,8 +109,6 @@ export default function Props({ lite, reducedMotion }: { lite: boolean; reducedM
             });
       }
     };
-    stack(18.7, -6.7, 3);
-    stack(18.6, 0.9, 2);
     if (!lite) {
       stack(TEA_STALL.x + 0.5, TEA_STALL.z + 1.9, 2);
       stack(-14, 8.0, 2);

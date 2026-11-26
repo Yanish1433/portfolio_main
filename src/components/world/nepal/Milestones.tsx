@@ -1,6 +1,6 @@
 "use client";
 
-// The Work Journey path: each stone of the lane (zones.ts MILESTONES, one per stop of the
+// The My Journey path: each stone of the lane (zones.ts MILESTONES, one per stop of the
 // captain's real journey, see ../journey.ts) lights up when the avatar runs past it, and stays lit.
 // Two draw calls in all: the glowing parts of every stone on ONE InstancedMesh (per-instance
 // colour), and ONE atlas mesh with every stone's caption (per-vertex brightness). The stone

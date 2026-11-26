@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { blockKind, BLOCK_SIZE, dioramaBlocks, MAX_BLOCKS, flowSentence, formatMetric, groupStack, parseMetric, pickLiveScreen, posterUrl, screenPose, videoUrl } from "./showcaseView";
+import { blockKind, BLOCK_SIZE, dioramaBlocks, MAX_BLOCKS, flowSentence, formatMetric, groupStack, parseMetric, posterUrl, screenPose, videoStateFor, videoUrl } from "./showcaseView";
 
 test("parseMetric splits prefix, number and suffix and formats back to the original", () => {
   for (const v of ["40", "1.2k", "-30%", "$4,000", "99.95%", "+12", "3x", "2,500+"]) {
@@ -69,15 +69,19 @@ test("screenPose stands in front of the screen and fits it", () => {
   assert.ok(phone.pos[2] > d);
 });
 
-test("pickLiveScreen: nearest on-screen stand within range, else none", () => {
-  const list = [
-    { id: "a", dist: 3, onScreen: true },
-    { id: "b", dist: 2, onScreen: false },
-    { id: "c", dist: 5.5, onScreen: true },
+test("videoStateFor: plays only on a stand's ring (+0.3 m), one at a time", () => {
+  const stands = [
+    { key: "a", ring: [0, 0] as [number, number] },
+    { key: "b", ring: [3, 0] as [number, number] },
   ];
-  assert.equal(pickLiveScreen(list, 6), "a");
-  assert.equal(pickLiveScreen(list, 2.5), null);
-  assert.equal(pickLiveScreen([], 6), null);
+  assert.equal(videoStateFor([0, 0], stands), "a");
+  assert.equal(videoStateFor([0.79, 0], stands), "a");
+  assert.equal(videoStateFor([0.85, 0], stands), null);
+  assert.equal(videoStateFor([5, 5], stands), null);
+  assert.equal(videoStateFor([3, 0.2], stands), "b");
+  assert.equal(videoStateFor([0, 0], []), null);
+  // overlapping rings: the nearer one wins
+  assert.equal(videoStateFor([1.4, 0], [{ key: "x", ring: [1, 0] }, { key: "y", ring: [1.6, 0] }]), "y");
 });
 
 test("blockKind maps plain layers to Newari buildings", () => {

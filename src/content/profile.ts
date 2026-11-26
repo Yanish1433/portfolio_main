@@ -109,6 +109,16 @@ export type Project = {
   media?: { poster?: string; screenshots?: string[]; video?: string };
 };
 
+/** A GitHub-only project (not deployed): shown as a compact "Code only" card in the Workshop. */
+export type WorkshopProject = {
+  id: string;
+  name: string;
+  repoUrl: string;
+  /** One honest plain line. */
+  blurb: string;
+  stack: string[];
+};
+
 export type Education = {
   id: string;
   school: string;
@@ -170,6 +180,10 @@ export type Profile = {
   certificates: Certificate[];
   courses: Course[];
   experience: Experience[];
+  /** GitHub-only projects (wording approved by the captain, 2026-11-26). */
+  workshop?: WorkshopProject[];
+  /** What kind of roles the captain is open to ("internships", "junior roles", "freelance"). */
+  openTo?: string[];
   about?: About;
 };
 
@@ -186,50 +200,60 @@ export const profile: Profile = {
     email: "#",
     resumeUrl: "#",
   },
+  // Skills: built from what the captain's projects actually use (2026-11-26, "do it however you can").
+  // No years are given. Level rule: Strong (80) = used in both deployed full-stack projects,
+  // Good (60) = used in one deployed project, Learning (40) = only in GitHub-only projects so far.
   skills: [
     {
       category: "frontend",
       label: "Frontend",
       skills: [
-        { name: "React", level: 85, years: 3 },
-        { name: "Next.js", level: 80, years: 2 },
-        { name: "TypeScript", level: 82, years: 3 },
-        { name: "Tailwind CSS", level: 85, years: 3 },
+        { name: "React", level: 80 },
+        { name: "Vite", level: 80 },
+        { name: "Tailwind CSS", level: 60 },
+        { name: "GSAP", level: 80 },
+        { name: "Framer Motion", level: 60 },
+        { name: "TypeScript", level: 40 },
+        { name: "Flutter (Dart)", level: 40 },
       ],
     },
     {
       category: "backend",
       label: "Backend",
       skills: [
-        { name: "Node.js", level: 80, years: 3 },
-        { name: "REST APIs", level: 80, years: 3 },
-        { name: "Authentication", level: 75, years: 2, usedIn: ["barber-on-demand", "goldstar-3d"] },
+        { name: "Node.js", level: 80 },
+        { name: "Express", level: 80 },
+        { name: "REST APIs", level: 80, usedIn: ["barber-on-demand", "goldstar-3d"] },
+        { name: "JWT auth", level: 80, usedIn: ["barber-on-demand", "goldstar-3d"] },
+        { name: "Zod", level: 80 },
+        { name: "WebSockets", level: 60 },
       ],
     },
     {
       category: "database",
       label: "Database",
       skills: [
-        { name: "PostgreSQL", level: 75, years: 2 },
-        { name: "MongoDB", level: 70, years: 2 },
+        { name: "MongoDB", level: 80 },
+        { name: "Mongoose", level: 80 },
       ],
     },
     {
       category: "devops",
       label: "DevOps",
       skills: [
-        { name: "Git", level: 85, years: 4 },
-        { name: "Docker", level: 65, years: 1 },
-        { name: "CI/CD", level: 60, years: 1 },
+        { name: "Git & GitHub", level: 80, usedIn: ["barber-on-demand", "goldstar-3d"] },
+        { name: "Cloudflare", level: 80, usedIn: ["barber-on-demand", "goldstar-3d"] },
+        { name: "Vitest", level: 60 },
       ],
     },
     {
       category: "3d/ai",
       label: "3D & AI",
       skills: [
-        { name: "Three.js", level: 60, years: 1, usedIn: ["barber-on-demand", "goldstar-3d"] } /* Barber uses React Three Fiber, which is three.js */,
-        { name: "Blender", level: 50, years: 1 },
-        { name: "LLM APIs", level: 65, years: 1 },
+        { name: "React Three Fiber", level: 80 },
+        { name: "Three.js", level: 80, usedIn: ["barber-on-demand", "goldstar-3d"] } /* Barber uses React Three Fiber, which is three.js */,
+        { name: "Python (ML basics)", level: 40 },
+        { name: "Gemini API", level: 40 },
       ],
     },
   ],
@@ -396,6 +420,44 @@ export const profile: Profile = {
   certificates: [],
   courses: [],
   experience: [],
+  openTo: ["internships", "junior roles", "freelance"],
+  workshop: [
+    {
+      id: "arena-nepal",
+      name: "Arena Nepal",
+      repoUrl: "https://github.com/Yanish1433/gaming",
+      blurb: "Community site for Nepali mobile gamers: 1v1 and squad challenges, custom rooms, sponsor-funded tournaments and XP leaderboards by province, with no betting.",
+      stack: ["React", "Vite", "Tailwind CSS", "Express 5", "MongoDB", "Mongoose", "JWT", "Zod"],
+    },
+    {
+      id: "virtualmart",
+      name: "VirtualMart",
+      repoUrl: "https://github.com/Yanish1433/Wow-Mart",
+      blurb: "Walkable 3D supermarket for a Nepali store, with a 2D catalogue and an admin back office.",
+      stack: ["React 19", "TypeScript", "React Three Fiber", "TanStack Query", "Zustand", "Express 5", "MongoDB", "Zod"],
+    },
+    {
+      id: "rudrakshya",
+      name: "Rudrakshya",
+      repoUrl: "https://github.com/Yanish1433/blog-page",
+      blurb: "Cinematic 3D scroll story, \"The Tears of Shiva\": from Kailash to Pashupatinath.",
+      stack: ["TypeScript", "Three.js", "3D scroll"],
+    },
+    {
+      id: "atelier-study",
+      name: "Atelier Study",
+      repoUrl: "https://github.com/Yanish1433/prototype",
+      blurb: "3D study sanctuary you can roam freely, with day/evening/night lighting and chair booking inside the 3D room.",
+      stack: ["React", "Three.js", "Express", "Gemini API", "Tailwind CSS"],
+    },
+    {
+      id: "dental-booking",
+      name: "Dental Booking + AI",
+      repoUrl: "https://github.com/Yanish1433/dental-booking-",
+      blurb: "Dental appointment booking with an AI service that predicts no-shows.",
+      stack: ["React", "Vite", "Tailwind CSS", "Express", "MongoDB", "JWT", "Python (Flask, ML)"],
+    },
+  ],
   // About me: written from the captain's resume (2026-11-26).
   about: {
     photo: "/showcase/about/photo.webp",

@@ -33,6 +33,8 @@ export function defaultInfo(spot: Spot): InfoRef | null {
       const c = HALL.certificates[spot.index];
       return c ? { kind: "certificate", id: c.id, spot: spot.key } : null;
     }
+    case "workshop":
+      return { kind: "workshop", id: "all", spot: spot.key };
     default:
       return null;
   }

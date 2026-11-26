@@ -6,7 +6,9 @@ export type Vec2 = [number, number];
 export type Theme = "day" | "night";
 
 /** What the shared info panel shows (Project Hall stands, plaques, certificates, books). */
-export type InfoKind = "project" | "more" | "education" | "certificate" | "course" | "about";
+export type InfoKind = "project" | "more" | "education" | "certificate" | "course" | "about" | "contact" | "workshop";
+/** The contact form panel of the mailbox (opened by walking up, tapping the mailbox or E). */
+export const CONTACT_INFO: InfoRef = { kind: "contact", id: "contact", spot: "mailbox" };
 /** The About panel of Yanish's Ghar (opened by walking up, tapping the house or E). */
 export const ABOUT_INFO: InfoRef = { kind: "about", id: "about", spot: "about" };
 export type InfoRef = {
@@ -129,22 +131,22 @@ type WorldState = {
   gharHint: boolean;
   setGharHint: (v: boolean) => void;
 
-  /** Pottery Square. Pots are numbered by their position in the flat skill list (skills/potData.ts). */
+  /** Prayer-wheel gallery. Wheels are numbered by their position in the row (wheels/wheelData.ts), one per skill group. */
   /** Row filter chip: other rows dim. */
   skillFilter: SkillFilter;
   setSkillFilter: (f: SkillFilter) => void;
-  /** Pot under the mouse (fine pointers only), or null. */
-  potHover: number | null;
-  /** Pot the avatar stands next to, or null. */
-  potNear: number | null;
-  /** Chosen pot (clicked, tapped or picked with E): its threads and card are open. */
-  potSelected: number | null;
+  /** Wheel under the mouse (fine pointers only), or null. */
+  wheelHover: number | null;
+  /** Wheel the avatar stands next to, or null. */
+  wheelNear: number | null;
+  /** Chosen wheel (clicked, tapped or picked with E): its skill ring, threads and card are open. */
+  wheelSelected: number | null;
   /** performance.now() when it was chosen (the threads fade 8 s later). */
-  potSelectedAt: number;
-  setPotHover: (i: number | null) => void;
-  setPotNear: (i: number | null) => void;
-  /** Choose a pot (restarts its threads), or null to clear. */
-  selectPot: (i: number | null) => void;
+  wheelSelectedAt: number;
+  setWheelHover: (i: number | null) => void;
+  setWheelNear: (i: number | null) => void;
+  /** Choose a wheel (restarts its threads), or null to clear. */
+  selectWheel: (i: number | null) => void;
 };
 
 /** The Skills filter chips: everything, or one group. */
@@ -225,13 +227,13 @@ export const useWorld = create<WorldState>((set, get) => ({
   setGharHint: (gharHint) => set({ gharHint }),
   skillFilter: "all",
   setSkillFilter: (skillFilter) => set({ skillFilter }),
-  potHover: null,
-  potNear: null,
-  potSelected: null,
-  potSelectedAt: 0,
-  setPotHover: (potHover) => set((s) => (s.potHover === potHover ? s : { potHover })),
-  setPotNear: (potNear) => set((s) => (s.potNear === potNear ? s : { potNear })),
-  selectPot: (i) => set({ potSelected: i, potSelectedAt: performance.now() }),
+  wheelHover: null,
+  wheelNear: null,
+  wheelSelected: null,
+  wheelSelectedAt: 0,
+  setWheelHover: (wheelHover) => set((s) => (s.wheelHover === wheelHover ? s : { wheelHover })),
+  setWheelNear: (wheelNear) => set((s) => (s.wheelNear === wheelNear ? s : { wheelNear })),
+  selectWheel: (i) => set({ wheelSelected: i, wheelSelectedAt: performance.now() }),
 }));
 
 /** Visitor movement (keys, joystick, ground clicks) is off while a case study is open or the camera is flying. */

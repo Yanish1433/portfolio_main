@@ -15,6 +15,11 @@ import { LeadOrder } from "./LeadOrder";
 import { TiltCard } from "./TiltCard";
 import { eduRow, eduSortKey, expPeriod, isNow } from "@/lib/robot/journey";
 import { ctaState, initials } from "@/components/world/about/aboutView";
+import { Himalaya } from "@/components/landing/Himalaya";
+import { CarvedFrame, PagodaRoof } from "@/components/landing/Ornaments";
+import { isPlaceholder, isRealEmail, isRealLink } from "./links";
+import { WORLD_HREF } from "@/components/landing/routes";
+import { builtLine, teamCards } from "@/lib/robot/proof";
 
 const isExternal = (url: string) => /^https?:/.test(url);
 const mailto = (email: string) => (email.includes("@") ? `mailto:${email}` : email);
@@ -24,6 +29,7 @@ const extProps = (url: string) =>
 function SectionHead({ id, eyebrow, title }: { id: string; eyebrow: string; title: string }) {
   return (
     <div className={styles.sectionHead} data-reveal>
+      <PagodaRoof className={styles.roofMark} />
       <p className={styles.eyebrow}>{eyebrow}</p>
       <h2 id={id} className={styles.h2}>
         {title}
@@ -37,7 +43,7 @@ function SectionHead({ id, eyebrow, title }: { id: string; eyebrow: string; titl
 export function TopNav() {
   return (
     <nav className={styles.topbar} aria-label="Page" data-recruiter-nav>
-      <Link href="/" className={styles.backLink}>
+      <Link href={WORLD_HREF} className={styles.backLink}>
         <span aria-hidden="true">←</span> Back to 3D world
       </Link>
       <div className={styles.topRight}>
@@ -45,7 +51,7 @@ export function TopNav() {
           <li><a href="#about">About</a></li>
           <li><a href="#projects">Projects</a></li>
           <li><a href="#skills">Skills</a></li>
-          <li><a href="#journey">Journey</a></li>
+          <li><a href="#journey">My Journey</a></li>
           <li><a href="#contact">Contact</a></li>
         </ul>
         <ThemeToggle />
@@ -58,12 +64,17 @@ export function Hero() {
   const { name, title, tagline, location, links } = profile;
   return (
     <section className={styles.hero} aria-labelledby="hero-title">
+      <Himalaya variant="band" />
       <Particles />
       <HeroMotion className={styles.heroInner}>
         <p className={styles.heroSub} data-hero-fade>
           <span lang="ne">छिटो परिचय</span>
-          <span className={styles.heroSubDot} aria-hidden="true" />
-          <span>{location}</span>
+          {!isPlaceholder(location) && (
+            <>
+              <span className={styles.heroSubDot} aria-hidden="true" />
+              <span>{location}</span>
+            </>
+          )}
         </p>
         <h1 id="hero-title" className={styles.heroName} data-hero-name>
           {name}
@@ -71,18 +82,29 @@ export function Hero() {
         <p className={styles.heroTitle} data-hero-fade>{title}</p>
         <p className={styles.heroTag} data-hero-fade>{tagline}</p>
         <div className={styles.heroActions} data-hero-fade>
-          <MagneticLink href={links.resumeUrl} variant="primary" download>
-            <DownloadIcon /> Download Resume
+          {isRealLink(links.resumeUrl) && (
+            <MagneticLink href={links.resumeUrl} variant="primary" download>
+              <DownloadIcon /> Download Resume
+            </MagneticLink>
+          )}
+          <MagneticLink href="#contact" variant={isRealLink(links.resumeUrl) ? "ghost" : "primary"}>
+            <MailIcon /> Contact
           </MagneticLink>
-          <MagneticLink href={mailto(links.email)}>
-            <MailIcon /> Email
-          </MagneticLink>
-          <MagneticLink href={links.github}>
-            <GithubIcon /> GitHub
-          </MagneticLink>
-          <MagneticLink href={links.linkedin}>
-            <LinkedinIcon /> LinkedIn
-          </MagneticLink>
+          {isRealEmail(links.email) && (
+            <MagneticLink href={mailto(links.email)}>
+              <MailIcon /> Email
+            </MagneticLink>
+          )}
+          {isRealLink(links.github) && (
+            <MagneticLink href={links.github}>
+              <GithubIcon /> GitHub
+            </MagneticLink>
+          )}
+          {isRealLink(links.linkedin) && (
+            <MagneticLink href={links.linkedin}>
+              <LinkedinIcon /> LinkedIn
+            </MagneticLink>
+          )}
         </div>
       </HeroMotion>
       <a href="#projects" className={styles.scrollHint} aria-label="Scroll to projects">
@@ -160,13 +182,53 @@ function ProjectCard({ project, index }: { project: Project; index: number }) {
 
 export function Projects() {
   return (
-    <ProjectsGallery header={<SectionHead id="projects-title" eyebrow="Selected work" title="Projects" />}>
-      <LeadOrder>
-        {profile.projects.map((p, i) => (
-          <ProjectCard key={p.id} project={p} index={i} />
-        ))}
-      </LeadOrder>
-    </ProjectsGallery>
+    <>
+      <ProjectsGallery header={<SectionHead id="projects-title" eyebrow="Selected work" title="Projects" />}>
+        <LeadOrder>
+          {profile.projects.map((p, i) => (
+            <ProjectCard key={p.id} project={p} index={i} />
+          ))}
+        </LeadOrder>
+      </ProjectsGallery>
+      <Workshop />
+    </>
+  );
+}
+
+/** GitHub-only projects: compact "Code only" cards. */
+function Workshop() {
+  const list = profile.workshop ?? [];
+  if (!list.length) return null;
+  return (
+    <section id="workshop" className={styles.section} aria-labelledby="workshop-title">
+      <Reveal>
+        <h3 className={styles.h3} id="workshop-title" data-reveal>
+          More on GitHub · Workshop
+        </h3>
+        <ul className={styles.workshopGrid}>
+          {list.map((w) => (
+            <li key={w.id} data-reveal>
+              <article className={styles.workCard}>
+                <div className={styles.workFoot}>
+                  <h4>{w.name}</h4>
+                  <span className={styles.badge}>Code only</span>
+                </div>
+                <p>{w.blurb}</p>
+                <ul className={styles.chips} aria-label="Tech used">
+                  {w.stack.slice(0, 5).map((t) => (
+                    <li key={t}>{t}</li>
+                  ))}
+                </ul>
+                <a className={styles.workLink} href={w.repoUrl} target="_blank" rel="noopener">
+                  View code <span aria-hidden="true">↗</span>
+                  <span className={styles.srOnly}> for {w.name} on GitHub (opens in a new tab)</span>
+                </a>
+              </article>
+            </li>
+          ))}
+        </ul>
+      </Reveal>
+    </section>
   );
 }
 
@@ -207,14 +269,16 @@ export function About({ photo = null }: { photo?: string | null }) {
       <Reveal>
         <SectionHead id="about-title" eyebrow="Meet me" title="About" />
         <div className={styles.aboutGrid} data-reveal>
-          <div className={styles.aboutCard} role={photo ? undefined : "img"} aria-label={photo ? undefined : `Portrait card of ${profile.name}`}>
-            {photo ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={photo} alt={`Portrait of ${profile.name}`} />
-            ) : (
-              initials(profile.name)
-            )}
-          </div>
+          {photo ? (
+            <CarvedFrame className={styles.aboutFrame}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={photo} alt={`Portrait of ${profile.name}`} width={640} height={800} loading="lazy" decoding="async" />
+            </CarvedFrame>
+          ) : (
+            <div className={styles.aboutCard} role="img" aria-label={`Portrait card of ${profile.name}`}>
+              {initials(profile.name)}
+            </div>
+          )}
           <div className={styles.aboutStory}>
             {about.story.map((l, i) => (
               <p key={i}>{l}</p>
@@ -328,6 +392,53 @@ function milestones(): Milestone[] {
   return [...exp, ...edu].sort((a, b) => b.sort - a.sort);
 }
 
+/** Proof instead of job titles: derived from the projects (lib/robot/proof.ts), so nothing is invented. */
+function JourneyProof() {
+  const built = builtLine(profile);
+  const cards = teamCards(profile);
+  const open = profile.openTo ?? [];
+  const learning = profile.education.find((e) => isNow(e.end));
+  if (!built && !cards.length && !open.length && !learning) return null;
+  return (
+    <Reveal className={styles.proof}>
+      {built && (
+        <div data-reveal>
+          <h3 className={styles.h3}>What I&apos;ve built</h3>
+          <p className={styles.proofBuilt}>{built}.</p>
+        </div>
+      )}
+      {cards.length > 0 && (
+        <div data-reveal>
+          <h3 className={styles.h3}>What I can do for your team</h3>
+          <ul className={styles.proofGrid}>
+            {cards.map((c) => (
+              <li key={c.id} className={styles.proofCard}>
+                <h4>{c.title}</h4>
+                <p>{c.evidence}</p>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {open.length > 0 && (
+        <div className={styles.proofRow} data-reveal>
+          <strong>Open to</strong>
+          <ul className={styles.chips}>
+            {open.map((o) => (
+              <li key={o}>{o}</li>
+            ))}
+          </ul>
+        </div>
+      )}
+      {learning && (
+        <p className={styles.proofLearning} data-reveal>
+          Currently learning at <strong>{learning.school}</strong>
+        </p>
+      )}
+    </Reveal>
+  );
+}
+
 export function Journey() {
   const items = milestones();
   const noJobs = profile.experience.length === 0;
@@ -338,8 +449,9 @@ export function Journey() {
   return (
     <section id="journey" className={styles.section} aria-labelledby="journey-title">
       <Reveal>
-        <SectionHead id="journey-title" eyebrow="Path so far" title="Education & Experience" />
+        <SectionHead id="journey-title" eyebrow="Path so far" title="My Journey" />
       </Reveal>
+      <JourneyProof />
       <TimelineMotion className={styles.timeline}>
         <div className={styles.tlTrack} aria-hidden="true">
           <div className={styles.tlLine} data-tl-line />
@@ -350,12 +462,12 @@ export function Journey() {
               <span className={styles.tlDot} data-tl-dot aria-hidden="true" />
               <div className={styles.tlCard}>
                 <p className={styles.tlPeriod}>
-                  <span className={styles.badge}>Experience</span> Next milestone
+                  <span className={styles.badge}>Next</span> My first role
                 </p>
-                <h3 className={styles.tlTitle}>Open to my first full-time role</h3>
-                <p className={styles.tlOrg}>Recent work is the projects above. Your company could be the next stone on this path.</p>
+                <h3 className={styles.tlTitle}>Your company could be my first: let&apos;s talk</h3>
+                <p className={styles.tlOrg}>No jobs yet: the proof is the projects above.</p>
                 <p>
-                  <a className={styles.tlOrg} href="#contact">Let&apos;s talk →</a>
+                  <a className={styles.tlOrg} href="#contact">Send a message →</a>
                 </p>
               </div>
             </li>
@@ -440,7 +552,7 @@ export function Contact() {
             {profile.summary}
           </p>
           <div data-reveal>
-            <ContactForm to={profile.links.email} />
+            <ContactForm githubUrl={profile.links.github} />
           </div>
         </div>
       </Reveal>
@@ -454,10 +566,10 @@ export function Footer() {
     <footer className={styles.footer}>
       <p>© {new Date().getFullYear()} {name}</p>
       <ul className={styles.footLinks}>
-        <li><a href={links.github} {...extProps(links.github)}>GitHub</a></li>
-        <li><a href={links.linkedin} {...extProps(links.linkedin)}>LinkedIn</a></li>
-        <li><a href={mailto(links.email)}>Email</a></li>
-        <li><Link href="/">Back to 3D world</Link></li>
+        {isRealLink(links.github) && <li><a href={links.github} {...extProps(links.github)}>GitHub</a></li>}
+        {isRealLink(links.linkedin) && <li><a href={links.linkedin} {...extProps(links.linkedin)}>LinkedIn</a></li>}
+        {isRealEmail(links.email) && <li><a href={mailto(links.email)}>Email</a></li>}
+        <li><Link href={WORLD_HREF}>Back to 3D world</Link></li>
       </ul>
     </footer>
   );

@@ -1,25 +1,27 @@
 "use client";
 
-// Living screens: the stand nearest the avatar (within LIVE_R m, and on screen) plays its demo
-// clip as a muted, looping VideoTexture over its poster. At most ONE <video> exists at a time:
-// a clip is only requested when its stand becomes the nearest, and is fully released (pause,
-// drop src, load(), dispose the texture) when another stand wins or the avatar walks away.
-// While a case study is open the clip pauses. Not mounted on phones or with ?perf=low.
+// Living screens: a project stand's demo clip plays ONLY while the avatar stands on that stand's
+// ring (ring radius + 0.3 m; showcaseView.videoStateFor). Leaving the ring pauses the clip and the
+// poster shows again; coming back restarts it from 0 (same element, no reload). At most ONE <video>
+// exists at a time: entering another stand releases the previous clip (pause, drop src, load(),
+// dispose the texture), and a clip left behind is released after RELEASE_AFTER_S seconds.
+// Desktop autoplays on the ring. Phones / ?perf=low (autoplay=false): tapping the screen while on
+// the ring plays it (muted, inline); the same stop-on-leave rule applies. It pauses while a case study is open.
 import { useEffect, useMemo, useRef } from "react";
-import { useFrame, useThree } from "@react-three/fiber";
+import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { useWorld } from "@/store/world";
 import { playerPos } from "../input";
 import { register, themeTargets } from "../nepal/themeState";
 import { HALL } from "./content";
 import { STANDS, type Stand } from "./layout";
-import { pickLiveScreen, videoUrl, type ScreenCandidate } from "./showcaseView";
+import { videoStateFor, videoUrl } from "./showcaseView";
 import { debugHidden } from "./spots";
 
-const LIVE_R = 6;
 const CHECK_S = 0.25;
+const RELEASE_AFTER_S = 8;
 
-type Live = { key: string; stand: Stand; video: HTMLVideoElement; tex: THREE.VideoTexture; ready: boolean };
+type Live = { key: string; stand: Stand; video: HTMLVideoElement; tex: THREE.VideoTexture; ready: boolean; /** avatar is on the ring */ on: boolean; leftAt: number };
 
 /** Stands that have a clip. */
 const CANDIDATES = STANDS.flatMap((stand) => {
@@ -29,8 +31,6 @@ const CANDIDATES = STANDS.flatMap((stand) => {
   return src ? [{ stand, src, id: p.id }] : [];
 });
 
-const _v = new THREE.Vector3();
-
 function release(l: Live | null) {
   if (!l) return;
   l.video.pause();
@@ -39,10 +39,10 @@ function release(l: Live | null) {
   l.tex.dispose();
 }
 
-export default function LiveScreen() {
-  const camera = useThree((s) => s.camera);
+export default function LiveScreen({ autoplay }: { autoplay: boolean }) {
   const live = useRef<Live | null>(null);
   const mesh = useRef<THREE.Mesh>(null);
+  const tap = useRef<THREE.Mesh>(null);
   const last = useRef(-1);
   const mat = useMemo(() => new THREE.MeshBasicMaterial({ toneMapped: false, color: new THREE.Color(0.84, 0.84, 0.84) }), []);
   // a unit quad, scaled and moved onto the chosen screen
@@ -63,7 +63,7 @@ export default function LiveScreen() {
     video.src = c.src;
     const tex = new THREE.VideoTexture(video);
     tex.colorSpace = THREE.SRGBColorSpace;
-    const l: Live = { key: c.stand.spot.key, stand: c.stand, video, tex, ready: false };
+    const l: Live = { key: c.stand.spot.key, stand: c.stand, video, tex, ready: false, on: true, leftAt: 0 };
     video.addEventListener("loadedmetadata", () => {
       // cover-fit the clip into the screen (crop the long side)
       const va = video.videoWidth / Math.max(1, video.videoHeight);
@@ -82,18 +82,55 @@ export default function LiveScreen() {
       mat.map = tex;
       mat.needsUpdate = true;
     });
-    if (!useWorld.getState().cinema) video.play().catch(() => undefined);
+    if (autoplay && !useWorld.getState().cinema) video.play().catch(() => undefined);
     return l;
   };
 
-  const switchTo = (key: string | null) => {
-    if ((live.current?.key ?? null) === key) return;
-    release(live.current);
+  /** The avatar is on ring `key` (or on none). */
+  const enter = (key: string | null, now: number) => {
+    const l = live.current;
+    if (l && l.key === key) {
+      if (!l.on) {
+        // back on the same ring: restart from 0 (no reload)
+        l.on = true;
+        l.ready = false;
+        l.video.currentTime = 0;
+        if (autoplay && !useWorld.getState().cinema) l.video.play().catch(() => undefined);
+      }
+      return;
+    }
+    if (l && l.on) {
+      // left the ring: stop, the poster shows again
+      l.on = false;
+      l.leftAt = now;
+      l.ready = false;
+      l.video.pause();
+    }
+    if (key === null) {
+      if (l && now - l.leftAt > RELEASE_AFTER_S) {
+        release(l);
+        live.current = null;
+        mat.map = null;
+        mat.needsUpdate = true;
+      }
+      return;
+    }
+    release(l);
     live.current = null;
     mat.map = null;
     mat.needsUpdate = true;
-    const c = key ? CANDIDATES.find((k) => k.stand.spot.key === key) : undefined;
-    if (c) live.current = start(c);
+    const c = CANDIDATES.find((k) => k.stand.spot.key === key);
+    if (c) {
+      live.current = start(c);
+      if (!autoplay) useWorld.getState().showToast("Tap the screen to play the demo");
+    }
+  };
+
+  const playNow = () => {
+    const l = live.current;
+    if (!l || !l.on || useWorld.getState().cinema) return;
+    l.video.currentTime = 0;
+    l.video.play().catch(() => undefined);
   };
 
   // pause while a case study is open (the 3D loop is paused too), resume after
@@ -102,9 +139,9 @@ export default function LiveScreen() {
       useWorld.subscribe((s, prev) => {
         if (!!s.cinema === !!prev.cinema || !live.current) return;
         if (s.cinema) live.current.video.pause();
-        else live.current.video.play().catch(() => undefined);
+        else if (autoplay && live.current.on) live.current.video.play().catch(() => undefined);
       }),
-    [],
+    [autoplay],
   );
 
   // ?debug: which stand is live and its clip (automated checks read currentTime)
@@ -120,7 +157,7 @@ export default function LiveScreen() {
       },
       state: () => {
         const v = live.current?.video;
-        return v ? { key: live.current!.key, ready: live.current!.ready, time: v.currentTime, paused: v.paused, src: v.currentSrc } : null;
+        return v ? { key: live.current!.key, on: live.current!.on, ready: live.current!.ready, time: v.currentTime, paused: v.paused, src: v.currentSrc } : null;
       },
     };
     return () => {
@@ -142,26 +179,45 @@ export default function LiveScreen() {
     const now = state.clock.elapsedTime;
     if (now - last.current >= CHECK_S && CANDIDATES.length) {
       last.current = now;
-      const list: ScreenCandidate[] = CANDIDATES.map(({ stand }) => {
-        _v.set(stand.x, stand.screen.y, stand.z).project(camera);
-        return {
-          id: stand.spot.key,
-          dist: Math.hypot(playerPos.x - stand.x, playerPos.z - stand.z),
-          onScreen: _v.z < 1 && Math.abs(_v.x) < 1.05 && Math.abs(_v.y) < 1.05,
-        };
-      });
-      switchTo(pickLiveScreen(list, LIVE_R));
+      enter(videoStateFor([playerPos.x, playerPos.z], CANDIDATES.map(({ stand }) => ({ key: stand.spot.key, ring: stand.spot.ring }))), now);
     }
     const m = mesh.current;
     const l = live.current;
     if (!m) return;
-    m.visible = !!l?.ready && !debugHidden.has("live");
+    m.visible = !!l?.ready && l.on && !debugHidden.has("live");
     if (l?.ready) {
       const sc = l.stand.screen;
       m.position.set(l.stand.x, sc.y, l.stand.z + 0.034);
       m.scale.set(sc.w, sc.h, 1);
     }
+    // phones: an invisible tap target over the screen while the avatar is on the ring
+    const t = tap.current;
+    if (t) {
+      t.visible = !!l?.on;
+      if (l) {
+        const sc = l.stand.screen;
+        t.position.set(l.stand.x, sc.y, l.stand.z + 0.36); // in front of the stand's click box (it reaches z + 0.3)
+        t.scale.set(sc.w, sc.h, 1);
+      }
+    }
   });
 
-  return <mesh ref={mesh} geometry={geo} material={mat} visible={false} />;
+  return (
+    <>
+      <mesh ref={mesh} geometry={geo} material={mat} visible={false} />
+      {!autoplay && (
+        <mesh
+          ref={tap}
+          geometry={geo}
+          visible={false}
+          onClick={(e) => {
+            e.stopPropagation();
+            playNow();
+          }}
+        >
+          <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+        </mesh>
+      )}
+    </>
+  );
 }

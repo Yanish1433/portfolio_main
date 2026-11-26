@@ -25,7 +25,7 @@ const TOUR_LINES: Record<ZoneId, string> = {
   plaza: `This is Durbar Square, the heart of ${profile.name}'s portfolio. Every path starts here.`,
   "project-hall": `The Project Hall: ${profile.projects.length} projects stand along the dalan, the carved gallery. Walk up to any stand.`,
   education: "The pathshala, the old school house. Degree plaques, certificates and a bookshelf of courses are in the courtyard.",
-  "skills-lab": "Pottery Square! Each row of pots is one group of skills.",
+  "skills-lab": "The prayer wheels! Each wheel is one group of skills.",
   timeline: "The brick lane is the work journey, one milestone stone per step.",
   about: `${profile.name.split(" ")[0]}'s Ghar, the home of the person behind this portfolio. Step up to the doormat to read the story.`,
   mailbox: "The hulak (post box). This is where you can get in touch.",
@@ -218,6 +218,19 @@ export function runAction(action: RobotAction, spoken = false) {
       void walkSequence(action.zone);
       return;
     case "openProject": {
+      if (action.projectId === "workshop") {
+        // the Workshop (GitHub-only projects) hangs in the Project Hall's east bay
+        if (!spoken) robot.say(`${LABELS.robot.followMe} The Workshop hangs at the east end of the Project Hall.`);
+        const ws = spotByKey("workshop");
+        if (!ws) {
+          void walkSequence("project-hall");
+          return;
+        }
+        robotMotion.lookAt = [ws.x, ws.z];
+        robotMotion.lookUntil = performance.now() / 1000 + 3;
+        void visit({ kind: "workshop", id: "all", spot: "workshop" }, { signal: newTask(), lead: "project-hall" });
+        return;
+      }
       // Walk to that project's stand in the dalan and open its panel.
       const proj = profile.projects.find((p) => p.id === action.projectId);
       const ref = projectInfo(action.projectId);

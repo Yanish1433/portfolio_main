@@ -18,7 +18,7 @@ import {
   TEA_SIGN,
   TEA_STALL,
   TIMELINE_PATH,
-  WHEELS,
+  GALLERY,
   zones,
 } from "../zones";
 import { MAT_KEYS, Parts, T, beam, box, lathe, plane, seeded, type MatKey } from "./geom";
@@ -39,6 +39,8 @@ import {
 } from "./kit";
 import { CASTS, getMaterials, materialFor } from "./materials";
 import { buildHallParts } from "../halls/hallParts";
+import { buildWheelGallery } from "../wheels/frame";
+import { WHEELS } from "../wheels/wheelData";
 
 export const TOWN_RADIUS = 22.9;
 
@@ -120,16 +122,10 @@ export function buildTown(): TownData {
   A.diyos.push(V(COURTYARD.x1, 1.62, COURTYARD.gate[0]), V(COURTYARD.x1, 1.62, COURTYARD.gate[1]));
   A.lanterns.push(V(COURTYARD.x1 + 0.3, 1.2, -2.5));
 
-  // pottery square: wheels with a pot in progress
-  P.small(() => {
-    for (const [x, z] of WHEELS) {
-      P.add("plain", new THREE.CylinderGeometry(0.55, 0.6, 0.22, 10), COL.stoneDark, T(x, 0.11, z));
-      P.add("plain", new THREE.CylinderGeometry(0.4, 0.4, 0.06, 10), "#4b3a30", T(x, 0.25, z));
-      P.add("clay", lathe([[0, 0], [0.16, 0], [0.2, 0.12], [0.12, 0.28], [0.09, 0.34], [0.11, 0.38]], 8), "#b0643c", T(x, 0.28, z));
-    }
-  });
-  // straw drying mats
-  P.box("plain", 4.6, 0.02, 5.0, 14.7, 0.011, -3, "#c8a96b");
+  // prayer-wheel gallery: frame, roof, pedestals, plaque boards, butter lamps (the golden drums are wheels/WheelGallery.tsx)
+  buildWheelGallery(P, A, WHEELS);
+  // woven mat on the lane in front of the wheels
+  P.box("plain", 6.6, 0.02, 1.9, GALLERY.x, 0.011, GALLERY.z + 1.95, "#c8a96b");
 
   // lane: stone milestones and lamp posts
   P.small(() => {

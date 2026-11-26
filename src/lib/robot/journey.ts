@@ -85,7 +85,7 @@ export type Milestone = {
   kind: "past" | "now" | "next";
 };
 
-export const NEXT_MILESTONE_TEXT = "Next milestone: your company?";
+export const NEXT_MILESTONE_TEXT = "Your company could be my first: let's talk";
 /** The path holds at most this many stones including "next" (older years are folded into the first). */
 export const MAX_STONES = 6;
 

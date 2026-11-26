@@ -4,6 +4,7 @@ import { profile } from "@/content/profile";
 import { ScrollProvider } from "@/components/recruiter/ScrollProvider";
 import { THEME_SCRIPT } from "@/components/recruiter/themeScript";
 import styles from "@/components/recruiter/recruiter.module.css";
+import { DHAKA_URL } from "@/components/landing/art";
 
 const display = Space_Grotesk({
   subsets: ["latin"],
@@ -42,6 +43,7 @@ export default function RecruiterLayout({ children }: { children: React.ReactNod
     <div
       data-recruiter-root
       suppressHydrationWarning
+      style={{ "--dhaka": DHAKA_URL } as React.CSSProperties}
       className={`${display.variable} ${body.variable} ${nepali.variable} ${styles.page}`}
     >
       <script dangerouslySetInnerHTML={{ __html: THEME_SCRIPT }} />

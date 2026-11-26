@@ -124,16 +124,27 @@ export function screenPose(
 
 // ---------------------------------------------------------------- living screens
 
-export type ScreenCandidate = { id: string; dist: number; onScreen: boolean };
+/** The painted ring on the ground is 0.5 m wide; the clip plays within it plus this slack. */
+export const RING_VISUAL_R = 0.5;
+export const RING_SLACK = 0.3;
 
-/** The one stand whose clip plays: the nearest on-screen candidate within `maxDist` m, or null. */
-export function pickLiveScreen(list: ScreenCandidate[], maxDist: number): string | null {
-  let best: ScreenCandidate | null = null;
-  for (const c of list) {
-    if (!c.onScreen || c.dist > maxDist) continue;
-    if (!best || c.dist < best.dist) best = c;
+export type VideoStand = { key: string; ring: [number, number] };
+
+/**
+ * The one stand whose clip should play: the stand whose ring the avatar is standing on
+ * (inside the ring radius + 0.3 m; the nearest if rings ever overlap), or null anywhere else.
+ */
+export function videoStateFor(avatarPos: [number, number], stands: VideoStand[]): string | null {
+  let best: string | null = null;
+  let bestD = RING_VISUAL_R + RING_SLACK;
+  for (const s of stands) {
+    const d = Math.hypot(avatarPos[0] - s.ring[0], avatarPos[1] - s.ring[1]);
+    if (d <= bestD) {
+      best = s.key;
+      bestD = d;
+    }
   }
-  return best?.id ?? null;
+  return best;
 }
 
 // ---------------------------------------------------------------- dioramas

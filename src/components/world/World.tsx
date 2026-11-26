@@ -17,9 +17,9 @@ import ThemeDriver from "./nepal/ThemeDriver";
 import RobotBuddy from "./robot/RobotBuddy";
 import Halls from "./halls/Halls";
 import CinemaCamera from "./halls/CinemaCamera";
-import SkillPots from "./skills/SkillPots";
-import PotLabels from "./skills/PotLabels";
-import Threads from "./skills/ThreadsLayer";
+import WheelGallery from "./wheels/WheelGallery";
+import WheelLabels from "./wheels/WheelLabels";
+import Threads from "./wheels/ThreadsLayer";
 import { themeTargets } from "./nepal/themeState";
 import { initialTheme, useWorld } from "@/store/world";
 
@@ -171,8 +171,8 @@ export default function World({ characters, thumbs, posters = [], aboutPhoto = n
           <Milestones reducedMotion={reducedMotion} />
           <Labels />
           <Halls thumbs={thumbs} posters={posters} liveVideo={liveVideo} reducedMotion={reducedMotion} />
-          <SkillPots reducedMotion={reducedMotion} />
-          <PotLabels />
+          <WheelGallery reducedMotion={reducedMotion} />
+          <WheelLabels />
           <Threads reducedMotion={reducedMotion} />
           <CinemaCamera reducedMotion={reducedMotion} />
           <Player characters={characters} reducedMotion={reducedMotion} />

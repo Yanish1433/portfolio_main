@@ -9,7 +9,7 @@ export const LABELS = {
     "project-hall": { en: "Project Hall", ne: "परियोजना कक्ष" },
     education: { en: "Education", ne: "शिक्षा" },
     "skills-lab": { en: "Skills", ne: "सीप" },
-    timeline: { en: "Work Journey", ne: "कार्य अनुभव" },
+    timeline: { en: "My Journey", ne: "मेरो यात्रा" },
     about: { en: "Yanish's Ghar", ne: "यानिशको घर" },
     mailbox: { en: "Contact", ne: "सम्पर्क" },
     // Captain's choice (2026-11-26): "quick introduction".

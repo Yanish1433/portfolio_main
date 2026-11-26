@@ -3,6 +3,7 @@
 
 import type { Profile } from "@/content/profile";
 import { eduSentence, expPeriod, sortedEducation } from "./journey";
+import { builtLine, openToText, shippedProjects } from "./proof";
 import type { MatchResult, TechEntity } from "./matcher";
 import type {
   IntentId,
@@ -18,7 +19,7 @@ export const ZONE_LABEL: Record<ZoneId, string> = {
   "project-hall": "the Project Hall",
   education: "the Education Zone",
   "skills-lab": "the Skills Lab",
-  timeline: "the Timeline",
+  timeline: "My Journey",
   about: "the Ghar (the About house)",
   mailbox: "the Mailbox",
   kiosk: "the Kiosk",
@@ -30,7 +31,7 @@ export const RECRUITER_ANCHORS: Record<ZoneId, { url: string; label: string }> =
   "project-hall": { url: "#projects", label: "Projects" },
   education: { url: "#journey", label: "Education" },
   "skills-lab": { url: "#skills", label: "Skills" },
-  timeline: { url: "#journey", label: "Experience" },
+  timeline: { url: "#journey", label: "My Journey" },
   about: { url: "#about", label: "About" },
   mailbox: { url: "#contact", label: "Contact" },
   kiosk: { url: "#contact", label: "Contact" },
@@ -212,6 +213,19 @@ function build(input: BuildInput): Parts {
       return { text, suggestions, focus: { list: true }, ...(actions ? { actions } : {}) };
     }
 
+    case "workshop": {
+      const w = p.workshop ?? [];
+      if (w.length === 0) return { text: `${F} has no other projects listed yet. Here are the main ones.`, suggestions: [msg("Show me the projects", "Show me the projects"), ...defaults.slice(1, 3)] };
+      const names = joinList(w.slice(0, 5).map((x) => x.name));
+      const text = `Besides the main projects, ${F} has ${w.length} more on GitHub (code only, not deployed): ${names}. ${world ? "Want me to walk you to the Workshop?" : "They are in the More on GitHub section below the projects."}`;
+      const suggestions: RobotSuggestion[] = [
+        world ? act("Yes, take me", { type: "openProject", projectId: "workshop" }) : act("Jump to projects", zoneAction("project-hall", mode)),
+        ...(isRealUrl(p.links.github) ? [act("Open GitHub", { type: "openLink", url: p.links.github, label: "GitHub" })] : []),
+        msg("Show me the projects", "Show me the projects"),
+      ];
+      return { text, suggestions, ...(match.go && world ? { actions: [{ type: "openProject" as const, projectId: "workshop" }] } : {}) };
+    }
+
     case "project_detail": {
       const idx = match.projectIdx ?? 0;
       const proj = p.projects[idx];
@@ -355,11 +369,11 @@ function build(input: BuildInput): Parts {
 
     case "experience": {
       if (p.experience.length === 0) {
-        const recent = p.projects.slice(0, 2).map((x) => x.name);
-        const work = recent.length ? ` Recent work is ${joinList(recent)}, built as projects.` : "";
+        const built = builtLine(p) ? `has built and shipped ${shippedProjects(p).length} full-stack ${shippedProjects(p).length === 1 ? "app" : "apps"} solo` : "has built projects of their own";
+        const open = openToText(p);
         return {
-          text: `No jobs are listed yet.${work} ${world ? "I can walk you along the path of milestones if you like." : "The journey section shows the path so far."}`,
-          suggestions: [yesOffer("timeline", mode), msg("Show me the projects", "Show me the projects"), msg("How can I contact you?", "How can I contact you?")],
+          text: `${F} is starting out: no jobs listed yet, but ${built}${open ? `, and is open to ${open}` : ""}. Want to see the projects?`,
+          suggestions: [msg("Show me the projects", "Show me the projects"), yesOffer("timeline", mode), msg("How can I contact you?", "How can I contact you?")],
           offer: zoneAction("timeline", mode),
         };
       }

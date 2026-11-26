@@ -73,6 +73,7 @@ export type IntentId =
   | "who_are_you"
   | "about_owner"
   | "projects_overview"
+  | "workshop"
   | "project_detail"
   | "skills_overview"
   | "skill_check"

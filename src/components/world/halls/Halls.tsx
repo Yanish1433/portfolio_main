@@ -29,6 +29,7 @@ import { CLICK_BOXES, CLOSE_R, DIORAMAS, OPEN_R, OPEN_SPEED, RINGS, SHELF, SPOTS
 import { at, cursor, makeAtlas, merge, quad, useAnisotropy, useFontsSettled } from "./three";
 import { defaultInfo, visitByVisitor, visitState } from "./visit";
 import Pathshala from "./Pathshala";
+import Workshop from "./Workshop";
 
 // --- Project posters --------------------------------------------------------
 
@@ -219,7 +220,7 @@ const _hit = new THREE.Vector3();
 function ClickTargets() {
   const built = useMemo(() => {
     const boxes = CLICK_BOXES;
-    const geos = boxes.map((b) => new THREE.BoxGeometry(b.w, b.h, b.d).applyMatrix4(at(b.spot.x, b.y, b.spot.z + (b.dz ?? 0), b.spot.yaw)));
+    const geos = boxes.map((b) => new THREE.BoxGeometry(b.w, b.h, b.d).applyMatrix4(at(b.spot.x + (b.dx ?? 0), b.y, b.spot.z + (b.dz ?? 0), b.spot.yaw)));
     const geo = boxes.length ? merge(geos) : new THREE.BufferGeometry();
     // 12 triangles per box
     const boxOfFace = (face: number) => boxes[Math.floor(face / 12)];
@@ -247,8 +248,9 @@ function ClickTargets() {
         e.stopPropagation();
         const box = e.faceIndex != null ? built.boxOfFace(e.faceIndex) : undefined;
         const spot = box?.spot;
-        const ref = spot ? defaultInfo(spot) : null;
-        if (!ref) return;
+        const base = spot ? defaultInfo(spot) : null;
+        if (!base) return;
+        const ref = box?.item ? { ...base, id: box.item } : base;
         // A click on a project's screen goes all the way: walk there, then open its case study.
         // (Where the click ray crosses the screen's plane; the diorama in front never counts.)
         const stand = spot?.kind === "project" && box?.part !== "diorama" ? STANDS.find((s) => s.spot.key === spot.key) : undefined;
@@ -367,7 +369,7 @@ export default function Halls({
 }: {
   thumbs: string[];
   posters?: string[];
-  /** Living screens may play clips (off on phones and with ?perf=low). */
+  /** Clips autoplay on the ring (off on phones and with ?perf=low: tap the screen instead). */
   liveVideo: boolean;
   reducedMotion: boolean;
 }) {
@@ -378,8 +380,9 @@ export default function Halls({
       <ProjectScreens files={files} />
       <FlagshipHalo reducedMotion={reducedMotion} />
       <Dioramas reducedMotion={reducedMotion} />
-      {liveVideo && <LiveScreen />}
+      <LiveScreen autoplay={liveVideo} />
       <Pathshala reducedMotion={reducedMotion} />
+      <Workshop />
       <SpotRings />
       <ClickTargets />
       <HallLogic />

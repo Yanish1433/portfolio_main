@@ -7,7 +7,7 @@ import { test } from "node:test";
 import { profile as liveProfile } from "@/content/profile";
 import type { Profile } from "@/content/profile";
 import { FIXTURE_CERTIFICATES, FIXTURE_COURSES, FIXTURE_EDUCATION, FIXTURE_EXPERIENCE, FIXTURE_PROJECTS, FIXTURE_REAL_EDUCATION } from "./test-fixtures";
-import { FALLBACK_THRESHOLD, ZONE_IDS, createLocalBrain } from "./index";
+import { FALLBACK_THRESHOLD, ZONE_IDS, ZONE_LABEL, createLocalBrain } from "./index";
 import type { RobotAction, RobotContext, RobotMode, RobotReply } from "./index";
 import { INTENTS } from "./intents";
 import { STOPWORDS, damerauLevenshtein, fuzzyMatch, normalize } from "./text";
@@ -215,9 +215,11 @@ test("education reply with the real shape: clean sentence, mentions TechSkills, 
 test("experience reply: honest line when there are no jobs, real data when there are", async () => {
   const empty = await ask("work history?", world, realShape);
   assert.equal(empty.intent, "experience");
-  assert.match(empty.text, /No jobs are listed yet/);
-  assert.match(empty.text, /BookEasy and SyncBoard/);
-  assert.doesNotMatch(empty.text, /(he|she|his|her)/i);
+  assert.match(empty.text, /no jobs listed yet/);
+  assert.match(empty.text, /open to internships, junior roles and freelance/);
+  assert.doesNotMatch(empty.text, /\b(he|she|his|her)\b/i);
+  const real = await ask("work history?", world, { ...liveProfile, experience: [] });
+  assert.equal(real.text, "Yanish is starting out: no jobs listed yet, but has built and shipped 2 full-stack apps solo, and is open to internships, junior roles and freelance. Want to see the projects?");
   assert.ok(empty.suggestions.some((s) => s.action?.type === "walkTo" && s.action.zone === "timeline"));
   const r = await ask("work history?", recruiter, realShape);
   assert.ok(r.suggestions.some((s) => s.action?.type === "openLink" && s.action.url === "#journey"));
@@ -594,4 +596,31 @@ test("asking about projects without a navigation verb does not walk", async () =
       assert.equal(r.actions, undefined, m);
     }
   }
+});
+
+test("workshop: other / more / github projects list the GitHub-only projects, not the featured ones", async () => {
+  for (const q of ["other projects", "show me more projects", "do you have github projects?", "what's in the workshop"]) {
+    const r = await ask(q, world, liveProfile);
+    assert.equal(r.intent, "workshop", q);
+    assert.match(r.text, /Arena Nepal, VirtualMart, Rudrakshya, Atelier Study and Dental Booking \+ AI/, q);
+    assert.ok(r.suggestions.some((s) => s.action?.type === "openProject" && s.action.projectId === "workshop"), q);
+    assert.ok(r.suggestions.length >= 2 && r.suggestions.length <= 4, q);
+  }
+  const rec = await ask("other projects", recruiter, liveProfile);
+  assert.ok(rec.suggestions.some((s) => s.action?.type === "openLink" && s.action.url === "#projects"));
+  assert.ok(!rec.suggestions.some((s) => s.action?.type === "openProject"));
+});
+
+test("workshop does not steal the featured projects", async () => {
+  for (const q of ["show me the projects", "what projects have you built", "tell me about the projects"]) {
+    const r = await ask(q, world, liveProfile);
+    assert.equal(r.intent, "projects_overview", q);
+  }
+  const g = await ask("take me to the other projects", world, liveProfile);
+  assert.equal(g.intent, "workshop");
+  assert.ok(g.actions?.some((a) => a.type === "openProject" && a.projectId === "workshop"));
+});
+
+test("the journey zone is called My Journey", async () => {
+  assert.equal(ZONE_LABEL.timeline, "My Journey");
 });

@@ -1,6 +1,6 @@
 // Shared walk-up spot types and the small layout helper used by the dalan and the pathshala.
 
-export type SpotKind = "project" | "more" | "education" | "certificate" | "shelf";
+export type SpotKind = "project" | "more" | "education" | "certificate" | "shelf" | "workshop";
 
 /** Something the avatar can walk up to. */
 export type Spot = {
@@ -25,7 +25,7 @@ export const CLOSE_R = 1.6;
 export const OPEN_SPEED = 1.0;
 
 /** A clickable box over a display (raycast only, never drawn), in world space. */
-export type ClickBox = { spot: Spot; w: number; h: number; d: number; y: number; /** offset toward +z from the spot */ dz?: number; part?: "diorama" };
+export type ClickBox = { spot: Spot; w: number; h: number; d: number; y: number; /** offset toward +z from the spot */ dz?: number; /** offset toward +x from the spot */ dx?: number; part?: "diorama"; /** which item of the spot this box opens (Workshop: a repo id) */ item?: string };
 
 /** n centres spread over [a, b], at most `maxSpacing` apart, centred. */
 export function wingCentres(n: number, [a, b]: [number, number], maxSpacing = 2.3): { xs: number[]; spacing: number } {

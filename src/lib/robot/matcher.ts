@@ -472,8 +472,12 @@ function projectVariant(a: Analysis): string | undefined {
   return undefined;
 }
 
+/** "other / more / github projects", "the workshop": the GitHub-only projects, never the featured ones. */
+const WORKSHOP_RE = /\b(?:other|more|extra|additional|github|unfinished|undeployed|not deployed|code only) (?:projects?|work)\b|\bprojects? (?:on|in|from) github\b|\bworkshop\b/;
+
 /** Decide the intent for one message. Precedence: navigate > project entity > skill entity > scored intents. */
 export function classify(a: Analysis): MatchResult {
+  if (WORKSHOP_RE.test(a.norm)) return { intent: "workshop", confidence: 0.9, ...(a.goVerb ? { go: true } : {}) };
   if (a.navigate && a.zones.length > 0) {
     return { intent: "navigate", zone: a.zones[0], confidence: 0.95 };
   }

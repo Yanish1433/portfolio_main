@@ -48,15 +48,20 @@ export const PALACE = { x: 0, z: -17, w: 20, d: 5, gateX: 0 };
 /** Pathshala (Education): house faces east onto a walled courtyard. */
 export const SCHOOL = { x: -16, z: -2.5, w: 6, d: 5 };
 export const COURTYARD = { x0: -13.5, x1: -10.5, z0: -5.3, z1: 0.3, gate: [-3.9, -1.1] as [number, number] };
-/** Pottery Square (Skills). */
-export const POTTERY = { x: 14, z: -3 };
-export const WHEELS: [number, number][] = [
-  [12.2, -6.2],
-  [12.2, 0.2],
-];
-/** Pot rows (one row per skill group), each [x, z0, z1]. */
-export const POT_ROWS_X = [12.9, 13.8, 14.7, 15.6, 16.5];
-export const POT_ROW_Z: [number, number] = [-5.2, -0.8];
+/** Prayer-wheel gallery (Skills): ONE row along x, wheels facing +z (south, toward the camera), walkable lane in front. */
+export const GALLERY = {
+  x: 13.3,
+  z: -4.7,
+  /** Frame depth (z). */
+  d: 1.3,
+  /** Most room the wheels may take along x, and the widest pitch between two of them. */
+  maxSpan: 6.6,
+  maxPitch: 1.3,
+  /** At most this many wheels (one per skill group). */
+  maxWheels: 8,
+};
+/** The middle of the gallery's lane, where the zone label and walk-up checks look. */
+export const SKILLS_MID = { x: GALLERY.x, z: GALLERY.z + 1.6 };
 /** Smaller temples. */
 export const SHRINES = [
   { x: -10.5, z: -9.5, tiers: 3, steps: 3, base: 4 },
@@ -206,15 +211,15 @@ export const zones: Zone[] = [
   {
     id: "skills-lab",
     label: LABELS.zones["skills-lab"].en,
-    prompt: "Press E or tap to look at the pots",
-    position: [15, -3],
+    prompt: "Press E or tap to look at the prayer wheels",
+    position: [GALLERY.x, GALLERY.z + 0.4],
     ring: [9.6, -3],
     ringRadius: 1.4,
     color: "#e8925a",
     labelY: 5.6,
     obstacles: [
-      ...WHEELS.map(([x, z]) => circle(x, z, 0.7)),
-      rect(14.7, -3, 4.4, POT_ROW_Z[1] - POT_ROW_Z[0] + 0.6),
+      // the gallery's footprint (frame + pedestals), sized for the widest row
+      rect(GALLERY.x, GALLERY.z, GALLERY.maxSpan + 1.0, GALLERY.d + 0.2),
       rotRect(PATIS[2].x, PATIS[2].z, PATIS[2].w + 0.2, PATIS[2].d + 0.2, PATIS[2].rot),
     ],
   },

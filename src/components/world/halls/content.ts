@@ -8,7 +8,7 @@
 //
 // ?debug&lead=barber|goldstar (see LEAD_ID below) forces which flagship leads, for the rotation proof.
 //
-// ?debug&skills=N (skills/potData.ts) does the same for the Pottery Square's pots.
+// ?debug&groups=N (wheels/wheelData.ts) does the same for the prayer-wheel gallery.
 //
 // Demo media (production needs ?debug): ?debug&media=demo gives the first two projects the
 // placeholder clips in public/showcase/demo-a and demo-b, so the living screens and the cinema

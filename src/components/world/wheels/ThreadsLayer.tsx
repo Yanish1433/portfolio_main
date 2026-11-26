@@ -1,18 +1,19 @@
 "use client";
 
-// Glowing threads from the chosen pot to every project stand that used its skill, plus a gentle pulse on
+// Glowing threads from the chosen prayer wheel to every project stand that used any skill of its group, plus a gentle pulse on
 // those stands' screens. Two draw calls in total:
 // - threads: ONE merged tube mesh for all arcs, with a dash shader that runs along each arc
 //   (reduced motion: the dashes stand still)
 // - pulse: ONE InstancedMesh of additive quads laid over the matching screens
-// Both fade in, and out after 8 s (threads.ts), and restart when another pot is chosen.
+// Both fade in, and out after 8 s (threads.ts), and restart when another wheel is chosen.
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
 import { useWorld } from "@/store/world";
 import { STANDS } from "../halls/layout";
-import { POTS, standsForPot } from "./potData";
-import { CULL_R, skillsHidden, squareDist } from "./SkillPots";
+import { WHEELS, standsForWheel } from "./wheelData";
+import { CULL_R, galleryDist, galleryHidden } from "./WheelGallery";
+import { DRUM_H, DRUM_Y } from "./wheelLayout";
 import { threadAlpha, threadBuffers, type V3 } from "./threads";
 
 const VERT = /* glsl */ `
@@ -29,10 +30,10 @@ uniform float uFade;
 uniform vec3 uColor;
 varying float vU;
 void main() {
-  // about 14 dashes per arc, running from the pot toward the stand
+  // about 14 dashes per arc, running from the wheel toward the stand
   float d = fract(vU * 14.0 - uTime * 0.7);
   float dash = smoothstep(0.0, 0.12, d) * (1.0 - smoothstep(0.52, 0.64, d));
-  // the ends melt into the pot and the screen
+  // the ends melt into the wheel and the screen
   float ends = smoothstep(0.0, 0.05, vU) * (1.0 - smoothstep(0.95, 1.0, vU));
   float a = dash * ends * uFade;
   if (a < 0.01) discard;
@@ -47,8 +48,8 @@ const _p = new THREE.Vector3();
 const _s = new THREE.Vector3();
 
 export default function Threads({ reducedMotion }: { reducedMotion: boolean }) {
-  const selected = useWorld((s) => s.potSelected);
-  const selectedAt = useWorld((s) => s.potSelectedAt);
+  const selected = useWorld((s) => s.wheelSelected);
+  const selectedAt = useWorld((s) => s.wheelSelectedAt);
 
   const mat = useMemo(
     () =>
@@ -69,17 +70,17 @@ export default function Threads({ reducedMotion }: { reducedMotion: boolean }) {
   const pulse = useRef<THREE.InstancedMesh>(null);
   const geo = useRef<THREE.BufferGeometry | null>(null);
 
-  // Rebuild the arcs (and which screens pulse) whenever a pot is chosen.
+  // Rebuild the arcs (and which screens pulse) whenever a wheel is chosen.
   useEffect(() => {
     const m = mesh.current;
     const pm = pulse.current;
     if (!m || !pm) return;
     geo.current?.dispose();
     geo.current = null;
-    const stands = selected === null ? [] : standsForPot(selected);
-    const pot = selected === null ? null : POTS[selected];
-    if (pot && stands.length) {
-      const from: V3 = [pot.x, 0.02 + 0.62 * pot.height + 0.12, pot.z];
+    const stands = selected === null ? [] : standsForWheel(selected);
+    const wheel = selected === null ? null : WHEELS[selected];
+    if (wheel && stands.length) {
+      const from: V3 = [wheel.x, DRUM_Y + DRUM_H + 0.3, wheel.z];
       // to the lower middle of each stand's screen
       const to: V3[] = stands.map((s) => [s.x, s.screen.y - s.screen.h * 0.3, s.z + 0.3]);
       const b = threadBuffers(from, to);
@@ -113,10 +114,10 @@ export default function Threads({ reducedMotion }: { reducedMotion: boolean }) {
     const pm = pulse.current;
     if (!m || !pm) return;
     const w = useWorld.getState();
-    const age = (performance.now() - w.potSelectedAt) / 1000;
-    const a = w.potSelected === null || squareDist() > CULL_R ? 0 : threadAlpha(age);
-    m.visible = a > 0 && !!geo.current && !skillsHidden.has("threads");
-    pm.visible = a > 0 && !skillsHidden.has("pulse");
+    const age = (performance.now() - w.wheelSelectedAt) / 1000;
+    const a = w.wheelSelected === null || galleryDist() > CULL_R ? 0 : threadAlpha(age);
+    m.visible = a > 0 && !!geo.current && !galleryHidden.has("threads");
+    pm.visible = a > 0 && !galleryHidden.has("pulse");
     if (m.visible) {
       mat.uniforms.uFade.value = a;
       mat.uniforms.uTime.value = reducedMotion ? 0 : state.clock.elapsedTime;

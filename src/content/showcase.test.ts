@@ -76,9 +76,9 @@ test("projectsForSkill: whole pipeline on a local fixture (not the live profile)
   assert.deepEqual(ids(projectsForSkill("Postgres", data)), ["a", "c"]);
 });
 
-test("real content: React, Node.js, MongoDB, Three.js and Authentication link to both real projects", () => {
+test("real content: React, Node.js, MongoDB, Three.js and JWT auth link to both real projects", () => {
   const both = ["barber-on-demand", "goldstar-3d"];
-  for (const s of ["React", "Node.js", "MongoDB", "Three.js", "Authentication"]) assert.deepEqual(ids(projectsForSkill(s)), both, s);
+  for (const s of ["React", "Node.js", "MongoDB", "Three.js", "JWT auth", "GSAP"]) assert.deepEqual(ids(projectsForSkill(s)), both, s);
 });
 
 test("real content: two projects, both flagships, Goldstar carries its disclaimer, no invented metrics", () => {

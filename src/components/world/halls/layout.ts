@@ -16,6 +16,7 @@ import { HALL, LEAD_ID } from "./content";
 import { featuredProjects, leadFirst, plainArchitecture } from "@/content/showcase";
 import { dioramaBlocks, type DioramaBlock } from "./showcaseView";
 import { FLAG_H, packWing, type ClickBox, type Spot } from "./spots";
+import { WORKSHOP_BOXES, WORKSHOP_OBSTACLES, WORKSHOP_SPOT } from "./workshopLayout";
 import { EDUCATION_FACE, PATHSHALA_BOXES, PATHSHALA_OBSTACLES, PATHSHALA_RINGS, PATHSHALA_SPOTS, extraSpot } from "./pathshalaLayout";
 
 export { CLOSE_R, OPEN_R, OPEN_SPEED, type Spot, type SpotKind } from "./spots";
@@ -130,18 +131,19 @@ export const DALAN = { z0: PALACE_FRONT, z1: PALACE_FRONT + 2.3, wings: WINGS.ma
 // --- Shared ----------------------------------------------------------------
 
 /** Every walk-up spot. */
-export const SPOTS: Spot[] = [...STANDS.map((s) => s.spot), ...PATHSHALA_SPOTS];
+export const SPOTS: Spot[] = [...STANDS.map((s) => s.spot), ...(WORKSHOP_SPOT ? [WORKSHOP_SPOT] : []), ...PATHSHALA_SPOTS];
 
 export const spotByKey = (key: string): Spot | undefined => SPOTS.find((s) => s.key === key) ?? extraSpot(key);
 
 /** Ring markers on the ground (one per spot, plus the bookshelf). */
-export const RINGS: [number, number][] = [...STANDS.map((s) => s.spot.ring), ...PATHSHALA_RINGS];
+export const RINGS: [number, number][] = [...STANDS.map((s) => s.spot.ring), ...(WORKSHOP_SPOT ? [WORKSHOP_SPOT.ring] : []), ...PATHSHALA_RINGS];
 
 /** Invisible click boxes over the stands, plaques and easels. */
 export const CLICK_BOXES: ClickBox[] = [
   ...STANDS.map((s) => ({ spot: s.spot, w: s.w, h: 2.6, d: 0.6, y: 1.3 })),
   // the diorama at its foot opens the same stand
   ...STANDS.flatMap((s) => (s.diorama ? [{ spot: s.spot, w: s.diorama.w, h: s.diorama.top + 0.4, d: s.diorama.d, y: (s.diorama.top + 0.4) / 2, dz: s.diorama.z - s.z, part: "diorama" as const }] : [])),
+  ...WORKSHOP_BOXES,
   ...PATHSHALA_BOXES,
 ];
 
@@ -174,6 +176,7 @@ export const HALL_OBSTACLES: Obstacle[] = [
   ...DIORAMAS.map(({ d }): Obstacle => ({ kind: "rect", x: d.x, z: d.z, w: d.w + 0.06, d: d.d + 0.04 })),
   // dalan pillars stand between the stands, in line with them
   ...dalanPillars().map(([x, z]): Obstacle => ({ kind: "circle", x, z, r: 0.14 })),
+  ...WORKSHOP_OBSTACLES,
   ...PATHSHALA_OBSTACLES,
 ];
 

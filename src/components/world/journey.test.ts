@@ -4,7 +4,8 @@ import { test } from "node:test";
 import { profile } from "@/content/profile";
 import { JOURNEY, stonePositions } from "./journey";
 import { GHAR, ISLAND_RADIUS, MILESTONES, STATIC_OBSTACLES, TIMELINE_PATH, zones, type Obstacle } from "./zones";
-import { HALL_OBSTACLES, SCROLL, SHELF, EASELS } from "./halls/layout";
+import { HALL_OBSTACLES, SCROLL, SHELF, EASELS, SPOTS } from "./halls/layout";
+import { SCROLL_XS, WORKSHOP, WORKSHOP_SPOT } from "./halls/workshopLayout";
 
 // A small stand-in for nav.ts (which pulls in the store): the same 0.5 m grid, avatar radius + 0.12.
 const obstacles: Obstacle[] = [...zones.flatMap((z) => z.obstacles), ...STATIC_OBSTACLES, ...HALL_OBSTACLES];
@@ -70,4 +71,16 @@ test("nothing empty is built: no certificates means no easels, no courses means 
   assert.equal(EASELS.length > 0, profile.certificates.length > 0);
   assert.equal(SHELF !== null, profile.courses.length > 0);
   assert.equal(SCROLL !== null, profile.education.length > 0);
+});
+
+test("the Workshop: one scroll per GitHub project, on the palace wall, and its ring can be reached", () => {
+  assert.equal(WORKSHOP.length, 5);
+  assert.equal(SCROLL_XS.length, WORKSHOP.length);
+  assert.ok(WORKSHOP_SPOT && SPOTS.includes(WORKSHOP_SPOT));
+  for (let i = 1; i < SCROLL_XS.length; i++) assert.ok(SCROLL_XS[i] - SCROLL_XS[i - 1] >= 0.45, "scrolls do not overlap");
+  assert.ok(SCROLL_XS[0] > 8.3, "the board stands beyond the dalan roof (x > 8.25)");
+  const [rx, rz] = WORKSHOP_SPOT!.ring;
+  assert.ok(!blockedAt(rx, rz), "the ring is clear");
+  assert.ok(findPath({ x: 0, z: 4.4 }, { x: rx, z: rz }), "no path to the Workshop");
+  for (const s of SPOTS) assert.ok(findPath({ x: 0, z: 4.4 }, { x: s.ring[0], z: s.ring[1] }), `no path to ${s.key}`);
 });

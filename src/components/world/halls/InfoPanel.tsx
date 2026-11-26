@@ -13,6 +13,10 @@ import { taglineOf } from "@/content/showcase";
 import { STANDS } from "./layout";
 import { eduRow } from "@/lib/robot/journey";
 import AboutBody from "../about/AboutBody";
+import { ContactForm } from "@/components/recruiter/ContactForm";
+import { profile } from "@/content/profile";
+import { ctaState } from "../about/aboutView";
+import { WORKSHOP } from "./workshopLayout";
 
 function useClose() {
   return () => useWorld.getState().closeInfo(true);
@@ -73,6 +77,70 @@ function Body({ info, theme, headingId, aboutPhoto }: { info: InfoRef; theme: Th
   switch (info.kind) {
     case "about":
       return <AboutBody photo={aboutPhoto} night={theme.night} headingId={headingId} linkBtn={(primary) => linkBtn(theme, primary)} />;
+    case "workshop": {
+      const w = WORKSHOP.find((x) => x.id === info.id);
+      const others = WORKSHOP.filter((x) => x.id !== info.id);
+      return (
+        <>
+          {heading(w ? w.name : "Workshop")}
+          <p className="mt-0.5 text-sm opacity-80">{w ? "GitHub only · code, not deployed" : `${WORKSHOP.length} more projects on GitHub. Pick one:`}</p>
+          {w && (
+            <>
+              <p className="mt-3 text-base leading-relaxed">{w.blurb}</p>
+              <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="Tech used">
+                {w.stack.map((t) => (
+                  <li key={t} className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${theme.night ? "bg-white/10" : "bg-[#9c3b22]/10"}`}>
+                    {t}
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <ExtLink href={w.repoUrl} label="View code on GitHub" primary theme={theme} />
+              </div>
+            </>
+          )}
+          {others.length > 0 && (
+            <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="Other Workshop projects">
+              {others.map((o) => (
+                <li key={o.id}>
+                  <button
+                    type="button"
+                    className={`rounded-full px-3 py-1 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 ${
+                      theme.night ? "bg-white/5 hover:bg-white/10 focus-visible:ring-[#e5c158]" : "bg-[#9c3b22]/5 hover:bg-[#9c3b22]/10 focus-visible:ring-[#9c3b22]"
+                    }`}
+                    onClick={() => useWorld.getState().openInfo({ kind: "workshop", id: o.id, spot: "workshop" })}
+                  >
+                    {o.name}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      );
+    }
+    case "contact": {
+      const links = [
+        ["GitHub", profile.links.github],
+        ["LinkedIn", profile.links.linkedin],
+      ].filter(([, href]) => ctaState(href).kind === "link");
+      return (
+        <>
+          {heading("Say hello")}
+          <p className="mt-0.5 text-sm opacity-80">Your company could be my first. Send a note and I will reply.</p>
+          <div className="mt-3">
+            <ContactForm variant="panel" night={theme.night} githubUrl={ctaState(profile.links.github).kind === "link" ? profile.links.github : undefined} />
+          </div>
+          {links.length > 0 && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              {links.map(([label, href]) => (
+                <ExtLink key={label} href={href} label={label} theme={theme} />
+              ))}
+            </div>
+          )}
+        </>
+      );
+    }
     case "project": {
       // The teaser: plain-words pitch, one big number and the way into the full case study.
       const i = HALL.projects.findIndex((p) => p.id === info.id);
@@ -217,6 +285,8 @@ const KIND_LABEL: Record<InfoRef["kind"], string> = {
   certificate: "Certificate",
   course: "Course",
   about: "About me · Yanish's Ghar",
+  contact: "Mailbox · Contact",
+  workshop: "Workshop · Project Hall",
 };
 
 export default function InfoPanel({ aboutPhoto = null }: { aboutPhoto?: string | null }) {

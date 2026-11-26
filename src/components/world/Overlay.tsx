@@ -5,8 +5,9 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useProgress } from "@react-three/drei";
 import { profile } from "@/content/profile";
-import { ABOUT_INFO, isTypingTarget, useWorld } from "@/store/world";
+import { ABOUT_INFO, CONTACT_INFO, isTypingTarget, useWorld } from "@/store/world";
 import { AboutLogic, GharHint } from "./about/AboutLogic";
+import { ContactLogic } from "./ContactLogic";
 import { ctaState } from "./about/aboutView";
 import { runAction } from "./robot/actions";
 import { eduLine, NEXT_MILESTONE_TEXT } from "@/lib/robot/journey";
@@ -25,7 +26,7 @@ import { HALL } from "./halls/content";
 import { courseInfo, defaultInfo, projectInfo, visitByVisitor } from "./halls/visit";
 import { EASELS, SCROLL } from "./halls/layout";
 import type { InfoRef } from "@/store/world";
-import { PotCard, SkillFilterBar, SquareHint } from "./skills/PotUi";
+import { WheelCard, SkillFilterBar, WheelHint } from "./wheels/WheelUi";
 
 const RECRUITER_HREF = "/recruiter";
 
@@ -127,8 +128,8 @@ function ZoneCard() {
   const setPanelOpen = useWorld((s) => s.setPanelOpen);
   const focusProject = useWorld((s) => s.focusProject);
   const infoOpen = useWorld((s) => !!s.info);
-  // the pot card (hover / walk-up / chosen) takes the zone card's place
-  const potCard = useWorld((s) => s.potHover !== null || s.potNear !== null || s.potSelected !== null);
+  // the wheel card (hover / walk-up / chosen) takes the zone card's place
+  const wheelCard = useWorld((s) => s.wheelHover !== null || s.wheelNear !== null || s.wheelSelected !== null);
   const zone = zoneById(activeZone);
 
   // Press E to enter the active zone.
@@ -145,6 +146,13 @@ function ZoneCard() {
           st.clearInfoDismissed();
           st.openInfo(ABOUT_INFO);
         }
+      } else if (id === "mailbox") {
+        const st = useWorld.getState();
+        if (st.info?.kind === "contact") st.closeInfo(true);
+        else {
+          st.clearInfoDismissed();
+          st.openInfo(CONTACT_INFO);
+        }
       } else set(!open);
     };
     const onNav = (e: Event) => router.push((e as CustomEvent<string>).detail || RECRUITER_HREF);
@@ -157,7 +165,7 @@ function ZoneCard() {
   }, [router]);
 
   // The info panel replaces the card while it's open.
-  if (!zone || infoOpen || potCard) return null;
+  if (!zone || infoOpen || wheelCard) return null;
   const content = zoneContent(zone.id);
   const isKiosk = zone.id === "kiosk";
   const isAbout = zone.id === "about";
@@ -189,7 +197,7 @@ function ZoneCard() {
             onClick={() => runAction({ type: "walkTo", zone: "mailbox" })}
           >
             {NEXT_MILESTONE_TEXT}
-            <span className="block text-xs font-normal opacity-85">Tap to walk to the mailbox and say hello</span>
+            <span className="block text-xs font-normal opacity-85">Tap to walk to the mailbox and send a message</span>
           </button>
         )}
         {panelOpen && content.lines.length > 0 && (
@@ -385,7 +393,8 @@ export default function Overlay({ characters, thumbs = [], posters = [], aboutPh
       <HallHint />
       <GharHint />
       <AboutLogic />
-      <SquareHint />
+      <ContactLogic />
+      <WheelHint />
       <SkillFilterBar />
       <AvatarControls />
       <Toast />
@@ -393,7 +402,7 @@ export default function Overlay({ characters, thumbs = [], posters = [], aboutPh
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-3 p-4 pb-5 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] [@media(pointer:coarse)]:pb-[calc(168px+env(safe-area-inset-bottom))]">
         <ZoneCard />
         <InfoPanel aboutPhoto={aboutPhoto} />
-        <PotCard />
+        <WheelCard />
         <RobotChat />
       </div>
       <div className="absolute right-4 top-4 z-20 flex items-center gap-2">
