@@ -41,3 +41,21 @@ test("a lone flagship gets the full bigger stand", () => {
   const [s] = packWing(1, WING, 0);
   assert.ok(s.w > 2.0 && s.w <= 2.2, String(s.w));
 });
+
+test("packWing with two flagships: same size, gaps >= MIN_GAP, inside the wing; a lone one per wing is bigger than a plain stand", () => {
+  for (const wing of [
+    [3.1, 9.2],
+    [3.1, 7.1],
+  ] as [number, number][]) {
+    for (const count of [1, 2, 3, 4]) {
+      const flags = count === 1 ? [0] : [0, count - 1];
+      const got = packWing(count, wing, flags);
+      assert.equal(got.length, count);
+      for (const i of flags) assert.ok(Math.abs(got[i].w - got[flags[0]].w) < 1e-9, "flagships are the same size");
+      for (let i = 0; i + 1 < count; i++) assert.ok(got[i + 1].x - got[i + 1].w / 2 - (got[i].x + got[i].w / 2) >= MIN_GAP - 1e-6, `gap ${i}`);
+      assert.ok(got[0].x - got[0].w / 2 >= wing[0] - 1e-6 - 0.8 && got[count - 1].x + got[count - 1].w / 2 <= wing[1] + 1e-6 + 0.8);
+    }
+  }
+  const solo = packWing(1, [3.1, 7.1], [0]);
+  assert.ok(solo[0].w > 1.6, "a flagship stand is wider than a plain one");
+});

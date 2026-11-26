@@ -11,6 +11,8 @@ import Props from "./nepal/Props";
 import Sky from "./nepal/Sky";
 import Labels from "./nepal/LabelSprites";
 import Rings from "./nepal/Rings";
+import Milestones from "./nepal/Milestones";
+import Ghar from "./nepal/Ghar";
 import ThemeDriver from "./nepal/ThemeDriver";
 import RobotBuddy from "./robot/RobotBuddy";
 import Halls from "./halls/Halls";
@@ -106,7 +108,7 @@ function Robot({ reducedMotion }: { reducedMotion: boolean }) {
   return chosen ? <RobotBuddy reducedMotion={reducedMotion} /> : null;
 }
 
-export default function World({ characters, thumbs, posters = [] }: { characters: CharacterId[]; thumbs: string[]; posters?: string[] }) {
+export default function World({ characters, thumbs, posters = [], aboutPhoto = null }: { characters: CharacterId[]; thumbs: string[]; posters?: string[]; aboutPhoto?: string | null }) {
   const [reducedMotion] = useState(
     () => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches,
   );
@@ -163,8 +165,10 @@ export default function World({ characters, thumbs, posters = [] }: { characters
         <Sky />
         <Suspense fallback={null}>
           <Town />
-          <Props lite={coarse} reducedMotion={reducedMotion} />
+          <Props lite={coarse} reducedMotion={reducedMotion || !liveVideo} />
+          <Ghar photo={aboutPhoto} />
           <Rings reducedMotion={reducedMotion} />
+          <Milestones reducedMotion={reducedMotion} />
           <Labels />
           <Halls thumbs={thumbs} posters={posters} liveVideo={liveVideo} reducedMotion={reducedMotion} />
           <SkillPots reducedMotion={reducedMotion} />

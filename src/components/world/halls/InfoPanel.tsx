@@ -9,7 +9,10 @@
 import { useEffect, useId, useRef } from "react";
 import { isTypingTarget, useWorld, type InfoRef } from "@/store/world";
 import { accentAt, HALL, realUrl } from "./content";
+import { taglineOf } from "@/content/showcase";
 import { STANDS } from "./layout";
+import { eduRow } from "@/lib/robot/journey";
+import AboutBody from "../about/AboutBody";
 
 function useClose() {
   return () => useWorld.getState().closeInfo(true);
@@ -61,13 +64,15 @@ function ExtLink({ href, label, primary, theme }: { href: string | null | undefi
   );
 }
 
-function Body({ info, theme, headingId }: { info: InfoRef; theme: Theme; headingId: string }) {
+function Body({ info, theme, headingId, aboutPhoto }: { info: InfoRef; theme: Theme; headingId: string; aboutPhoto: string | null }) {
   const heading = (t: string) => (
     <h2 id={headingId} className="pr-9 text-xl font-semibold leading-tight">
       {t}
     </h2>
   );
   switch (info.kind) {
+    case "about":
+      return <AboutBody photo={aboutPhoto} night={theme.night} headingId={headingId} linkBtn={(primary) => linkBtn(theme, primary)} />;
     case "project": {
       // The teaser: plain-words pitch, one big number and the way into the full case study.
       const i = HALL.projects.findIndex((p) => p.id === info.id);
@@ -82,11 +87,26 @@ function Body({ info, theme, headingId }: { info: InfoRef; theme: Theme; heading
             <div className="min-w-0 flex-1">
               {heading(p.name)}
               <p className="mt-0.5 text-sm opacity-80">
-                {p.tagline} <span className="whitespace-nowrap opacity-80">· {p.year}</span>
+                {taglineOf(p)} <span className="whitespace-nowrap opacity-80">· {p.year}</span>
               </p>
+              {p.disclaimer && (
+                <p className={`mt-1 inline-block rounded-md px-2 py-0.5 text-xs font-semibold ${theme.night ? "bg-white/10 text-[#f1d98a]" : "bg-[#9c3b22]/10 text-[#7a2d18]"}`} data-disclaimer>
+                  {p.disclaimer}
+                </p>
+              )}
             </div>
           </div>
           <p className="mt-3 text-base leading-relaxed">{p.pitch ?? p.description}</p>
+          {!top && p.highlights.length > 0 && (
+            <ul className={`mt-3 space-y-1.5 rounded-xl px-3 py-2 text-sm leading-snug ${theme.night ? "bg-white/5" : "bg-[#9c3b22]/[0.06]"}`} aria-label="Highlights">
+              {p.highlights.slice(0, 2).map((h) => (
+                <li key={h} className="flex gap-2">
+                  <span aria-hidden="true" className="mt-[0.5em] h-1.5 w-1.5 shrink-0 rotate-45" style={{ background: accent }} />
+                  <span className="min-w-0">{h}</span>
+                </li>
+              ))}
+            </ul>
+          )}
           {top && (
             <div className={`mt-3 flex items-baseline gap-3 rounded-xl px-3 py-2 ${theme.night ? "bg-white/5" : "bg-[#9c3b22]/[0.06]"}`}>
               <span className="min-w-[3ch] shrink-0 whitespace-nowrap text-3xl font-semibold leading-none tabular-nums" style={{ color: theme.night ? "#e5c158" : "#9c3b22" }}>
@@ -137,24 +157,18 @@ function Body({ info, theme, headingId }: { info: InfoRef; theme: Theme; heading
     case "education": {
       const e = HALL.education.find((x) => x.id === info.id);
       if (!e) return heading("Not found");
+      const { title, meta } = eduRow(e);
+      // the plain line first; grade and highlights only when there are any (no empty rows)
       return (
         <>
-          {heading(e.school)}
-          <p className="mt-0.5 text-sm opacity-80">
-            {e.degree}, {e.field}
-          </p>
-          <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
-            <dt className="opacity-70">Years</dt>
-            <dd>
-              {e.start} – {e.end}
-            </dd>
-            {e.grade && (
-              <>
-                <dt className="opacity-70">Grade</dt>
-                <dd>{e.grade}</dd>
-              </>
-            )}
-          </dl>
+          {heading(title)}
+          {meta && <p className="mt-0.5 text-sm opacity-80">{meta}</p>}
+          {e.grade && (
+            <dl className="mt-3 grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 text-sm">
+              <dt className="opacity-70">Grade</dt>
+              <dd>{e.grade}</dd>
+            </dl>
+          )}
           {e.highlights.length > 0 && (
             <Section title="Highlights">
               <Bullets items={e.highlights} />
@@ -202,9 +216,10 @@ const KIND_LABEL: Record<InfoRef["kind"], string> = {
   education: "Education",
   certificate: "Certificate",
   course: "Course",
+  about: "About me · Yanish's Ghar",
 };
 
-export default function InfoPanel() {
+export default function InfoPanel({ aboutPhoto = null }: { aboutPhoto?: string | null }) {
   const info = useWorld((s) => s.info);
   const night = useWorld((s) => s.theme === "night");
   const close = useClose();
@@ -280,7 +295,7 @@ export default function InfoPanel() {
         >
           <span aria-hidden="true">×</span>
         </button>
-        <Body info={info} theme={theme} headingId={headingId} />
+        <Body info={info} theme={theme} headingId={headingId} aboutPhoto={aboutPhoto} />
       </div>
     </div>
   );

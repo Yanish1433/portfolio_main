@@ -10,6 +10,7 @@ export const LABELS = {
     education: { en: "Education", ne: "शिक्षा" },
     "skills-lab": { en: "Skills", ne: "सीप" },
     timeline: { en: "Work Journey", ne: "कार्य अनुभव" },
+    about: { en: "Yanish's Ghar", ne: "यानिशको घर" },
     mailbox: { en: "Contact", ne: "सम्पर्क" },
     // Captain's choice (2026-11-26): "quick introduction".
     kiosk: { en: "Recruiter Mode", ne: "छिटो परिचय" },

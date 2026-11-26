@@ -116,10 +116,57 @@ function struts(P: Parts, side: Face, w: number, d: number, n: number, wallY: nu
 
 // ---------------------------------------------------------------- house
 
-export type HouseOpts = { w: number; d: number; floors: number; seed: number; ornate?: boolean; shop?: boolean };
+export type HouseOpts = { w: number; d: number; floors: number; seed: number; ornate?: boolean; shop?: boolean; ghar?: boolean };
 
 const GROUND_H = 2.3;
 const FLOOR_H = [2.0, 1.9, 1.8, 1.7];
+
+/**
+ * The carved photo window of "Yanish's Ghar", in the house's local space (front = +z): an
+ * ankhijhyal-style frame whose middle holds the photo, drawn by nepal/Ghar.tsx as one quad.
+ */
+export function gharWindow(o: Pick<HouseOpts, "d" | "floors">) {
+  const f = o.floors - 1;
+  const y = GROUND_H + FLOOR_H.slice(0, f - 1).reduce((a, b) => a + b, 0) + FLOOR_H[f - 1] * 0.5;
+  return { y, z: o.d / 2, frameW: 1.3, frameH: 1.2, photoW: 0.9, photoH: 1.0, photoZ: 0.075 };
+}
+
+/** The Ghar's extras: carved window hood and bead, doorway lamp and garland, potted plants, doormat. */
+function gharDetails(P: Parts, A: Anchors, o: HouseOpts) {
+  const { w, d } = o;
+  const win = gharWindow(o);
+  const m = faceMatrix("front", w, d, 0, win.y);
+  const at = (x: number, y: number, z: number) => m.clone().multiply(T(x, y, z));
+  const { frameW: fw, frameH: fh, photoW: pw, photoH: ph, photoZ: pz } = win;
+  // carved hood over the window, with two little brackets, and a deeper apron under it
+  P.add("wood", box(fw + 0.55, 0.09, 0.4), COL.woodDark, at(0, fh / 2 + 0.2, 0.22));
+  for (const s of [-1, 1]) P.add("wood", box(0.07, 0.2, 0.3), COL.wood, at(s * (fw / 2 + 0.12), fh / 2 + 0.05, 0.16));
+  P.add("wood", box(fw + 0.3, 0.2, 0.26), COL.wood, at(0, -fh / 2 - 0.2, 0.15));
+  // a gold bead round the photo
+  P.small(() => {
+    P.add("gold", box(pw + 0.08, 0.04, 0.03), COL.gold, at(0, ph / 2 + 0.02, pz - 0.005));
+    P.add("gold", box(pw + 0.08, 0.04, 0.03), COL.gold, at(0, -ph / 2 - 0.02, pz - 0.005));
+    P.add("gold", box(0.04, ph, 0.03), COL.gold, at(-pw / 2 - 0.02, 0, pz - 0.005));
+    P.add("gold", box(0.04, ph, 0.03), COL.gold, at(pw / 2 + 0.02, 0, pz - 0.005));
+  });
+  // the doorway lamp (an instanced lantern, glow and flicker come from nepal/Props.tsx) and a marigold garland
+  A.lanterns.push(V(0, 2.12, d / 2 + 0.3));
+  A.garlands.push({ a: V(-0.72, 1.84, d / 2 + 0.18), b: V(0.72, 1.84, d / 2 + 0.18), drop: 0.2 });
+  A.diyos.push(V(-w / 2 + 0.3, 0.18, d / 2 + 0.38));
+  // potted plants on the step, either side of the door
+  P.small(() => {
+    for (const [x, leaf, bloom] of [[-1.05, "#4f7f3a", "#f39a1b"], [1.05, "#5f8f3c", "#e0761c"]] as const) {
+      P.add("clay", new THREE.CylinderGeometry(0.17, 0.12, 0.26, 8), "#b0643c", T(x, 0.31, d / 2 + 0.3));
+      P.add("plain", new THREE.IcosahedronGeometry(0.27, 0), leaf, T(x, 0.62, d / 2 + 0.3));
+      P.add("plain", new THREE.IcosahedronGeometry(0.19, 0), leaf, T(x + 0.1, 0.84, d / 2 + 0.34));
+      for (const [dx, dy, dz] of [[-0.12, 0.92, 0.07], [0.16, 0.76, 0.12], [0.02, 1.02, -0.04]] as const)
+        P.add("plain", new THREE.IcosahedronGeometry(0.06, 0), bloom, T(x + dx, dy, d / 2 + 0.3 + dz));
+    }
+    // doormat at the foot of the step: red with a saffron border
+    P.box("plain", 1.15, 0.03, 0.7, 0, 0.015, d / 2 + 0.9, "#d9a21b");
+    P.box("plain", 1.0, 0.04, 0.55, 0, 0.02, d / 2 + 0.9, "#8e2f26");
+  });
+}
 
 export function buildHouse(o: HouseOpts): Built {
   return cached(`house:${JSON.stringify(o)}`, () => {
@@ -143,7 +190,8 @@ export function buildHouse(o: HouseOpts): Built {
     if (o.shop) {
       windowParts(P, faceMatrix("front", w, d, 0, gy), Math.min(w * 0.6, 2.6), 1.7, "shop", 1);
     } else {
-      windowParts(P, faceMatrix("front", w, d, 0, 0.95), 0.9, 1.7, "door", r() > 0.5 ? 1 : 0);
+      // the Ghar's doorway always glows at night
+      windowParts(P, faceMatrix("front", w, d, 0, 0.95), 0.9, 1.7, "door", o.ghar ? 1 : r() > 0.5 ? 1 : 0);
       if (w > 3.2)
         for (const x of [-w * 0.32, w * 0.32]) windowParts(P, faceMatrix("front", w, d, x, 1.3), 0.5, 0.6, "jhyal", r() < 0.6 ? 1 : 0);
     }
@@ -152,7 +200,10 @@ export function buildHouse(o: HouseOpts): Built {
       const y = ys[f] + FLOOR_H[f - 1] * 0.5;
       const top = f === o.floors - 1;
       const saiFloor = o.ornate && f === Math.min(2, o.floors - 1);
-      if (saiFloor) {
+      if (o.ghar && top) {
+        const g = gharWindow(o);
+        windowParts(P, faceMatrix("front", w, d, 0, g.y), g.frameW, g.frameH, "jhyal", 1);
+      } else if (saiFloor) {
         const sw = Math.min(2.4, w * 0.5);
         windowParts(P, faceMatrix("front", w, d, 0, y), sw, 0.95, "sai", r() < 0.6 ? 1 : 0);
         for (const x of [-(sw / 2 + (w / 2 - sw / 2) / 2), sw / 2 + (w / 2 - sw / 2) / 2])
@@ -187,6 +238,7 @@ export function buildHouse(o: HouseOpts): Built {
     struts(P, "back", w, d, Math.round(w / 1.2) + 1, H - 0.85, eaveUnder, ov * 0.8);
     struts(P, "left", w, d, 2, H - 0.85, eaveUnder, ov * 0.8);
     struts(P, "right", w, d, 2, H - 0.85, eaveUnder, ov * 0.8);
+    if (o.ghar) gharDetails(P, A, o);
     // a pot or two by the door
     if (r() > 0.4) A.diyos.push(V(w / 2 - 0.35, 0.18, d / 2 + 0.35));
     return { parts: P, anchors: A, height: base + rise };

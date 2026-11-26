@@ -4,13 +4,14 @@
 // buildings sit on the north side so they never hide the avatar from the
 // fixed 45° camera; anything that does get in the way is dithered out.
 import { LABELS } from "./nepal/labels";
+import { JOURNEY, stonePositions } from "./journey";
 
 export type Obstacle =
   | { kind: "rect"; x: number; z: number; w: number; d: number }
   | { kind: "circle"; x: number; z: number; r: number };
 
 /** Ids shared with the robot engine. Do not rename. */
-export type ZoneId = "plaza" | "project-hall" | "education" | "skills-lab" | "timeline" | "mailbox" | "kiosk";
+export type ZoneId = "plaza" | "project-hall" | "education" | "skills-lab" | "timeline" | "about" | "mailbox" | "kiosk";
 
 export type Zone = {
   id: ZoneId;
@@ -86,6 +87,8 @@ export type HouseSpec = {
   rot: number;
   ornate?: boolean;
   shop?: boolean;
+  /** "Yanish's Ghar": carved photo window, lamp, plants and a doormat (nepal/kit.ts). Front must face +z. */
+  ghar?: boolean;
   seed: number;
 };
 
@@ -101,7 +104,7 @@ export const HOUSES: HouseSpec[] = [
   { x: -17.2, z: -9.2, w: 5, d: 3.6, floors: 3, rot: E, shop: true, seed: 13 },
   { x: 17.4, z: -10, w: 5, d: 3.6, floors: 3, rot: W, ornate: true, seed: 14 },
   { x: -18.4, z: 4, w: 4, d: 3.6, floors: 3, rot: E, shop: true, seed: 15 },
-  { x: -14, z: 5.6, w: 3.6, d: 3, floors: 2, rot: 0, seed: 16 },
+  { x: -14, z: 5.6, w: 3.6, d: 3, floors: 2, rot: 0, seed: 16, ghar: true },
   { x: 18, z: 4.4, w: 4.4, d: 3.6, floors: 3, rot: W, shop: true, seed: 17 },
   { x: 16.4, z: 13, w: 4, d: 3.4, floors: 2, rot: N, seed: 18 },
   { x: -11.5, z: 16.8, w: 4, d: 3, floors: 2, rot: N, shop: true, seed: 19 },
@@ -116,6 +119,9 @@ export const TREES: [number, number, number][] = [
   [13.2, 16.8, 0.85],
 ];
 
+/** "Yanish's Ghar" (About me): the small two-storey house west of the plaza, its front facing the camera. */
+export const GHAR = HOUSES.find((h) => h.ghar)!;
+
 /** Work Timeline brick lane (also used by the visuals). */
 export const TIMELINE_PATH: [number, number][] = [
   [-7.5, 7.5],
@@ -123,8 +129,8 @@ export const TIMELINE_PATH: [number, number][] = [
   [-12.5, 11],
   [-15, 12.2],
 ];
-/** Stone milestone markers along the lane (north-west side). */
-export const MILESTONES: [number, number][] = TIMELINE_PATH.slice(1).map(([x, z]) => [x - 0.87, z - 1.09]);
+/** Stone milestone markers along the lane (north-west side): one per stop of the captain's journey (journey.ts), the last one is "Next milestone". */
+export const MILESTONES: [number, number][] = stonePositions(TIMELINE_PATH, JOURNEY.length);
 
 // --- Footprints -> obstacles ---------------------------------------------
 
@@ -216,11 +222,25 @@ export const zones: Zone[] = [
     id: "timeline",
     label: LABELS.zones.timeline.en,
     prompt: "Press E or tap to walk the lane",
-    position: [-12, 10.2],
+    // hangs over the lane's entrance ring at the plaza end, away from every stone (the stones and
+    // their captions run south-west of here) and well east of the Ghar's door (showcase-6 round 2)
+    position: [-6.0, 10.0],
     ring: [-6.6, 6.9],
     ringRadius: 1.3,
     color: "#ffb347",
-    labelY: 4.4,
+    labelY: 3.4,
+    obstacles: [],
+  },
+  {
+    id: "about",
+    label: LABELS.zones.about.en,
+    prompt: "Press E or tap to step inside",
+    position: [GHAR.x, GHAR.z],
+    // on the doormat, in front of the step (the house is already a solid obstacle)
+    ring: [GHAR.x, GHAR.z + GHAR.d / 2 + 1.4],
+    ringRadius: 1.2,
+    color: "#ffd27a",
+    labelY: 5.6,
     obstacles: [],
   },
   {

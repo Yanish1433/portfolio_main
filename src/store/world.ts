@@ -6,7 +6,9 @@ export type Vec2 = [number, number];
 export type Theme = "day" | "night";
 
 /** What the shared info panel shows (Project Hall stands, plaques, certificates, books). */
-export type InfoKind = "project" | "more" | "education" | "certificate" | "course";
+export type InfoKind = "project" | "more" | "education" | "certificate" | "course" | "about";
+/** The About panel of Yanish's Ghar (opened by walking up, tapping the house or E). */
+export const ABOUT_INFO: InfoRef = { kind: "about", id: "about", spot: "about" };
 export type InfoRef = {
   kind: InfoKind;
   /** Item id in profile.ts ("more": the carousel stand). */
@@ -123,6 +125,10 @@ type WorldState = {
   setCinemaReady: (v: boolean) => void;
   setCameraMode: (m: CameraMode) => void;
 
+  /** The Ghar hint is on screen (the top-centre "Click anywhere" hint steps aside). */
+  gharHint: boolean;
+  setGharHint: (v: boolean) => void;
+
   /** Pottery Square. Pots are numbered by their position in the flat skill list (skills/potData.ts). */
   /** Row filter chip: other rows dim. */
   skillFilter: SkillFilter;
@@ -215,6 +221,8 @@ export const useWorld = create<WorldState>((set, get) => ({
   closeCinema: () => set((s) => (s.cinema ? { cinema: null, cinemaReady: false, cameraMode: "returning" } : s)),
   setCinemaReady: (cinemaReady) => set({ cinemaReady }),
   setCameraMode: (cameraMode) => set({ cameraMode }),
+  gharHint: false,
+  setGharHint: (gharHint) => set({ gharHint }),
   skillFilter: "all",
   setSkillFilter: (skillFilter) => set({ skillFilter }),
   potHover: null,

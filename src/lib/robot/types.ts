@@ -6,6 +6,7 @@ export type ZoneId =
   | "education"
   | "skills-lab"
   | "timeline"
+  | "about"
   | "mailbox"
   | "kiosk";
 
@@ -15,6 +16,7 @@ export const ZONE_IDS: readonly ZoneId[] = [
   "education",
   "skills-lab",
   "timeline",
+  "about",
   "mailbox",
   "kiosk",
 ];

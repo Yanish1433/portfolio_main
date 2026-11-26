@@ -5,7 +5,12 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useProgress } from "@react-three/drei";
 import { profile } from "@/content/profile";
-import { isTypingTarget, useWorld } from "@/store/world";
+import { ABOUT_INFO, isTypingTarget, useWorld } from "@/store/world";
+import { AboutLogic, GharHint } from "./about/AboutLogic";
+import { ctaState } from "./about/aboutView";
+import { runAction } from "./robot/actions";
+import { eduLine, NEXT_MILESTONE_TEXT } from "@/lib/robot/journey";
+import { JOURNEY } from "./journey";
 import { zoneById } from "./zones";
 import { LABELS } from "./nepal/labels";
 import { NAVIGATE_EVENT } from "./nepal/navigate";
@@ -18,7 +23,7 @@ import CinemaMode from "./halls/CinemaMode";
 import { DALAN } from "./halls/layout";
 import { HALL } from "./halls/content";
 import { courseInfo, defaultInfo, projectInfo, visitByVisitor } from "./halls/visit";
-import { EASELS, PLAQUES } from "./halls/layout";
+import { EASELS, SCROLL } from "./halls/layout";
 import type { InfoRef } from "@/store/world";
 import { PotCard, SkillFilterBar, SquareHint } from "./skills/PotUi";
 
@@ -41,13 +46,13 @@ function zoneContent(id: string): { blurb: string; lines: string[]; ids?: string
       };
     case "education":
       return {
-        blurb: "Where I studied and keep learning. Walk up to a plaque, a frame or the bookshelf.",
+        blurb: `Where I studied and keep learning. Walk up to the scroll${HALL.certificates.length ? ", a certificate" : ""}${HALL.courses.length ? " or the bookshelf" : ""}, and tap a row for details.`,
         lines: [
-          ...HALL.education.map((e) => `${e.school}: ${e.degree}`),
+          ...HALL.education.map((e) => eduLine(e)),
           ...HALL.certificates.map((c) => `Certificate: ${c.name}`),
           ...HALL.courses.map((c) => `Course: ${c.name}`),
         ],
-        refs: [...PLAQUES.map((p) => defaultInfo(p.spot)), ...EASELS.map((e) => defaultInfo(e.spot)), ...HALL.courses.map((c) => courseInfo(c.id))],
+        refs: [...(SCROLL?.rows ?? []).map((r) => defaultInfo(r.spot)), ...EASELS.map((e) => defaultInfo(e.spot)), ...HALL.courses.map((c) => courseInfo(c.id))],
       };
     case "skills-lab":
       return {
@@ -56,13 +61,19 @@ function zoneContent(id: string): { blurb: string; lines: string[]; ids?: string
       };
     case "timeline":
       return {
-        blurb: "Experience, step by step.",
-        lines: profile.experience.map((e) => `${e.role} at ${e.company} (${e.start} to ${e.end})`),
+        blurb: profile.experience.length ? "Experience, step by step." : "No jobs yet, so the stones show the journey so far. Run along the path to light them up.",
+        lines: JOURNEY.map((m) => (m.kind === "next" ? NEXT_MILESTONE_TEXT : `${m.head}: ${m.lines.join(", ")}${m.impact ? `. ${m.impact}` : ""}`)),
       };
+    case "about":
+      return { blurb: `Meet ${profile.name}: the story, what I love building and how to get in touch.`, lines: [] };
     case "mailbox":
       return {
         blurb: "Say hello.",
-        lines: [`Email: ${profile.links.email}`, `GitHub: ${profile.links.github}`, `LinkedIn: ${profile.links.linkedin}`],
+        // only real links (placeholders are "#"; no email on the site)
+        lines: [
+          ...(ctaState(profile.links.github).kind === "link" ? [`GitHub: ${profile.links.github}`] : []),
+          ...(ctaState(profile.links.linkedin).kind === "link" ? [`LinkedIn: ${profile.links.linkedin}`] : []),
+        ],
       };
     case "kiosk":
       return { blurb: "Prefer a fast, no-walking summary? Open Recruiter mode.", lines: [] };
@@ -127,7 +138,14 @@ function ZoneCard() {
       const { activeZone: id, panelOpen: open, setPanelOpen: set } = useWorld.getState();
       if (!id) return;
       if (id === "kiosk") router.push(RECRUITER_HREF);
-      else set(!open);
+      else if (id === "about") {
+        const st = useWorld.getState();
+        if (st.info?.kind === "about") st.closeInfo(true);
+        else {
+          st.clearInfoDismissed();
+          st.openInfo(ABOUT_INFO);
+        }
+      } else set(!open);
     };
     const onNav = (e: Event) => router.push((e as CustomEvent<string>).detail || RECRUITER_HREF);
     window.addEventListener("keydown", onKey);
@@ -142,6 +160,7 @@ function ZoneCard() {
   if (!zone || infoOpen || potCard) return null;
   const content = zoneContent(zone.id);
   const isKiosk = zone.id === "kiosk";
+  const isAbout = zone.id === "about";
   const button =
     "pointer-events-auto rounded-full px-5 py-2 text-sm font-semibold text-white shadow transition hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-white";
 
@@ -162,6 +181,17 @@ function ZoneCard() {
           </h2>
         </div>
         <p className="mt-1 text-sm opacity-80">{content.blurb}</p>
+        {zone.id === "timeline" && (
+          <button
+            type="button"
+            data-next-milestone
+            className="pointer-events-auto mt-3 w-full rounded-xl bg-[#9c3b22] px-3 py-2 text-left text-sm font-semibold text-white shadow transition hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#c9a227]"
+            onClick={() => runAction({ type: "walkTo", zone: "mailbox" })}
+          >
+            {NEXT_MILESTONE_TEXT}
+            <span className="block text-xs font-normal opacity-85">Tap to walk to the mailbox and say hello</span>
+          </button>
+        )}
         {panelOpen && content.lines.length > 0 && (
           <ul className="mt-3 max-h-40 space-y-1 overflow-y-auto text-sm">
             {content.lines.map((l, i) => {
@@ -193,6 +223,10 @@ function ZoneCard() {
             <Link href={RECRUITER_HREF} className={button} style={{ background: "#2f8f7a" }}>
               Open Recruiter mode
             </Link>
+          ) : isAbout ? (
+            <button type="button" className={button} style={{ background: "#d9775b" }} onClick={() => { useWorld.getState().clearInfoDismissed(); useWorld.getState().openInfo(ABOUT_INFO); }}>
+              Meet {profile.name.split(" ")[0]}
+            </button>
           ) : content.lines.length > 0 ? (
             <button type="button" className={button} style={{ background: "#d9775b" }} onClick={() => setPanelOpen(!panelOpen)}>
               {panelOpen ? "Close" : "Enter"}
@@ -207,10 +241,11 @@ function ZoneCard() {
 function Hint() {
   const moved = useWorld((s) => s.moved);
   const loaded = useWorld((s) => s.loaded);
+  const gharHint = useWorld((s) => s.gharHint);
   return (
     <div
       className={`pointer-events-none absolute inset-x-0 top-16 z-10 flex justify-center px-4 transition-opacity duration-500 sm:top-4 ${
-        loaded && !moved ? "opacity-100" : "opacity-0"
+        loaded && !moved && !gharHint ? "opacity-100" : "opacity-0"
       }`}
     >
       <p className="rounded-full bg-[#5a3d33]/80 px-4 py-2 text-sm text-white shadow">
@@ -338,7 +373,7 @@ function AvatarControls() {
   );
 }
 
-export default function Overlay({ characters, thumbs = [], posters = [] }: { characters: CharacterId[]; thumbs?: string[]; posters?: string[] }) {
+export default function Overlay({ characters, thumbs = [], posters = [], aboutPhoto = null }: { characters: CharacterId[]; thumbs?: string[]; posters?: string[]; aboutPhoto?: string | null }) {
   const files = useMemo(() => ({ thumbs: new Set(thumbs), showcasePosters: new Set(posters) }), [thumbs, posters]);
   const cinema = useWorld((s) => !!s.cinema);
   return (
@@ -348,6 +383,8 @@ export default function Overlay({ characters, thumbs = [], posters = [] }: { cha
       <div className={cinema ? "invisible contents" : "contents"} aria-hidden={cinema || undefined}>
       <Hint />
       <HallHint />
+      <GharHint />
+      <AboutLogic />
       <SquareHint />
       <SkillFilterBar />
       <AvatarControls />
@@ -355,7 +392,7 @@ export default function Overlay({ characters, thumbs = [], posters = [] }: { cha
       {/* Bottom dock: zone card above the robot chat; on touch screens it sits above the joystick. */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-3 p-4 pb-5 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] [@media(pointer:coarse)]:pb-[calc(168px+env(safe-area-inset-bottom))]">
         <ZoneCard />
-        <InfoPanel />
+        <InfoPanel aboutPhoto={aboutPhoto} />
         <PotCard />
         <RobotChat />
       </div>

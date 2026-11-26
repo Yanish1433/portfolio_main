@@ -4,12 +4,25 @@
 
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { profile } from "@/content/profile";
+import { profile as liveProfile } from "@/content/profile";
 import type { Profile } from "@/content/profile";
+import { FIXTURE_CERTIFICATES, FIXTURE_COURSES, FIXTURE_EDUCATION, FIXTURE_EXPERIENCE, FIXTURE_PROJECTS, FIXTURE_REAL_EDUCATION } from "./test-fixtures";
 import { FALLBACK_THRESHOLD, ZONE_IDS, createLocalBrain } from "./index";
 import type { RobotAction, RobotContext, RobotMode, RobotReply } from "./index";
 import { INTENTS } from "./intents";
 import { STOPWORDS, damerauLevenshtein, fuzzyMatch, normalize } from "./text";
+
+// The robot is tested against fixed content, so editing the real content never breaks these tests.
+const profile: Profile = {
+  ...liveProfile,
+  projects: FIXTURE_PROJECTS,
+  education: FIXTURE_EDUCATION,
+  certificates: FIXTURE_CERTIFICATES,
+  courses: FIXTURE_COURSES,
+  experience: FIXTURE_EXPERIENCE,
+};
+/** The captain's real shape today: current study + three schools, no jobs, certificates or courses. */
+const realShape: Profile = { ...profile, education: FIXTURE_REAL_EDUCATION, certificates: [], courses: [], experience: [] };
 
 const SEED = 7;
 const world: RobotContext = { mode: "world" };
@@ -122,7 +135,7 @@ test("navigate verb + zone beats the topic intent and walks", async () => {
 test("every zone can be reached by name", async () => {
   const names: Record<string, string> = {
     plaza: "plaza", "project-hall": "project hall", education: "education", "skills-lab": "skills lab",
-    timeline: "timeline", mailbox: "mailbox", kiosk: "kiosk",
+    timeline: "timeline", about: "ghar", mailbox: "mailbox", kiosk: "kiosk",
   };
   for (const zone of ZONE_IDS) {
     const r = await ask(`take me to the ${names[zone]}`);
@@ -182,6 +195,45 @@ test("education reply offers a walk to the education zone", async () => {
   assert.ok(r.suggestions.some((s) => s.action?.type === "walkTo" && s.action.zone === "education"));
 });
 
+test("education reply with the real shape: clean sentence, mentions TechSkills, no empty-field artefacts, no dead-end chips", async () => {
+  for (const ctx of [world, recruiter]) {
+    const r = await ask("what's your education?", ctx, realShape);
+    assert.equal(r.intent, "education");
+    assert.match(r.text, /currently studying at TechSkills Institute/);
+    assert.match(r.text, /Bachelor of Information Technology \(BIT\) at Lincoln University \(2022–2026\)/);
+    assert.match(r.text, /Universal School \(until 2020\)/);
+    assert.doesNotMatch(r.text, / in {1,2}at |\(–|until present|Information Technology in Information|\s{2}/);
+    assert.doesNotMatch(r.text, /(he|she|his|her)/i);
+    assert.ok(r.suggestions.every((s) => !/certificates|courses/i.test(s.label)), "no chips for empty lists");
+    assert.ok(r.suggestions.every((s) => s.action?.type !== "showResume"), "no resume chip without a real resume");
+    assert.ok(r.suggestions.some((s) => s.action?.type === (ctx === world ? "walkTo" : "openLink")));
+  }
+  const filled = await ask("where did you study");
+  assert.ok(filled.suggestions.some((s) => /certificates/i.test(s.label)) && filled.suggestions.some((s) => /courses/i.test(s.label)));
+});
+
+test("experience reply: honest line when there are no jobs, real data when there are", async () => {
+  const empty = await ask("work history?", world, realShape);
+  assert.equal(empty.intent, "experience");
+  assert.match(empty.text, /No jobs are listed yet/);
+  assert.match(empty.text, /BookEasy and SyncBoard/);
+  assert.doesNotMatch(empty.text, /(he|she|his|her)/i);
+  assert.ok(empty.suggestions.some((s) => s.action?.type === "walkTo" && s.action.zone === "timeline"));
+  const r = await ask("work history?", recruiter, realShape);
+  assert.ok(r.suggestions.some((s) => s.action?.type === "openLink" && s.action.url === "#journey"));
+  const full = await ask("work history?", world, profile);
+  assert.match(full.text, /Full-Stack Developer at Placeholder Company A \(2025–now\)/);
+});
+
+test("resume chips appear only when links.resumeUrl is real", async () => {
+  const fallback = await ask("zzzz qqqq");
+  assert.ok(fallback.suggestions.every((s) => s.action?.type !== "showResume"));
+  const withResume: Profile = { ...profile, links: { ...profile.links, resumeUrl: "https://example.com/cv.pdf" } };
+  const r = await ask("zzzz qqqq", world, withResume);
+  assert.ok(r.suggestions.some((s) => s.action?.type === "showResume"));
+  assert.deepEqual((await ask("show me your resume")).actions, [{ type: "showResume" }]);
+});
+
 test("resume and recruiter mode trigger their actions", async () => {
   assert.deepEqual((await ask("show me your resume")).actions, [{ type: "showResume" }]);
   assert.deepEqual((await ask("i'm in a hurry")).actions, [{ type: "openRecruiterMode" }]);
@@ -212,12 +264,11 @@ test("emoji-only and punctuation-only input does not crash", async () => {
   }
 });
 
-test("fallback never invents facts and offers 3 suggestions plus the resume", async () => {
+test("fallback never invents facts and always offers suggestions", async () => {
   const r = await ask("zzzz qqqq");
   assert.equal(r.intent, "fallback");
   assert.match(r.text, /not (sure|certain)/);
-  assert.equal(r.suggestions.length, 4);
-  assert.ok(r.suggestions.some((s) => s.action?.type === "showResume"));
+  assert.ok(r.suggestions.length >= 3 && r.suggestions.length <= 4);
 });
 
 test("normalize handles case, accents, slang and tech names", () => {
@@ -328,7 +379,7 @@ test("memory can be rebuilt from ctx.history when the brain is new", async () =>
 
 test("recruiter mode: navigation becomes #section links, never walkTo", async () => {
   const cases: [string, string][] = [
-    ["take me to education", "#education"],
+    ["take me to education", "#journey"],
     ["go to the project hall", "#projects"],
     ["take me to the skills lab", "#skills"],
     ["go to mailbox", "#contact"],
@@ -350,7 +401,7 @@ test("recruiter mode: 'yes' runs the offer as a scroll link", async () => {
   const brain = createLocalBrain(profile, { seed: SEED });
   await brain.reply("where did you study", recruiter);
   const r = await brain.reply("yes", recruiter);
-  assert.deepEqual(r.actions, [{ type: "openLink", url: "#education", label: "Education" }]);
+  assert.deepEqual(r.actions, [{ type: "openLink", url: "#journey", label: "Education" }]);
 });
 
 test("recruiter mode: an offer made in world mode is converted when run", async () => {
@@ -498,6 +549,40 @@ test("education questions that name the owner are education, not about-owner", a
 test("the owner's name on its own still means about-owner", async () => {
   for (const m of ["who is Yanish", "who is Yanish?", "tell me about Yanish"]) {
     assert.equal((await ask(m, world)).intent, "about_owner", m);
+  }
+});
+
+test("about the owner: the world walks to the Ghar, the recruiter page points to #about", async () => {
+  for (const m of ["who is Yanish", "tell me about yanish", "about you"]) {
+    const w = await ask(m, world);
+    assert.equal(w.intent, "about_owner", m);
+    assert.deepEqual(w.actions, [{ type: "walkTo", zone: "about" }], m);
+    assertShape(w, m);
+    const r = await ask(m, recruiter);
+    assert.equal(r.intent, "about_owner", m);
+    assert.equal(r.actions, undefined, `${m}: recruiter mode never auto-scrolls`);
+    assert.ok(r.suggestions.some((s) => s.action?.type === "openLink" && s.action.url === "#about"), m);
+    assert.ok(allActions(r).every((a) => a.type !== "walkTo"), m);
+  }
+});
+
+test("the Ghar can be asked for by name, and the recruiter anchors match the page", async () => {
+  for (const m of ["take me to the ghar", "go to the about house", "walk me to about me"]) {
+    assert.deepEqual((await ask(m, world)).actions, [{ type: "walkTo", zone: "about" }], m);
+  }
+  const r = await ask("take me to the ghar", recruiter);
+  assert.deepEqual(r.actions, [{ type: "openLink", url: "#about", label: "About" }]);
+  const exp = await ask("take me to the timeline", recruiter);
+  assert.equal(exp.actions?.[0]?.type === "openLink" ? exp.actions[0].url : "", "#journey");
+});
+
+test("'house' alone is not the Ghar, and self-intro questions stay with the robot", async () => {
+  assert.deepEqual((await ask("go to the school house")).actions, [{ type: "walkTo", zone: "education" }]);
+  assert.notDeepEqual((await ask("go to the house")).actions, [{ type: "walkTo", zone: "about" }]);
+  for (const m of ["tell me about yourself", "what about you?"]) {
+    const r = await ask(m);
+    assert.notEqual(r.intent, "about_owner", m);
+    assert.equal(r.actions, undefined, m);
   }
 });
 

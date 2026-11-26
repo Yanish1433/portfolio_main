@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { profile } from "@/content/profile";
+import { profileLeadFirst } from "@/content/lead";
 import { createLocalBrain } from "@/lib/robot";
 import type { RobotAction, RobotBrain, RobotContext, RobotReply } from "@/lib/robot";
 import styles from "./recruiter.module.css";
@@ -69,7 +70,7 @@ export function RobotChatClient() {
   );
 
   const greet = useCallback((): ChatTurn => {
-    brain.current ??= createLocalBrain(profile);
+    brain.current ??= createLocalBrain(profileLeadFirst(profile));
     const reply = brain.current.greet({ mode: "recruiter" });
     history.current = [{ role: "robot", text: reply.text }];
     lastOffer.current = offerOf(reply);
@@ -78,7 +79,7 @@ export function RobotChatClient() {
 
   const ask = useCallback(
     async (message: string): Promise<ChatTurn> => {
-      brain.current ??= createLocalBrain(profile);
+      brain.current ??= createLocalBrain(profileLeadFirst(profile));
       const reply = await brain.current.reply(message, {
         mode: "recruiter",
         history: history.current,

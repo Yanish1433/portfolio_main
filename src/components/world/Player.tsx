@@ -62,7 +62,12 @@ type DebugApi = {
   /** Teleport (screenshots). */
   place: (x: number, z: number) => void;
   zoom: (d: number) => void;
+  /** Fixed camera for overview screenshots (null = back to the normal follow camera). */
+  cam: (view: { pos: [number, number, number]; look: [number, number, number] } | null) => void;
 };
+
+// ?debug only (set through window.__world.cam): never set in normal use.
+let debugCamView: { pos: [number, number, number]; look: [number, number, number] } | null = null;
 
 export default function Player({ characters, reducedMotion }: { characters: CharacterId[]; reducedMotion: boolean }) {
   const group = useRef<THREE.Group>(null);
@@ -256,6 +261,9 @@ export default function Player({ characters, reducedMotion }: { characters: Char
         s.current.zoomTarget = d;
         s.current.camDist = d;
       },
+      cam: (view) => {
+        debugCamView = view;
+      },
     };
     const w = window as unknown as { __world?: DebugApi; __store?: unknown; __motion?: unknown };
     w.__world = api;
@@ -443,6 +451,10 @@ export default function Player({ characters, reducedMotion }: { characters: Char
     if (world.cameraMode !== "follow") return;
     camera.position.set(camRig.pos.x, camRig.pos.y, camRig.pos.z);
     camera.lookAt(st.camTarget);
+    if (debugCamView) {
+      camera.position.set(...debugCamView.pos);
+      camera.lookAt(...debugCamView.look);
+    }
   });
 
   return (

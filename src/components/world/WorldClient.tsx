@@ -34,13 +34,13 @@ const World = dynamic(() => import("./World"), { ssr: false });
  * `thumbs`: project ids that have a public/projects/<id>.webp; `posters`: ids with a
  * public/showcase/<id>/poster.webp (both checked on the server, like the characters).
  */
-export default function WorldClient({ characters, thumbs = [], posters = [] }: { characters: CharacterId[]; thumbs?: string[]; posters?: string[] }) {
+export default function WorldClient({ characters, thumbs = [], posters = [], aboutPhoto = null }: { characters: CharacterId[]; thumbs?: string[]; posters?: string[]; aboutPhoto?: string | null }) {
   return (
     <div className="fixed inset-0 overflow-hidden bg-[#f3d9b8]">
       {/* Mukta (OFL, public/fonts/Mukta-OFL.txt): Latin + Devanagari for labels and overlays. */}
       <style>{FONT_FACES}</style>
-      <World characters={characters} thumbs={thumbs} posters={posters} />
-      <Overlay characters={characters} thumbs={thumbs} posters={posters} />
+      <World characters={characters} thumbs={thumbs} posters={posters} aboutPhoto={aboutPhoto} />
+      <Overlay characters={characters} thumbs={thumbs} posters={posters} aboutPhoto={aboutPhoto} />
     </div>
   );
 }

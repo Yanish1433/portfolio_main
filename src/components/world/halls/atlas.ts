@@ -1,8 +1,9 @@
 // Canvas2D atlases: every text surface of a zone lives in ONE CanvasTexture (one draw call
-// for the project posters + brass plates, one for the plaque faces + certificates, and the
+// for the project posters + brass plates, one for the scroll + certificates, and the
 // book spines share the education atlas). Drawn after the Mukta font is ready (the label
 // loader suspends on it) and redrawn once more when document.fonts settles.
 import type { Certificate, Course, Education, Project } from "@/content/profile";
+import { eduRow, isNow } from "@/lib/robot/journey";
 import { FONT_FAMILY } from "../nepal/LabelSprites";
 
 export type Rect = { x: number; y: number; w: number; h: number };
@@ -235,43 +236,140 @@ export function drawPlate(g: CanvasRenderingContext2D, r: Rect, text: string) {
 
 // --- Pathshala: plaques, certificates, book spines --------------------------
 
-/** Carved stone face: grey speckled stone, engraved (dark with a light lip) lettering. */
-export function drawPlaque(g: CanvasRenderingContext2D, r: Rect, e: Education) {
+/** Split `text` into lines no wider than `max` (at the current font). */
+function lineBreaks(g: CanvasRenderingContext2D, text: string, max: number): string[] {
+  const lines: string[] = [];
+  let line = "";
+  for (const word of text.split(/\s+/).filter(Boolean)) {
+    const test = line ? `${line} ${word}` : word;
+    if (g.measureText(test).width > max && line) {
+      lines.push(line);
+      line = word;
+    } else line = test;
+  }
+  if (line) lines.push(line);
+  return lines;
+}
+
+/**
+ * The education scroll: cream paper between thangka-style red and indigo silk borders, a gold
+ * timeline down the left with one diamond per school. `rows` are newest first (top).
+ */
+export function drawScroll(g: CanvasRenderingContext2D, r: Rect, rows: Education[], headerFrac: number, rowFrac: number) {
   const { x, y, w, h } = r;
   g.save();
-  g.fillStyle = "#b8b0a2";
+  // silk border (red outside, indigo inside) then paper
+  g.fillStyle = "#8f2f1d";
   g.fillRect(x, y, w, h);
-  // speckle (deterministic)
-  let seed = 7 + e.id.length * 13;
-  const rnd = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
-  for (let i = 0; i < 260; i++) {
-    g.fillStyle = rnd() > 0.5 ? "rgba(70,62,52,0.10)" : "rgba(255,250,240,0.10)";
-    g.fillRect(x + rnd() * w, y + rnd() * h, 2 + rnd() * 3, 2 + rnd() * 3);
-  }
-  const m = Math.round(w * 0.07);
-  g.strokeStyle = "rgba(60,52,44,0.55)";
-  g.lineWidth = 4;
-  g.strokeRect(x + m * 0.5, y + m * 0.5, w - m, h - m);
-  latticeBand(g, x + m, y + m * 0.9, w - m * 2, Math.round(h * 0.05), "rgba(60,52,44,0.5)");
-  const engrave = (text: string, px: number, weight: number, ty: number, max = w - m * 2) => {
-    fitFont(g, text, weight, px, max);
-    g.textAlign = "center";
-    g.fillStyle = "rgba(255,250,240,0.45)";
-    g.fillText(text, x + w / 2 + 1, ty + 2);
-    g.fillStyle = "#3b342c";
-    g.fillText(text, x + w / 2, ty);
-  };
+  const b1 = Math.round(w * 0.035);
+  const b2 = Math.round(w * 0.03);
+  g.fillStyle = "#223a5e";
+  g.fillRect(x + b1, y + b1 * 0.8, w - b1 * 2, h - b1 * 1.6);
+  const px = x + b1 + b2;
+  const py = y + b1 * 0.8 + b2 * 0.8;
+  const pw = w - (b1 + b2) * 2;
+  const ph = h - (b1 * 0.8 + b2 * 0.8) * 2;
+  const paper = g.createLinearGradient(px, py, px + pw, py + ph);
+  paper.addColorStop(0, "#f7ecd0");
+  paper.addColorStop(1, "#ead9ae");
+  g.fillStyle = paper;
+  g.fillRect(px, py, pw, ph);
+  g.strokeStyle = "#c9a227";
+  g.lineWidth = 3;
+  g.strokeRect(px + 5, py + 5, pw - 10, ph - 10);
+  latticeBand(g, x + b1 * 0.6, y + 2, w - b1 * 1.2, Math.max(8, Math.round(b1 * 0.8)), "rgba(201,162,39,0.85)");
+
   g.textBaseline = "alphabetic";
-  engrave(e.school, Math.round(h * 0.085), 600, y + h * 0.27);
-  engrave(e.degree, Math.round(h * 0.07), 600, y + h * 0.42);
-  engrave(e.field, Math.round(h * 0.062), 500, y + h * 0.53);
-  engrave(`${e.start} – ${e.end}`, Math.round(h * 0.07), 600, y + h * 0.69);
-  if (e.grade) engrave(e.grade, Math.round(h * 0.052), 500, y + h * 0.8);
+  g.textAlign = "center";
+  const headH = h * headerFrac;
+  g.fillStyle = "#8a5a1e";
+  fitFont(g, "EDUCATION", 700, Math.round(headH * 0.46), pw * 0.7);
+  g.fillText("EDUCATION", x + w / 2, py + headH * 0.62);
+  latticeBand(g, px + pw * 0.2, py + headH * 0.8, pw * 0.6, Math.round(headH * 0.12), "rgba(143,47,29,0.55)");
+
+  const rowH = h * rowFrac;
+  const lineX = px + pw * 0.1;
+  const top = py + headH;
+  // the timeline: a thin gold line from the first to the last node
+  if (rows.length > 1) {
+    g.strokeStyle = "#c9a227";
+    g.lineWidth = 5;
+    g.beginPath();
+    g.moveTo(lineX, top + rowH * 0.5);
+    g.lineTo(lineX, top + rowH * (rows.length - 0.5));
+    g.stroke();
+  }
+  // one type size for every row: the largest headline size and the largest 2-line second-line size that fit ALL rows
+  const left = lineX + pw * 0.08;
+  const max = px + pw - pw * 0.07 - left;
+  const texts = rows.map((e) => eduRow(e));
+  // headlines may wrap onto 2 lines (a long one, like "Currently studying at TechSkills Institute", is not shrunk)
+  let titlePx = Math.round(rowH * 0.28);
+  for (const { title } of texts) {
+    g.font = font(700, titlePx);
+    while (titlePx > 14 && lineBreaks(g, title, max).length > 2) {
+      titlePx -= 2;
+      g.font = font(700, titlePx);
+    }
+  }
+  let metaPx = Math.round(rowH * 0.22);
+  for (const { meta } of texts) {
+    g.font = font(500, metaPx);
+    while (meta && metaPx > 12 && lineBreaks(g, meta, max).length > 2) {
+      metaPx -= 2;
+      g.font = font(500, metaPx);
+    }
+  }
+  rows.forEach((e, i) => {
+    const cy = top + rowH * (i + 0.5);
+    const { title, meta } = texts[i];
+    // node: a diamond (filled red for what is happening now)
+    const d = rowH * 0.2;
+    g.beginPath();
+    g.moveTo(lineX, cy - d);
+    g.lineTo(lineX + d, cy);
+    g.lineTo(lineX, cy + d);
+    g.lineTo(lineX - d, cy);
+    g.closePath();
+    g.fillStyle = isNow(e.end) ? "#a8322a" : "#e9d79a";
+    g.fill();
+    g.strokeStyle = "#8a5a1e";
+    g.lineWidth = 3;
+    g.stroke();
+    g.textAlign = "left";
+    g.font = font(500, metaPx);
+    const metaLines = meta ? lineBreaks(g, meta, max).slice(0, 2) : [];
+    const lh = metaPx * 1.15;
+    g.font = font(700, titlePx);
+    const titleLines = lineBreaks(g, title, max).slice(0, 2);
+    const tlh = titlePx * 1.1;
+    // centre the block (headline line(s) + second line(s)) on the node
+    const block = titleLines.length * tlh + (metaLines.length ? titlePx * 0.1 + metaLines.length * lh : 0);
+    let ty = cy - block / 2 + titlePx * 0.8;
+    g.fillStyle = "#3a2419";
+    for (const l of titleLines) {
+      g.fillText(l, left, ty);
+      ty += tlh;
+    }
+    ty += titlePx * 0.1 - titlePx * 0.2;
+    g.fillStyle = "#6b4a30";
+    g.font = font(500, metaPx);
+    for (const l of metaLines) {
+      g.fillText(l, left, ty);
+      ty += lh;
+    }
+    if (e.grade || e.highlights.length) {
+      g.fillStyle = "#a8322a";
+      g.font = font(700, Math.round(rowH * 0.3));
+      g.textAlign = "right";
+      g.fillText("›", px + pw - pw * 0.025, cy + rowH * 0.1);
+    }
+  });
   g.textAlign = "start";
   g.restore();
 }
 
-/** Parchment certificate with a gold double border and a plain red seal. */
+/** Parchment certificate with a gold double border. The red seal is a separate instanced mesh that stamps in (Pathshala.tsx). */
 export function drawCertificate(g: CanvasRenderingContext2D, r: Rect, c: Certificate) {
   const { x, y, w, h } = r;
   g.save();
@@ -297,16 +395,6 @@ export function drawCertificate(g: CanvasRenderingContext2D, r: Rect, c: Certifi
   g.fillStyle = "#5a3d2a";
   g.font = font(500, Math.round(h * 0.07));
   g.fillText(`${c.issuer} · ${c.year}`, x + w / 2, y + h * 0.76);
-  // seal
-  g.fillStyle = "#a8322a";
-  g.beginPath();
-  g.arc(x + w - m * 3, y + h - m * 3, h * 0.075, 0, Math.PI * 2);
-  g.fill();
-  g.strokeStyle = "rgba(255,220,200,0.6)";
-  g.lineWidth = 2;
-  g.beginPath();
-  g.arc(x + w - m * 3, y + h - m * 3, h * 0.05, 0, Math.PI * 2);
-  g.stroke();
   g.textAlign = "start";
   g.restore();
 }

@@ -9,7 +9,9 @@
 // PROJECTS (each entry in `projects`)
 //   pitch        One plain sentence, no jargon.   "Helps salons take bookings online."
 //   audience     Who it helps.                    "Small salons and clinics."
-//   featured     true on exactly ONE project: your flagship. It gets the big central stand.
+//   featured     true on one or two projects: your flagships. Each gets a big stand; every visitor
+//                sees one of them as the "lead" (picked once per browser session).
+//   disclaimer   Optional honesty line, e.g. "Concept project, not affiliated with X."
 //   architecture The parts of the system, in order, left to right. `label` is the plain word
 //                (Website, Server, Database, Payments...). `tech` is the real tool's name.
 //                [{ label: "Website", tech: "Next.js" }, { label: "Server", tech: "Node API" },
@@ -95,10 +97,12 @@ export type Project = {
   pitch?: string;
   /** Who it helps. */
   audience?: string;
-  /** The flagship project (set on one only). */
+  /** A flagship project (set on one or two). Each visitor sees one of them as the lead. */
   featured?: boolean;
   /** The plain-word layers, in order, e.g. Website -> Server -> Database. */
   architecture?: { label: string; tech: string }[];
+  /** A short honesty line shown wherever the project is shown (e.g. "Concept project, not affiliated with X."). */
+  disclaimer?: string;
   /** Real numbers: `value` is the big figure, `plain` says what it means in words. */
   metrics?: { label: string; value: string; plain?: string }[];
   /** Files under /showcase/<id>/ (see public/showcase/README.md). */
@@ -171,13 +175,13 @@ export type Profile = {
 
 export const profile: Profile = {
   name: "Yanish Gurung",
-  title: "Full-Stack Developer",
+  title: "Full-Stack Developer · BIT Graduate",
   tagline: "I build fast, useful web products from idea to deployment.",
   summary:
-    "Full-stack developer focused on React, Next.js and Node.js, with a growing interest in 3D web experiences and applied AI. Placeholder summary: replace with the real one.",
+    "Bachelor of Information Technology (BIT) graduate from Lincoln University with a strong passion for full-stack web development: intuitive, responsive interfaces and dependable backend applications.",
   location: "Placeholder City, Country",
   links: {
-    github: "#",
+    github: "https://github.com/Yanish1433",
     linkedin: "#",
     email: "#",
     resumeUrl: "#",
@@ -199,7 +203,7 @@ export const profile: Profile = {
       skills: [
         { name: "Node.js", level: 80, years: 3 },
         { name: "REST APIs", level: 80, years: 3 },
-        { name: "Authentication", level: 75, years: 2, usedIn: ["bookeasy"] },
+        { name: "Authentication", level: 75, years: 2, usedIn: ["barber-on-demand", "goldstar-3d"] },
       ],
     },
     {
@@ -223,7 +227,7 @@ export const profile: Profile = {
       category: "3d/ai",
       label: "3D & AI",
       skills: [
-        { name: "Three.js", level: 60, years: 1 },
+        { name: "Three.js", level: 60, years: 1, usedIn: ["barber-on-demand", "goldstar-3d"] } /* Barber uses React Three Fiber, which is three.js */,
         { name: "Blender", level: 50, years: 1 },
         { name: "LLM APIs", level: 65, years: 1 },
       ],
@@ -231,209 +235,184 @@ export const profile: Profile = {
   ],
   projects: [
     {
-      id: "bookeasy",
-      name: "BookEasy",
-      tagline: "Booking SaaS for small service businesses",
+      id: "barber-on-demand",
+      name: "Barber On Demand",
+      tagline: "At-home barber booking with live tracking",
       description:
-        "Multi-tenant booking platform with calendars, reminders and online payments.",
+        "Pick a service and a barber, choose a time, pin your home on the map and confirm. You can watch your barber travel to you live, and pay with eSewa, Khalti, Fonepay or cash (demo checkout).",
       problem:
-        "Small service businesses lose bookings to phone tag and double-booked slots.",
-      stack: ["Next.js", "TypeScript", "PostgreSQL", "Stripe"],
-      highlights: [
-        "Multi-tenant data isolation",
-        "Real-time availability checks",
-        "Automated email reminders",
+        "Going to a salon means queues, uneven hygiene and a trip across town, which is hard for busy or elderly people.",
+      stack: [
+        "React",
+        "Vite",
+        "Tailwind CSS",
+        "React Three Fiber",
+        "GSAP",
+        "Lenis",
+        "Framer Motion",
+        "Leaflet",
+        "Node.js",
+        "Express",
+        "MongoDB",
+        "Mongoose",
+        "WebSockets",
+        "Zod",
+        "JWT",
+        "Cloudflare Workers",
       ],
-      liveUrl: "#",
-      repoUrl: "#",
-      caseStudyUrl: "#",
+      highlights: [
+        "Live barber tracking on a real Kathmandu route (WebSockets)",
+        "Demo checkout for eSewa, Khalti, Fonepay and cash",
+        "Cinematic 3D hero with scroll animation",
+        "Runs on Cloudflare Workers + Durable Objects, with a cron job for reminders",
+      ],
+      liveUrl: "https://barber-on-demand.barber-on-demand.workers.dev/",
+      repoUrl: "https://github.com/Yanish1433/barbers",
+      caseStudyUrl: null,
       demoVideo: null,
-      year: 2025,
-      // Showcase fields (placeholder: replace with real text and numbers)
-      pitch: "Helps salons and clinics take bookings online (placeholder).",
-      audience: "Small service businesses and their customers (placeholder).",
+      year: 2026,
+      pitch: "Book a premium barber who comes to your home, anywhere in Kathmandu.",
+      audience: "Busy professionals, elderly people and families in the Kathmandu Valley.",
       featured: true,
+      media: {
+        poster: "/showcase/barber-on-demand/poster.webp",
+        screenshots: [
+          "/showcase/barber-on-demand/shot-1.webp",
+          "/showcase/barber-on-demand/shot-2.webp",
+          "/showcase/barber-on-demand/shot-3.webp",
+          "/showcase/barber-on-demand/shot-4.webp",
+        ],
+        video: "/showcase/barber-on-demand/demo.mp4",
+      },
       architecture: [
-        { label: "Website", tech: "Next.js" },
-        { label: "Server", tech: "Node API" },
-        { label: "Database", tech: "PostgreSQL" },
-        { label: "Payments", tech: "Stripe" },
-      ],
-      metrics: [
-        { label: "Businesses", value: "40", plain: "small businesses take bookings with it (placeholder)" },
-        { label: "Bookings", value: "1.2k", plain: "appointments booked every month (placeholder)" },
-        { label: "No-shows", value: "-30%", plain: "fewer missed appointments thanks to reminders (placeholder)" },
+        { label: "Website", tech: "React + Vite" },
+        { label: "Server", tech: "Express on Cloudflare Workers" },
+        { label: "Live updates", tech: "WebSockets (Durable Object)" },
+        { label: "Database", tech: "MongoDB Atlas" },
+        { label: "Map", tech: "Leaflet + OSRM" },
       ],
     },
     {
-      id: "syncboard",
-      name: "SyncBoard",
-      tagline: "Real-time collaborative whiteboard",
+      id: "goldstar-3d",
+      name: "Goldstar 3D",
+      tagline: "Scroll-driven 3D shoe shop (concept, not affiliated with Goldstar)",
       description:
-        "Shared canvas where multiple users draw, add sticky notes and see each other's cursors live.",
+        "A full shop with catalogue, cart, cash-on-delivery checkout and an admin panel. The G10 trek shoe gets a scroll-driven 3D story. Concept prototype, not an official Goldstar site.",
       problem:
-        "Remote teams need a lightweight whiteboard that stays in sync without lag.",
-      stack: ["React", "WebSockets", "Node.js", "Redis"],
-      highlights: [
-        "Conflict-free shared state",
-        "Live cursors with presence",
-        "Undo/redo across sessions",
+        "Product pages for a beloved local shoe brand feel flat. Shoppers can't see why a shoe is special before buying.",
+      stack: [
+        "React",
+        "Vite",
+        "React Three Fiber",
+        "Three.js",
+        "GSAP",
+        "Lenis",
+        "Node.js",
+        "Express",
+        "MongoDB",
+        "Mongoose",
+        "Zod",
+        "JWT",
+        "Vitest",
+        "Cloudflare Pages",
       ],
-      liveUrl: "#",
-      repoUrl: "#",
+      highlights: [
+        "Scroll-driven 3D product story (React Three Fiber + GSAP)",
+        "Secure login with httpOnly cookie JWT",
+        "Admin panel for products and orders",
+        "Tested API with a separate test database",
+      ],
+      liveUrl: "https://goldstar-3d.pages.dev",
+      repoUrl: "https://github.com/Yanish1433/Goldstar-project",
       caseStudyUrl: null,
       demoVideo: null,
-      year: 2024,
-      // Showcase fields (placeholder: replace with real text and numbers)
-      pitch: "A shared online whiteboard where a team draws together, live (placeholder).",
-      audience: "Remote teams and classrooms (placeholder).",
+      year: 2026,
+      pitch: "A pitch-ready online shoe shop where scrolling tells a 3D story of the shoe.",
+      audience: "Shoe shoppers in Nepal; built as a pitch for the Goldstar brand.",
+      featured: true,
+      media: {
+        poster: "/showcase/goldstar-3d/poster.webp",
+        screenshots: [
+          "/showcase/goldstar-3d/shot-1.webp",
+          "/showcase/goldstar-3d/shot-2.webp",
+          "/showcase/goldstar-3d/shot-3.webp",
+          "/showcase/goldstar-3d/shot-4.webp",
+          "/showcase/goldstar-3d/shot-5.webp",
+        ],
+        video: "/showcase/goldstar-3d/demo.mp4",
+      },
+      disclaimer: "Concept project, not affiliated with Goldstar.",
       architecture: [
-        { label: "Website", tech: "React" },
-        { label: "Live link", tech: "WebSockets" },
-        { label: "Server", tech: "Node.js" },
-        { label: "Memory", tech: "Redis" },
-      ],
-      metrics: [
-        { label: "Live users", value: "50", plain: "people can draw on one board at once (placeholder)" },
-        { label: "Delay", value: "<100 ms", plain: "a stroke shows up for everyone almost instantly (placeholder)" },
-      ],
-    },
-    {
-      id: "repoguide",
-      name: "RepoGuide",
-      tagline: "AI codebase explainer",
-      description:
-        "Point it at a repository and get a guided tour of architecture, modules and key flows.",
-      problem:
-        "Onboarding onto an unfamiliar codebase takes days of reading without a map.",
-      stack: ["Next.js", "LLM API", "Tree-sitter", "Postgres"],
-      highlights: [
-        "Chunked repo indexing",
-        "Answers grounded in file references",
-        "Generated architecture overviews",
-      ],
-      liveUrl: null,
-      repoUrl: "#",
-      caseStudyUrl: null,
-      demoVideo: null,
-      year: 2025,
-      // Showcase fields (placeholder: replace with real text and numbers)
-      pitch: "Explains an unfamiliar codebase to you like a guide on a tour (placeholder).",
-      audience: "New developers joining a team (placeholder).",
-      architecture: [
-        { label: "Website", tech: "Next.js" },
-        { label: "Code reader", tech: "Tree-sitter" },
-        { label: "AI helper", tech: "LLM API" },
-        { label: "Database", tech: "Postgres" },
-      ],
-      metrics: [
-        { label: "Repos", value: "25", plain: "projects explained so far (placeholder)" },
-        { label: "Onboarding", value: "days to hours", plain: "time to understand a new codebase (placeholder)" },
+        { label: "Website", tech: "React + Vite" },
+        { label: "Server", tech: "Express 5" },
+        { label: "Database", tech: "MongoDB 8" },
       ],
     },
   ],
   education: [
     {
-      id: "uni",
-      school: "Placeholder University",
-      degree: "Bachelor of Science",
-      field: "Computer Science",
-      start: "2021",
-      end: "2025",
-      grade: "Placeholder grade",
-      highlights: ["Placeholder highlight: relevant coursework", "Placeholder highlight: final project"],
+      id: "techskills",
+      school: "TechSkills Institute",
+      degree: "",
+      field: "",
+      start: "",
+      end: "present",
+      grade: "",
+      highlights: [],
     },
     {
-      id: "college",
-      school: "Placeholder College",
-      degree: "Diploma",
-      field: "Software Engineering",
-      start: "2019",
-      end: "2021",
-      grade: "Placeholder grade",
-      highlights: ["Placeholder highlight: first web project"],
+      id: "bit",
+      school: "Lincoln University",
+      degree: "Bachelor of Information Technology (BIT)",
+      field: "Information Technology",
+      start: "2022",
+      end: "2026",
+      grade: "",
+      highlights: [],
+    },
+    {
+      id: "plus-two",
+      school: "Capital College and Research Center (CCRC)",
+      degree: "Higher Secondary Education (+2)",
+      field: "",
+      start: "2020",
+      end: "2022",
+      grade: "",
+      highlights: [],
+    },
+    {
+      id: "school",
+      school: "Universal School",
+      degree: "Secondary Education (up to Class 10)",
+      field: "",
+      start: "",
+      end: "2020",
+      grade: "",
+      highlights: [],
     },
   ],
-  certificates: [
-    {
-      id: "cert-1",
-      name: "Placeholder Certificate One",
-      issuer: "Placeholder Issuer",
-      year: 2025,
-      url: "#",
-    },
-    {
-      id: "cert-2",
-      name: "Placeholder Certificate Two",
-      issuer: "Placeholder Issuer",
-      year: 2024,
-      url: "#",
-    },
-    {
-      id: "cert-3",
-      name: "Placeholder Certificate Three",
-      issuer: "Placeholder Issuer",
-      year: 2024,
-      url: "#",
-    },
-  ],
-  courses: [
-    {
-      id: "course-1",
-      name: "Placeholder Course: Full-Stack Web Development",
-      provider: "Placeholder Provider",
-      learned: ["Placeholder skill A", "Placeholder skill B"],
-    },
-    {
-      id: "course-2",
-      name: "Placeholder Course: Cloud and DevOps",
-      provider: "Placeholder Provider",
-      learned: ["Placeholder skill C", "Placeholder skill D"],
-    },
-    {
-      id: "course-3",
-      name: "Placeholder Course: Applied Machine Learning",
-      provider: "Placeholder Provider",
-      learned: ["Placeholder skill E"],
-    },
-  ],
-  experience: [
-    {
-      id: "exp-1",
-      role: "Full-Stack Developer",
-      company: "Placeholder Company A",
-      start: "2025",
-      end: "Present",
-      points: ["Placeholder: shipped a customer-facing feature", "Placeholder: improved page load time"],
-      impact: "Placeholder: made the main page twice as fast for customers.",
-    },
-    {
-      id: "exp-2",
-      role: "Junior Web Developer",
-      company: "Placeholder Company B",
-      start: "2023",
-      end: "2025",
-      points: ["Placeholder: built internal tools", "Placeholder: wrote automated tests"],
-      impact: "Placeholder: saved the team hours every week with internal tools.",
-    },
-  ],
-  // Placeholder "About me": replace with the real story, photo and buttons.
+  // No real certificates, courses or jobs yet (captain, 2026-11-26): the world and Recruiter Mode
+  // show friendly empty states. Add entries here when there are real ones.
+  certificates: [],
+  courses: [],
+  experience: [],
+  // About me: written from the captain's resume (2026-11-26).
   about: {
+    photo: "/showcase/about/photo.webp",
     story: [
-      "Placeholder: I grew up curious about how websites work, and started building small ones for friends.",
-      "Placeholder: Today I build full-stack products from the first sketch to the live site.",
-      "Placeholder: I like work where clear design and solid engineering meet.",
+      "I'm a Bachelor of Information Technology (BIT) graduate from Lincoln University with a strong passion for full-stack web development.",
+      "I love building intuitive, responsive interfaces and dependable backend applications, from the first sketch to the live site.",
+      "I'm looking for an entry-level Full-Stack Developer or Software Engineering role where I can bring fresh ideas, problem-solving and hands-on project experience to a team.",
     ],
     loves: [
-      "Placeholder: tools that save people time",
-      "Placeholder: fast, friendly interfaces",
-      "Placeholder: playful 3D on the web",
+      "Full web apps, from the interface to the server",
+      "Mobile-first, brand-focused website designs",
+      "Clean, well-organised code and quick prototypes",
     ],
-    funFacts: ["Placeholder: I drink too much tea.", "Placeholder: I built this whole town as my portfolio."],
+    funFacts: ["I built this whole Bhaktapur town as my portfolio."],
     cta: [
+      { label: "See my GitHub", href: "https://github.com/Yanish1433" },
       { label: "Hire me", href: "#" },
-      { label: "Download resume", href: "#" },
-      { label: "Contact", href: "#" },
     ],
   },
 };

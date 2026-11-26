@@ -1,6 +1,6 @@
 "use client";
 
-// The flagship stand's "soft spotlight": no light source, just one additive mesh (1 draw call)
+// The flagship stands' "soft spotlight": no light source, just one additive mesh (1 draw call)
 // with a warm rim glow around its screen and a pool of light on the floor in front of it.
 // Brighter at night; it breathes gently unless reduced motion is on.
 import { useEffect, useMemo, useRef } from "react";
@@ -27,14 +27,18 @@ function glowTexture() {
 }
 
 export default function FlagshipHalo({ reducedMotion }: { reducedMotion: boolean }) {
-  const stand = STANDS.find((s) => s.flagship);
+  const flagships = useMemo(() => STANDS.filter((s) => s.flagship), []);
   const built = useMemo(() => {
-    if (!stand) return null;
-    const sc = stand.screen;
+    if (!flagships.length) return null;
     const full: [number, number, number, number] = [0, 0, 1, 1];
-    const rim = quad(sc.w + 0.55, sc.h + 0.55, at(stand.x, sc.y, stand.z + 0.02), full);
-    const pool = quad(stand.w + 1.0, 1.5, new THREE.Matrix4().makeRotationX(-Math.PI / 2).premultiply(at(stand.x, 0.035, stand.spot.ring[1])), full);
-    const geo = merge([rim, pool]);
+    const quads = flagships.flatMap((stand) => {
+      const sc = stand.screen;
+      return [
+        quad(sc.w + 0.55, sc.h + 0.55, at(stand.x, sc.y, stand.z + 0.02), full),
+        quad(stand.w + 1.0, 1.5, new THREE.Matrix4().makeRotationX(-Math.PI / 2).premultiply(at(stand.x, 0.035, stand.spot.ring[1])), full),
+      ];
+    });
+    const geo = merge(quads);
     const mat = new THREE.MeshBasicMaterial({
       map: glowTexture(),
       color: new THREE.Color("#ffc46b"),
@@ -45,7 +49,7 @@ export default function FlagshipHalo({ reducedMotion }: { reducedMotion: boolean
       toneMapped: false,
     });
     return { geo, mat };
-  }, [stand]);
+  }, [flagships]);
   const mesh = useRef<THREE.Mesh>(null);
   useFrame((state) => {
     if (!built) return;

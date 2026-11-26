@@ -1,33 +1,27 @@
-// Static geometry of the pathshala displays (stone plaques, certificate easels, the course
+// Static geometry of the pathshala displays (the scroll frame, certificate easels, the course
 // bookshelf), appended to the town's merged Parts like the dalan (no extra draw calls).
 import * as THREE from "three";
 import { Parts, T, beam, box, lathe } from "../nepal/geom";
 import { COL, type Anchors } from "../nepal/kit";
 import { slope } from "./shapes";
-import { EASELS, PLAQUES, SHELF } from "./pathshalaLayout";
+import { EASELS, SCROLL, SHELF } from "./pathshalaLayout";
 
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 
-/** Rounded-top stone stele outline (like the town's inscription stones). */
-function steleGeometry(w: number, h: number, depth: number) {
-  const s = new THREE.Shape();
-  const hw = w / 2;
-  const shoulder = h - hw * 0.55;
-  s.moveTo(-hw, 0);
-  s.lineTo(hw, 0);
-  s.lineTo(hw, shoulder);
-  s.quadraticCurveTo(hw, h, 0, h);
-  s.quadraticCurveTo(-hw, h, -hw, shoulder);
-  s.lineTo(-hw, 0);
-  return new THREE.ExtrudeGeometry(s, { depth, bevelEnabled: false, curveSegments: 4 });
-}
-
-function plaques(P: Parts, A: Anchors) {
-  for (const p of PLAQUES) {
-    P.box("plain", p.w + 0.16, 0.2, 0.38, p.x, 0.1, p.z, COL.stoneDark);
-    P.add("plain", steleGeometry(p.w, p.h, 0.14), "#b8b0a2", T(p.x, 0.2, p.z - 0.07));
-    A.diyos.push(V(p.x + p.w / 2 - 0.05, 0.22, p.z + 0.13));
+/** The scroll's frame: a stone plinth, two carved wooden posts and the top roller with gold finials (the paper and the bottom roller are drawn by Pathshala.tsx). */
+function scrollFrame(P: Parts, A: Anchors) {
+  const s = SCROLL;
+  if (!s) return;
+  P.box("plain", s.w + 0.5, 0.2, 0.42, s.x, 0.1, s.z, COL.stoneDark);
+  for (const sx of [-1, 1]) {
+    const px = s.x + sx * (s.w / 2 + 0.16);
+    P.add("wood", beam(V(px, 0.2, s.z), V(px, s.top + 0.3, s.z), 0.11), COL.wood);
+    P.add("gold", lathe([[0, 0], [0.09, 0], [0.06, 0.08], [0.1, 0.16], [0.03, 0.26], [0, 0.32]], 8), COL.gold, T(px, s.top + 0.3, s.z));
   }
+  // the roller the paper hangs from, and a plank over it
+  P.add("wood", beam(V(s.x - s.w / 2 - 0.2, s.top + 0.03, s.z + 0.02), V(s.x + s.w / 2 + 0.2, s.top + 0.03, s.z + 0.02), 0.07), COL.woodDark);
+  for (const sx of [-1, 1]) P.small(() => P.add("gold", lathe([[0, 0], [0.07, 0], [0.06, 0.04], [0, 0.07]], 6), COL.gold, T(s.x + sx * (s.w / 2 + 0.22), s.top + 0.03, s.z + 0.02, 0).multiply(new THREE.Matrix4().makeRotationZ(-sx * Math.PI / 2))));
+  A.diyos.push(V(s.x + s.w / 2 + 0.16, 0.22, s.z + 0.3), V(s.x - s.w / 2 - 0.16, 0.22, s.z + 0.3));
 }
 
 function easels(P: Parts) {
@@ -46,6 +40,7 @@ function easels(P: Parts) {
 
 function shelf(P: Parts, A: Anchors) {
   const s = SHELF;
+  if (!s) return; // no courses: no shelf
   const z = s.z;
   P.box("plain", s.w + 0.14, s.base - 0.04, s.d + 0.1, s.x, (s.base - 0.04) / 2, z, COL.stone);
   for (const sx of [-1, 1]) P.box("wood", 0.07, s.h - s.base + 0.04, s.d, s.x + sx * (s.w / 2 + 0.035), s.base + (s.h - s.base) / 2, z, COL.wood);
@@ -69,7 +64,7 @@ function shelf(P: Parts, A: Anchors) {
 export function buildPathshalaParts(P: Parts, A: Anchors) {
   // plaques and easels are small props: drawn, but skipped by the shadow pass
   P.small(() => {
-    plaques(P, A);
+    scrollFrame(P, A);
     easels(P);
   });
   shelf(P, A);

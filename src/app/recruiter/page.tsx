@@ -1,5 +1,6 @@
 import { RobotChatClient } from "@/components/recruiter/RobotChatClient";
-import { Contact, Footer, Hero, Journey, Projects, Skills, TopNav } from "@/components/recruiter/sections";
+import { aboutPhoto } from "@/content/aboutPhoto";
+import { About, Contact, Footer, Hero, Journey, Projects, Skills, TopNav } from "@/components/recruiter/sections";
 
 export default function RecruiterPage() {
   return (
@@ -7,6 +8,7 @@ export default function RecruiterPage() {
       <TopNav />
       <main id="top">
         <Hero />
+        <About photo={aboutPhoto()} />
         <Projects />
         <Skills />
         <Journey />

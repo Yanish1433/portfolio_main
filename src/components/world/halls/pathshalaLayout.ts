@@ -1,5 +1,5 @@
 // Pathshala (Education Zone) layout, from the array lengths in HALL:
-// - degree plaques: carved stone stelae against the courtyard's north wall, facing the camera
+// - the education scroll: a painted paper scroll on the courtyard's north wall, one row per school
 // - certificate easels: up to 3 along the school's east facade, turned 45° toward the gate
 //   (the facade itself is edge-on to the 45° camera), any more in an open-air row beside...
 // - ...the course bookshelf, an open-air cabinet north-east of the courtyard (kept clear of
@@ -8,24 +8,37 @@ import { COURTYARD, type Obstacle } from "../zones";
 import { HALL } from "./content";
 import { wingCentres, type ClickBox, type Spot } from "./spots";
 
-export type Plaque = { x: number; z: number; w: number; h: number; spot: Spot };
+export type ScrollRow = { index: number; /** centre height above the ground */ y: number; h: number; spot: Spot };
+/** The painted scroll on the courtyard's north wall: one row per school, newest at the top (oldest at the bottom). */
+export type Scroll = { x: number; z: number; w: number; h: number; /** world height of its top and bottom edge */ top: number; bottom: number; headerH: number; rowH: number; rows: ScrollRow[]; ring: [number, number] };
 export type Easel = { x: number; z: number; w: number; h: number; yaw: number; spot: Spot };
 
-const PLAQUE_Z = COURTYARD.z0 + 0.45;
-const PLAQUE_SPAN: [number, number] = [COURTYARD.x0 + 0.9, COURTYARD.x1 - 0.72];
+const SCROLL_Z = COURTYARD.z0 + 0.55;
+const SCROLL_W = 2.0;
+const SCROLL_BOTTOM = 0.62;
+const SCROLL_HEADER = 0.32;
+const SCROLL_ROW = 0.52;
+/** More rows than this (only ever in ?debug&edu=N) are left off the scroll. */
+export const SCROLL_MAX_ROWS = 8;
 
-function buildPlaques(): Plaque[] {
-  const n = HALL.education.length;
-  const { xs, spacing } = wingCentres(n, PLAQUE_SPAN, 1.25);
-  const w = Math.min(1.0, spacing - 0.2);
-  return xs.map((x, i) => ({
-    x,
-    z: PLAQUE_Z,
-    w,
-    h: 1.25,
-    spot: { key: `education:${HALL.education[i].id}`, kind: "education", zone: "education", index: i, x, z: PLAQUE_Z, yaw: 0, ring: [x, PLAQUE_Z + 0.85] },
+function buildScroll(): Scroll | null {
+  const n = Math.min(SCROLL_MAX_ROWS, HALL.education.length);
+  if (n === 0) return null;
+  const x = (COURTYARD.x0 + COURTYARD.x1) / 2;
+  const h = SCROLL_HEADER + n * SCROLL_ROW + 0.22;
+  const top = SCROLL_BOTTOM + h;
+  const ring: [number, number] = [x, SCROLL_Z + 1.5];
+  const rows: ScrollRow[] = Array.from({ length: n }, (_, i) => ({
+    index: i,
+    y: top - SCROLL_HEADER - (i + 0.5) * SCROLL_ROW,
+    h: SCROLL_ROW,
+    // rows are click-only (a walk-up would open a random row); every row shares the scroll's ring
+    spot: { key: `education:${HALL.education[i].id}`, kind: "education", zone: "education", index: i, x, z: SCROLL_Z, yaw: 0, ring },
   }));
+  return { x, z: SCROLL_Z, w: SCROLL_W, h, top, bottom: SCROLL_BOTTOM, headerH: SCROLL_HEADER, rowH: SCROLL_ROW, rows, ring };
 }
+
+export const SCROLL: Scroll | null = buildScroll();
 
 /** Certificates: up to FACADE_MAX easels along the school's east facade, turned 45° toward the gate... */
 const FACADE_MAX = 3;
@@ -61,14 +74,14 @@ function buildEasels(): Easel[] {
   ];
 }
 
-export const PLAQUES: Plaque[] = buildPlaques();
 export const EASELS: Easel[] = buildEasels();
 
 export type Book = { x: number; y: number; w: number; h: number; d: number; index: number };
 export type Shelf = { x: number; z: number; w: number; h: number; d: number; rowH: number; rows: number; base: number; books: Book[]; ring: [number, number] };
 
-function buildShelf(): Shelf {
+function buildShelf(): Shelf | null {
   const n = HALL.courses.length;
+  if (n === 0) return null; // no courses: no empty shelf
   let perRow = Math.max(3, Math.min(7, n));
   if (Math.ceil(n / perRow) > 3) perRow = Math.ceil(n / 3);
   const rows = Math.max(2, Math.ceil(n / perRow));
@@ -95,31 +108,29 @@ function buildShelf(): Shelf {
   return { x, z, w, h, d, rowH, rows, base, books, ring: [x, z + 1.0] };
 }
 
-export const SHELF: Shelf = buildShelf();
+/** The course bookshelf; null (and no shelf, spot, ring or obstacle) when there are no courses. */
+export const SHELF: Shelf | null = buildShelf();
 export const SHELF_SPOT_KEY = "shelf";
 
-const SHELF_SPOT: Spot = { key: SHELF_SPOT_KEY, kind: "shelf", zone: "education", index: 0, x: SHELF.x, z: SHELF.z, yaw: 0, ring: SHELF.ring };
-export const shelfSpot = (key: string): Spot | undefined => (key === SHELF_SPOT_KEY ? SHELF_SPOT : undefined);
+const SHELF_SPOT: Spot | null = SHELF && { key: SHELF_SPOT_KEY, kind: "shelf", zone: "education", index: 0, x: SHELF.x, z: SHELF.z, yaw: 0, ring: SHELF.ring };
+/** Spots that are click-only (the scroll's rows, the shelf): found by key, never opened by walking up. */
+export const extraSpot = (key: string): Spot | undefined => (SHELF_SPOT && key === SHELF_SPOT_KEY ? SHELF_SPOT : SCROLL?.rows.find((r) => r.spot.key === key)?.spot);
 
-/** Walk-up spots (books are click-only, via the shelf ring). */
-export const PATHSHALA_SPOTS: Spot[] = [...PLAQUES.map((p) => p.spot), ...EASELS.map((e) => e.spot)];
+/** Walk-up spots (the scroll's rows and the books are click-only). */
+export const PATHSHALA_SPOTS: Spot[] = EASELS.map((e) => e.spot);
 
-export const PATHSHALA_RINGS: [number, number][] = [...PATHSHALA_SPOTS.map((s) => s.ring), SHELF.ring];
+export const PATHSHALA_RINGS: [number, number][] = [...(SCROLL ? [SCROLL.ring] : []), ...PATHSHALA_SPOTS.map((s) => s.ring), ...(SHELF ? [SHELF.ring] : [])];
 
 export const PATHSHALA_BOXES: ClickBox[] = [
-  ...PLAQUES.map((p) => ({ spot: p.spot, w: p.w + 0.1, h: p.h + 0.25, d: 0.4, y: (p.h + 0.25) / 2 })),
+  ...(SCROLL ? SCROLL.rows.map((r) => ({ spot: r.spot, w: SCROLL.w, h: r.h, d: 0.4, y: r.y })) : []),
   ...EASELS.map((e) => ({ spot: e.spot, w: e.w + 0.2, h: 0.95 + e.h, d: 0.5, y: (0.95 + e.h) / 2 })),
 ];
 
-/** Where the avatar turns after the robot walks it to the pathshala: the plaques. */
-export const EDUCATION_FACE: [number, number] | undefined = PLAQUES.length
-  ? [PLAQUES.reduce((a, p) => a + p.x, 0) / PLAQUES.length, PLAQUE_Z]
-  : EASELS.length
-    ? [EASELS[0].x, EASELS[0].z]
-    : undefined;
+/** Where the avatar turns after the robot walks it to the pathshala: the scroll. */
+export const EDUCATION_FACE: [number, number] | undefined = SCROLL ? [SCROLL.x, SCROLL.z] : EASELS.length ? [EASELS[0].x, EASELS[0].z] : undefined;
 
 export const PATHSHALA_OBSTACLES: Obstacle[] = [
-  ...PLAQUES.map((p): Obstacle => ({ kind: "rect", x: p.x, z: p.z, w: p.w + 0.1, d: 0.34 })),
+  ...(SCROLL ? [{ kind: "rect", x: SCROLL.x, z: SCROLL.z, w: SCROLL.w + 0.3, d: 0.34 } as Obstacle] : []),
   ...EASELS.map((e): Obstacle => ({ kind: "circle", x: e.x, z: e.z, r: 0.3 })),
-  { kind: "rect", x: SHELF.x, z: SHELF.z, w: SHELF.w + 0.1, d: SHELF.d + 0.1 },
+  ...(SHELF ? [{ kind: "rect", x: SHELF.x, z: SHELF.z, w: SHELF.w + 0.1, d: SHELF.d + 0.1 } as Obstacle] : []),
 ];

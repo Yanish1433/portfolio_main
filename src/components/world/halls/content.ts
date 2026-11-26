@@ -6,6 +6,8 @@
 // items can be checked without touching profile.ts. It is read once when the module loads,
 // before the nav grid is built, so the obstacles always match what is drawn.
 //
+// ?debug&lead=barber|goldstar (see LEAD_ID below) forces which flagship leads, for the rotation proof.
+//
 // ?debug&skills=N (skills/potData.ts) does the same for the Pottery Square's pots.
 //
 // Demo media (production needs ?debug): ?debug&media=demo gives the first two projects the
@@ -18,6 +20,8 @@
 //   3. public/projects/<id>.webp (the older thumbnail folder)
 //   4. the generated poster (name + tagline + stack on the accent colour)
 import { profile, type Certificate, type Course, type Education, type Project } from "@/content/profile";
+import { resolveLeadId } from "@/content/lead";
+import { sortedEducation } from "@/lib/robot/journey";
 import { posterUrl, type MediaFiles } from "./showcaseView";
 
 const MAX_OVERRIDE = 40;
@@ -54,7 +58,16 @@ function withDemoMedia(list: Project[]): Project[] {
   return list.map((p, i) => (DEMO_MEDIA[i] ? { ...p, media: { ...p.media, ...DEMO_MEDIA[i] } } : p));
 }
 
-function resize<T extends { id: string }>(list: T[], n: number | null, rename: (item: T, copy: number) => T): T[] {
+/**
+ * ?debug only: with no real certificates or courses (the captain has none yet) the overrides
+ * `?debug&certs=N` / `&courses=N` repeat these invented samples instead, so the stamp-in seals and
+ * the bookshelf stay testable. Never used without ?debug, and never shown to a visitor.
+ */
+const SAMPLE_CERT: Certificate = { id: "sample-cert", name: "Sample certificate", issuer: "Sample issuer", year: 2026, url: "#" };
+const SAMPLE_COURSE: Course = { id: "sample-course", name: "Sample course", provider: "Sample provider", learned: ["Sample skill"] };
+
+function resize<T extends { id: string }>(list: T[], n: number | null, rename: (item: T, copy: number) => T, sample?: T): T[] {
+  if (n !== null && list.length === 0 && sample) list = [sample];
   if (n === null || list.length === 0) return list;
   return Array.from({ length: n }, (_, i) => {
     const base = list[i % list.length];
@@ -70,10 +83,18 @@ export const HALL: {
   courses: Course[];
 } = {
   projects: withDemoMedia(resize(profile.projects, debugCount("projects"), (p, k) => ({ ...p, id: `${p.id}-${k}`, name: `${p.name} ${k}`, featured: false }))),
-  education: resize(profile.education, debugCount("edu"), (e, k) => ({ ...e, id: `${e.id}-${k}`, school: `${e.school} ${k}` })),
-  certificates: resize(profile.certificates, debugCount("certs"), (c, k) => ({ ...c, id: `${c.id}-${k}`, name: `${c.name} ${k}` })),
-  courses: resize(profile.courses, debugCount("courses"), (c, k) => ({ ...c, id: `${c.id}-${k}`, name: `${c.name} ${k}` })),
+  education: sortedEducation(resize(profile.education, debugCount("edu"), (e, k) => ({ ...e, id: `${e.id}-${k}`, school: `${e.school} ${k}` }))),
+  certificates: resize(profile.certificates, debugCount("certs"), (c, k) => ({ ...c, id: `${c.id}-${k}`, name: `${c.name} ${k}` }), SAMPLE_CERT),
+  courses: resize(profile.courses, debugCount("courses"), (c, k) => ({ ...c, id: `${c.id}-${k}`, name: `${c.name} ${k}` }), SAMPLE_COURSE),
 };
+
+/**
+ * The id of this session's lead flagship (picked once per browser session, see content/lead.ts).
+ * The world is client-only, so this is already the real answer when the stands are built; it
+ * only decides WHICH project stands where, never the geometry. `?debug&lead=barber|goldstar`
+ * forces it. On the server it is the default (the first flagship).
+ */
+export const LEAD_ID: string | undefined = resolveLeadId({ projects: HALL.projects });
 
 export const projectById = (id: string) => HALL.projects.find((p) => p.id === id);
 

@@ -3,20 +3,23 @@
 // a ring and a nav obstacle with no code changes.
 //
 // Project Hall ("Project Dalan"): an open colonnade along the palace front, in two wings
-// either side of the golden gate. The 5-tier pagoda stands between the 45° camera and the
+// either side of the golden gate. The (up to two) flagships take the two stands that flank the
+// gate, the inner end of each wing, and they are the same size. Which project stands where is
+// the only thing the session's lead changes: the stands, obstacles and nav grid are identical
+// for either lead. With few projects the wings are shortened so the dalan hugs its stands. The 5-tier pagoda stands between the 45° camera and the
 // middle of the palace (|x| < ~2.4 m), so stands only go in the wings where the camera
 // can always see them.
 // The pathshala (Education Zone) has its own file, pathshala.ts; this one also gathers the
 // spots, rings, click boxes and obstacles of both zones.
-import { PALACE, type Obstacle } from "../zones";
-import { HALL } from "./content";
-import { featuredProject, plainArchitecture } from "@/content/showcase";
+import { GHAR, PALACE, type Obstacle } from "../zones";
+import { HALL, LEAD_ID } from "./content";
+import { featuredProjects, leadFirst, plainArchitecture } from "@/content/showcase";
 import { dioramaBlocks, type DioramaBlock } from "./showcaseView";
 import { FLAG_H, packWing, type ClickBox, type Spot } from "./spots";
-import { EDUCATION_FACE, PATHSHALA_BOXES, PATHSHALA_OBSTACLES, PATHSHALA_RINGS, PATHSHALA_SPOTS, shelfSpot } from "./pathshalaLayout";
+import { EDUCATION_FACE, PATHSHALA_BOXES, PATHSHALA_OBSTACLES, PATHSHALA_RINGS, PATHSHALA_SPOTS, extraSpot } from "./pathshalaLayout";
 
 export { CLOSE_R, OPEN_R, OPEN_SPEED, type Spot, type SpotKind } from "./spots";
-export { EASELS, PLAQUES, SHELF, SHELF_SPOT_KEY } from "./pathshalaLayout";
+export { EASELS, SCROLL, SHELF, SHELF_SPOT_KEY } from "./pathshalaLayout";
 
 // --- Project Dalan ----------------------------------------------------------
 
@@ -27,11 +30,18 @@ export const STAND_Z = PALACE_FRONT + 0.95;
 export const STAND_DEPTH = 0.4;
 /** Rings sit in front of the diorama plinths (avatar radius 0.45 + a margin). */
 const RING_DZ = 1.25;
-/** Stand centres stay inside these x spans (west wing, east wing). */
-export const WINGS: [number, number][] = [
-  [-9.2, -3.1],
-  [3.1, 9.2],
-];
+/** Stand centres stay inside these x spans (west wing, east wing). A wing with one stand is short. */
+const WING_INNER = 3.1;
+const WING_FULL = 6.1;
+const WING_SHORT = 4.0;
+export const WINGS: [number, number][] = (() => {
+  const perWing = Math.ceil(Math.min(HALL.projects.length, MAX_STANDS) / 2);
+  const len = perWing === 1 ? WING_SHORT : WING_FULL;
+  return [
+    [-(WING_INNER + len), -WING_INNER],
+    [WING_INNER, WING_INNER + len],
+  ];
+})();
 export const POSTER = { h: 1.05, y: 1.42 };
 
 export type Stand = {
@@ -52,22 +62,21 @@ export type Stand = {
 /** A carved plinth in front of a stand with one tiny building per layer, joined by a glowing road. */
 export type Diorama = { x: number; z: number; w: number; d: number; /** plinth top */ top: number; blocks: DioramaBlock[] };
 
-export const PLINTH = { w: 1.2, d: 0.45, top: 0.4, /** gap from the stand's front face */ gap: 0.0 };
+export const PLINTH = { w: 1.2, /** a flagship's plinth is wider */ flagW: 1.8, d: 0.45, top: 0.4, /** gap from the stand's front face */ gap: 0.0 };
 
-function dioramaFor(x: number, w: number, projectIndex: number | null): Diorama | null {
+function dioramaFor(x: number, w: number, projectIndex: number | null, flagship: boolean): Diorama | null {
   if (projectIndex === null) return null;
   const p = HALL.projects[projectIndex];
-  const pw = Math.min(PLINTH.w, w - 0.1);
+  const pw = Math.min(flagship ? PLINTH.flagW : PLINTH.w, w - 0.1);
   const blocks = p ? dioramaBlocks(plainArchitecture(p), pw) : [];
   if (!blocks.length) return null;
   return { x, z: STAND_Z + STAND_DEPTH / 2 + PLINTH.gap + PLINTH.d / 2, w: pw, d: PLINTH.d, top: PLINTH.top, blocks };
 }
 
-/** Index (in HALL.projects) of the flagship, or -1. featuredProject() falls back to the first project. */
-export const FLAGSHIP_INDEX = (() => {
-  const f = featuredProject({ projects: HALL.projects });
-  return f ? HALL.projects.indexOf(f) : -1;
-})();
+/** Indices (in HALL.projects) of the flagships, lead first; at most two get a flagship stand. */
+export const FLAGSHIPS: number[] = leadFirst(featuredProjects({ projects: HALL.projects }), LEAD_ID)
+  .slice(0, 2)
+  .map((p) => HALL.projects.indexOf(p));
 
 function buildStands(): Stand[] {
   const n = HALL.projects.length;
@@ -75,19 +84,24 @@ function buildStands(): Stand[] {
   const carousel = n > MAX_STANDS;
   const west = Math.ceil(slots / 2);
   const east = slots - west;
-  // The flagship takes the middle of the west wing (beside the hall entrance); the rest keep
-  // their profile order in the other slots. With a carousel, it never hides inside "More".
-  const flagSlot = FLAGSHIP_INDEX >= 0 ? Math.floor(west / 2) : -1;
-  const order: number[] = [];
-  const rest = Array.from({ length: n }, (_, i) => i).filter((i) => i !== FLAGSHIP_INDEX);
-  for (let slot = 0; slot < n; slot++) order.push(slot === flagSlot ? FLAGSHIP_INDEX : rest.shift()!);
+  // The flagships take the two inner slots (either side of the gate): the lead in the west one,
+  // the other in the east one. A lone flagship (or a lone stand) takes the west one. The rest keep
+  // their profile order in the other slots. With a carousel, no flagship ever hides inside "More".
+  const flagSlots = east > 0 ? [west - 1, west] : [west - 1];
+  const used = FLAGSHIPS.slice(0, flagSlots.length);
+  const order: number[] = Array(n).fill(-1);
+  used.forEach((pi, k) => (order[flagSlots[k]] = pi));
+  const rest = Array.from({ length: n }, (_, i) => i).filter((i) => !used.includes(i));
+  for (let slot = 0; slot < n; slot++) if (order[slot] < 0) order[slot] = rest.shift()!;
+  const westFlags = used.length ? [west - 1] : [];
+  const eastFlags = used.length > 1 ? [0] : [];
   const out: Stand[] = [];
-  const place = (count: number, wing: [number, number], flagAt: number) => {
+  const place = (count: number, wing: [number, number], flagAt: number[]) => {
     for (const { x, w } of packWing(count, wing, flagAt)) {
       const slot = out.length;
       const isMore = carousel && slot === slots - 1;
       const projects = isMore ? order.slice(slot) : [order[slot]];
-      const flagship = !isMore && order[slot] === FLAGSHIP_INDEX;
+      const flagship = !isMore && used.includes(order[slot]);
       const key = isMore ? "more" : `project:${HALL.projects[order[slot]].id}`;
       const h = POSTER.h * (flagship ? FLAG_H : 1);
       out.push({
@@ -98,13 +112,13 @@ function buildStands(): Stand[] {
         flagship,
         // screens share their bottom edge, so the flagship grows upward
         screen: { w: w - 0.22, h, y: POSTER.y - POSTER.h / 2 + h / 2 },
-        diorama: dioramaFor(x, w, isMore ? null : order[slot]),
+        diorama: dioramaFor(x, w, isMore ? null : order[slot], flagship),
         spot: { key, kind: isMore ? "more" : "project", zone: "project-hall", index: projects[0], x, z: STAND_Z, yaw: 0, ring: [x, STAND_Z + RING_DZ] },
       });
     }
   };
-  place(west, WINGS[0], flagSlot);
-  place(east, WINGS[1], -1);
+  place(west, WINGS[0], westFlags);
+  place(east, WINGS[1], eastFlags);
   return out;
 }
 
@@ -118,7 +132,7 @@ export const DALAN = { z0: PALACE_FRONT, z1: PALACE_FRONT + 2.3, wings: WINGS.ma
 /** Every walk-up spot. */
 export const SPOTS: Spot[] = [...STANDS.map((s) => s.spot), ...PATHSHALA_SPOTS];
 
-export const spotByKey = (key: string): Spot | undefined => SPOTS.find((s) => s.key === key) ?? shelfSpot(key);
+export const spotByKey = (key: string): Spot | undefined => SPOTS.find((s) => s.key === key) ?? extraSpot(key);
 
 /** Ring markers on the ground (one per spot, plus the bookshelf). */
 export const RINGS: [number, number][] = [...STANDS.map((s) => s.spot.ring), ...PATHSHALA_RINGS];
@@ -150,6 +164,8 @@ export function screenOf(id: string): { x: number; y: number; z: number; w: numb
 export const ZONE_FACE: Partial<Record<string, [number, number]>> = {
   "project-hall": STANDS.length ? [STANDS[0].x, STANDS[0].z] : undefined,
   education: EDUCATION_FACE,
+  // the avatar turns to the house (and its photo window) after a robot walk
+  about: [GHAR.x, GHAR.z],
 };
 
 /** Solid shapes for the nav grid / collision. */

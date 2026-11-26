@@ -2,6 +2,7 @@
 // Voice: friendly, short (about two sentences), then suggestions. No pronouns for the owner: name only.
 
 import type { Profile } from "@/content/profile";
+import { eduSentence, expPeriod, sortedEducation } from "./journey";
 import type { MatchResult, TechEntity } from "./matcher";
 import type {
   IntentId,
@@ -18,6 +19,7 @@ export const ZONE_LABEL: Record<ZoneId, string> = {
   education: "the Education Zone",
   "skills-lab": "the Skills Lab",
   timeline: "the Timeline",
+  about: "the Ghar (the About house)",
   mailbox: "the Mailbox",
   kiosk: "the Kiosk",
 };
@@ -26,9 +28,10 @@ export const ZONE_LABEL: Record<ZoneId, string> = {
 export const RECRUITER_ANCHORS: Record<ZoneId, { url: string; label: string }> = {
   plaza: { url: "#top", label: "Top of the page" },
   "project-hall": { url: "#projects", label: "Projects" },
-  education: { url: "#education", label: "Education" },
+  education: { url: "#journey", label: "Education" },
   "skills-lab": { url: "#skills", label: "Skills" },
-  timeline: { url: "#experience", label: "Experience" },
+  timeline: { url: "#journey", label: "Experience" },
+  about: { url: "#about", label: "About" },
   mailbox: { url: "#contact", label: "Contact" },
   kiosk: { url: "#contact", label: "Contact" },
 };
@@ -71,8 +74,6 @@ function joinList(items: string[], conj = "and"): string {
   if (items.length === 2) return `${items[0]} ${conj} ${items[1]}`;
   return `${items.slice(0, -1).join(", ")} ${conj} ${items[items.length - 1]}`;
 }
-
-const range = (start: string, end: string): string => (start === end ? start : `${start}–${end}`);
 
 const isRealUrl = (u: string | null | undefined): u is string => !!u && u.trim() !== "" && u.trim() !== "#";
 
@@ -178,9 +179,17 @@ function build(input: BuildInput): Parts {
         `Meet ${F}: ${p.title}. ${sentence(p.tagline)}`,
         sentence(p.summary.split(/(?<=\.)\s/)[0] ?? p.summary),
       ]);
+      if (world) {
+        // In the world the answer is a walk to the About house (the Ghar), where the full story is.
+        return {
+          text: `${intro} ${pick(rng, ["Follow me to the Ghar for the full story!", "Let's walk to the Ghar, the About house, for the full story!"])}`,
+          suggestions: [msg("Show me the projects", "Show me the projects"), msg("What are the skills?", "What are the skills?"), msg("Work experience?", "Tell me about the work experience"), act("Show me the resume", { type: "showResume" })],
+          actions: [zoneAction("about", mode)],
+        };
+      }
       return {
         text: intro,
-        suggestions: [msg("Show me the projects", "Show me the projects"), msg("What are the skills?", "What are the skills?"), msg("Work experience?", "Tell me about the work experience"), act("Show me the resume", { type: "showResume" })],
+        suggestions: [act("Read the About section", zoneAction("about", mode)), msg("Show me the projects", "Show me the projects"), msg("What are the skills?", "What are the skills?"), act("Show me the resume", { type: "showResume" })],
       };
     }
 
@@ -299,21 +308,24 @@ function build(input: BuildInput): Parts {
     }
 
     case "education": {
-      if (p.education.length === 0) return { text: `No education details are listed yet. The resume may have more.`, suggestions: [act("Show me the resume", { type: "showResume" }), ...defaults.slice(0, 2)] };
-      const ids = match.schoolIdxs?.length ? match.schoolIdxs : p.education.map((_, i) => i);
-      const parts = ids.slice(0, 3).map((i) => {
-        const e = p.education[i];
-        return `${e.degree} in ${e.field} at ${e.school} (${range(e.start, e.end)})`;
-      });
-      const text = pick(rng, [
-        `${F} studied ${joinList(parts)}. ${offerQuestion(rng, mode)}`,
-        `On the education side: ${joinList(parts)}. ${offerQuestion(rng, mode)}`,
-      ]);
-      return {
-        text,
-        suggestions: [yesOffer("education", mode), msg("Any certificates?", "Any certificates?"), msg("Any courses?", "Which courses were taken?"), act("Show me the resume", { type: "showResume" })],
-        offer: zoneAction("education", mode),
-      };
+      if (p.education.length === 0) return { text: `No education details are listed yet.`, suggestions: defaults.slice(0, 3) };
+      const order = sortedEducation(p.education);
+      const asked = match.schoolIdxs?.length ? match.schoolIdxs.map((i) => p.education[i]).filter(Boolean) : [];
+      const list = asked.length ? asked : order;
+      const parts = list.slice(0, 4).map((e) => eduSentence(e));
+      // "<Name> is currently studying at X" reads as its own clause; the rest follow as "and earlier: ..."
+      const now = parts.find((t) => t.startsWith("is currently"));
+      const rest = parts.filter((t) => t !== now);
+      const body = now
+        ? rest.length
+          ? `${F} ${now}. Earlier: ${joinList(rest)}.`
+          : `${F} ${now}.`
+        : pick(rng, [`${F} studied ${joinList(rest)}.`, `On the education side: ${joinList(rest)}.`]);
+      const suggestions: RobotSuggestion[] = [yesOffer("education", mode)];
+      if (p.certificates.length) suggestions.push(msg("Any certificates?", "Any certificates?"));
+      if (p.courses.length) suggestions.push(msg("Any courses?", "Which courses were taken?"));
+      suggestions.push(msg("Show me the projects", "Show me the projects"));
+      return { text: `${body} ${offerQuestion(rng, mode)}`, suggestions, offer: zoneAction("education", mode) };
     }
 
     case "certificates": {
@@ -324,7 +336,8 @@ function build(input: BuildInput): Parts {
       const linked = p.certificates[ids[0]];
       const suggestions: RobotSuggestion[] = [yesOffer("education", mode)];
       if (isRealUrl(linked.url)) suggestions.push(act(`Open ${linked.name}`, { type: "openLink", url: linked.url, label: linked.name }));
-      suggestions.push(msg("Which courses?", "Which courses were taken?"), msg("Where did they study?", "Where did you study?"));
+      if (p.courses.length) suggestions.push(msg("Which courses?", "Which courses were taken?"));
+      suggestions.push(msg("Where did they study?", "Where did you study?"));
       return { text, suggestions, offer: zoneAction("education", mode) };
     }
 
@@ -335,17 +348,26 @@ function build(input: BuildInput): Parts {
       const text = `${F} has taken ${p.courses.length} ${p.courses.length === 1 ? "course" : "courses"}: ${joinList(list)}. ${offerQuestion(rng, mode)}`;
       return {
         text,
-        suggestions: [yesOffer("education", mode), msg("Any certificates?", "Any certificates?"), msg("Where did they study?", "Where did you study?")],
+        suggestions: [yesOffer("education", mode), ...(p.certificates.length ? [msg("Any certificates?", "Any certificates?")] : []), msg("Where did they study?", "Where did you study?")],
         offer: zoneAction("education", mode),
       };
     }
 
     case "experience": {
-      if (p.experience.length === 0) return { text: `No work experience is listed yet. The projects show what ${F} can do.`, suggestions: [msg("Show me the projects", "Show me the projects"), ...defaults.slice(1, 3)] };
+      if (p.experience.length === 0) {
+        const recent = p.projects.slice(0, 2).map((x) => x.name);
+        const work = recent.length ? ` Recent work is ${joinList(recent)}, built as projects.` : "";
+        return {
+          text: `No jobs are listed yet.${work} ${world ? "I can walk you along the path of milestones if you like." : "The journey section shows the path so far."}`,
+          suggestions: [yesOffer("timeline", mode), msg("Show me the projects", "Show me the projects"), msg("How can I contact you?", "How can I contact you?")],
+          offer: zoneAction("timeline", mode),
+        };
+      }
       const ids = match.companyIdxs?.length ? match.companyIdxs : p.experience.map((_, i) => i);
       const parts = ids.slice(0, 3).map((i) => {
         const e = p.experience[i];
-        return `${e.role} at ${e.company} (${range(e.start, e.end)})`;
+        const yrs = expPeriod(e);
+        return `${e.role} at ${e.company}${yrs ? ` (${yrs})` : ""}`;
       });
       const text = pick(rng, [
         `Work history: ${joinList(parts)}. ${offerQuestion(rng, mode)}`,
@@ -353,7 +375,7 @@ function build(input: BuildInput): Parts {
       ]);
       return {
         text,
-        suggestions: [yesOffer("timeline", mode), msg("Show me the projects", "Show me the projects"), msg("What are the skills?", "What are the skills?"), act("Show me the resume", { type: "showResume" })],
+        suggestions: [yesOffer("timeline", mode), msg("Show me the projects", "Show me the projects"), msg("What are the skills?", "What are the skills?")],
         offer: zoneAction("timeline", mode),
       };
     }
@@ -530,15 +552,18 @@ function finish(parts: Parts, intent: IntentId, confidence: number, mode: RobotM
       return true;
     });
 
+  // No resume download on this site unless links.resumeUrl is real (captain's decision): drop those chips everywhere.
+  const resumeOk = isRealUrl(p.links.resumeUrl);
+  const chipOk = (s: RobotSuggestion) => resumeOk || s.action?.type !== "showResume";
   let suggestions = unique(
-    parts.suggestions.map((s) => (s.action ? { ...s, action: adaptAction(s.action, mode) } : s)),
+    parts.suggestions.filter(chipOk).map((s) => (s.action ? { ...s, action: adaptAction(s.action, mode) } : s)),
   );
   if (mode === "recruiter") {
     suggestions = suggestions.filter((s) => s.action?.type !== "openRecruiterMode");
   }
-  for (const extra of defaultSuggestions(p, mode)) {
+  for (const extra of defaultSuggestions(p, mode).filter(chipOk)) {
     if (suggestions.length >= 2) break;
-    suggestions = unique([...suggestions, extra]);
+    suggestions = [...suggestions, ...unique([extra])];
   }
   suggestions = suggestions.slice(0, 4);
 

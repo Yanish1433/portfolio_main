@@ -5,6 +5,7 @@ import { useFrame, useThree } from "@react-three/fiber";
 import { Html } from "@react-three/drei";
 import * as THREE from "three";
 import { blockedAt } from "../nav";
+import { SPOTS } from "../halls/layout";
 import { avatarMotion, navPath, playerPos, robotPos } from "../input";
 import { getEnvironment } from "../nepal/materials";
 import { themeState } from "../nepal/themeState";
@@ -124,6 +125,12 @@ export default function RobotBuddy({ reducedMotion }: { reducedMotion: boolean }
     } else {
       tx = playerPos.x + rx * SIDE - fx * BACK;
       tz = playerPos.z + rz * SIDE - fz * BACK;
+      // Standing at a project stand's ring: wait beside the ring, not over the stand's diorama.
+      const near = SPOTS.find((sp) => sp.kind === "project" && Math.hypot(sp.ring[0] - playerPos.x, sp.ring[1] - playerPos.z) < 1.2);
+      if (near) {
+        tx = near.ring[0] + (rx >= 0 ? 1 : -1) * 1.15;
+        tz = near.ring[1] + 0.3;
+      }
       if (blockedAt(tx, tz, PAD)) {
         // Fall back to the avatar's own trail (~1.2 m back), which is always walkable.
         let crumb: [number, number] = [playerPos.x, playerPos.z];

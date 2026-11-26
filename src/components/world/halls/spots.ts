@@ -47,24 +47,27 @@ const SCREEN_INSET = 0.22;
 
 /**
  * Stand centres and widths for one wing. Without a flagship it is the even spread of
- * wingCentres (width = spacing - MIN_GAP, at most 1.6 m). With one (`flagAt` = its slot), that
- * stand's screen is FLAG_W times wider; the wing grows into its spare room first and only then
- * narrows the other stands, so gaps never drop below MIN_GAP and the wing stays centred.
+ * wingCentres (width = spacing - MIN_GAP, at most 1.6 m). With some (`flagAt` = their slot, or a
+ * list of slots), those stands' screens are FLAG_W times wider and all the same size; the wing
+ * grows into its spare room first and only then narrows the other stands, so gaps never drop
+ * below MIN_GAP and the wing stays centred.
  */
-export function packWing(count: number, wing: [number, number], flagAt = -1): { x: number; w: number }[] {
+export function packWing(count: number, wing: [number, number], flagAt: number | number[] = -1): { x: number; w: number }[] {
   if (count <= 0) return [];
   const { xs, spacing } = wingCentres(count, wing);
   const w = Math.min(MAX_W, spacing - MIN_GAP);
-  if (flagAt < 0 || flagAt >= count) return xs.map((x) => ({ x, w }));
+  const flags = new Set((Array.isArray(flagAt) ? flagAt : [flagAt]).filter((i) => i >= 0 && i < count));
+  const f = flags.size;
+  if (f === 0) return xs.map((x) => ({ x, w }));
   const flagOf = (other: number) => Math.min(MAX_FLAG_W, FLAG_W * (other - SCREEN_INSET) + SCREEN_INSET);
   const [a, b] = wing;
   const room = b - a + w; // outer extent the wing may use
   let other = w;
   let flag = flagOf(other);
-  const sum = () => other * (count - 1) + flag;
+  const sum = () => other * (count - f) + flag * f;
   if (sum() + (count - 1) * MIN_GAP > room) {
-    // shrink the others (flag follows): (count-1)*o + FLAG_W*(o-inset)+inset + gaps = room
-    other = (room - (count - 1) * MIN_GAP + FLAG_W * SCREEN_INSET - SCREEN_INSET) / (count - 1 + FLAG_W);
+    // shrink the others (flag follows): (count-f)*o + f*(FLAG_W*(o-inset)+inset) + gaps = room
+    other = (room - (count - 1) * MIN_GAP + f * (FLAG_W - 1) * SCREEN_INSET) / (count - f + f * FLAG_W);
     flag = flagOf(other);
   }
   const extentNow = count > 1 ? xs[count - 1] - xs[0] + w : w;
@@ -73,7 +76,7 @@ export function packWing(count: number, wing: [number, number], flagAt = -1): { 
   const out: { x: number; w: number }[] = [];
   let left = (a + b) / 2 - extent / 2;
   for (let i = 0; i < count; i++) {
-    const wi = i === flagAt ? flag : other;
+    const wi = flags.has(i) ? flag : other;
     out.push({ x: left + wi / 2, w: wi });
     left += wi + gap;
   }

@@ -10,7 +10,7 @@
 // - Phones: a full-screen sheet; the tabs become a row of chips; everything scrolls.
 import { useEffect, useId, useRef, useState } from "react";
 import gsap from "gsap";
-import { plainArchitecture } from "@/content/showcase";
+import { plainArchitecture, taglineOf } from "@/content/showcase";
 import type { Project } from "@/content/profile";
 import { isTypingTarget, useWorld } from "@/store/world";
 import { accentAt, HALL, realUrl } from "./content";
@@ -232,13 +232,13 @@ function Hero({ p, accent, files, reducedMotion }: { p: Project; accent: string;
   );
 }
 
-const TABS = [
+const ALL_TABS = [
   { id: "overview", label: "Overview" },
   { id: "how", label: "How it works" },
   { id: "tech", label: "Tech" },
   { id: "results", label: "Results" },
 ] as const;
-type TabId = (typeof TABS)[number]["id"];
+type TabId = (typeof ALL_TABS)[number]["id"];
 
 function TabBody({ tab, p, theme, reducedMotion }: { tab: TabId; p: Project; theme: Theme; reducedMotion: boolean }) {
   switch (tab) {
@@ -248,11 +248,11 @@ function TabBody({ tab, p, theme, reducedMotion }: { tab: TabId; p: Project; the
           {p.pitch && <p className="mb-4 text-lg leading-relaxed">{p.pitch}</p>}
           <Block title="The problem">{p.problem}</Block>
           <Block title="What it does">{p.description}</Block>
-          {p.highlights.length > 0 && (
+          {p.highlights.length > 0 && p.metrics?.length ? (
             <Block title="Highlights">
               <Bullets items={p.highlights} />
             </Block>
-          )}
+          ) : null}
         </>
       );
     case "how": {
@@ -307,6 +307,8 @@ function CaseStudy({ p, index, files, reducedMotion }: { p: Project; index: numb
   const accent = accentAt(index);
   const theme: Theme = { night, accent };
   const [tab, setTab] = useState<TabId>("overview");
+  // no numbers yet: no empty "Results" tab (the highlights are shown up top instead)
+  const TABS = p.metrics?.length ? ALL_TABS : ALL_TABS.filter((t) => t.id !== "results");
   const root = useRef<HTMLDivElement>(null);
   const headingId = useId();
   const tabsId = useId();
@@ -409,7 +411,12 @@ function CaseStudy({ p, index, files, reducedMotion }: { p: Project; index: numb
               <h2 id={headingId} className="text-3xl font-semibold leading-tight sm:text-4xl">
                 {p.name}
               </h2>
-              <p className="mt-1 text-lg leading-snug opacity-90">{p.pitch ?? p.tagline}</p>
+              {p.disclaimer && (
+                <p className={`mt-1.5 inline-block rounded-md px-2.5 py-0.5 text-sm font-semibold ${night ? "bg-white/10 text-[#f1d98a]" : "bg-[#9c3b22]/10 text-[#7a2d18]"}`} data-disclaimer>
+                  {p.disclaimer}
+                </p>
+              )}
+              <p className="mt-1 text-lg leading-snug opacity-90">{p.pitch ?? taglineOf(p)}</p>
               <p className="mt-1 text-sm opacity-70">
                 {p.audience && (
                   <>
@@ -428,6 +435,20 @@ function CaseStudy({ p, index, files, reducedMotion }: { p: Project; index: numb
               <Metric key={m.label} value={m.value} label={m.label} plain={m.plain} reducedMotion={reducedMotion} />
             ))}
           </div>
+        )}
+
+        {top.length === 0 && p.highlights.length > 0 && (
+          <ul
+            aria-label="Highlights"
+            className={`mt-6 grid gap-3 rounded-2xl p-4 sm:grid-cols-2 ${night ? "bg-white/5" : "bg-[#9c3b22]/[0.06]"}`}
+          >
+            {p.highlights.map((h) => (
+              <li key={h} className="flex gap-2.5 text-base leading-snug">
+                <span aria-hidden="true" className="mt-[0.5em] h-2 w-2 shrink-0 rotate-45" style={{ background: accent }} />
+                <span className="min-w-0">{h}</span>
+              </li>
+            ))}
+          </ul>
         )}
 
         <div role="tablist" aria-label="Case study sections" className="-mx-4 mt-7 flex gap-2 overflow-x-auto px-4 pb-1 sm:mx-0 sm:px-0" onKeyDown={onTabKey}>

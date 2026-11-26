@@ -1,6 +1,7 @@
 import Link from "next/link";
 import type { CSSProperties } from "react";
 import { profile } from "@/content/profile";
+import { taglineOf } from "@/content/showcase";
 import type { Project } from "@/content/profile";
 import styles from "./recruiter.module.css";
 import { ContactForm } from "./ContactForm";
@@ -10,7 +11,10 @@ import { HeroMotion, Reveal, SkillsMotion, TimelineMotion } from "./motion";
 import { Particles } from "./Particles";
 import { ThemeToggle } from "./ThemeToggle";
 import { ProjectsGallery } from "./ProjectsGallery";
+import { LeadOrder } from "./LeadOrder";
 import { TiltCard } from "./TiltCard";
+import { eduRow, eduSortKey, expPeriod, isNow } from "@/lib/robot/journey";
+import { ctaState, initials } from "@/components/world/about/aboutView";
 
 const isExternal = (url: string) => /^https?:/.test(url);
 const mailto = (email: string) => (email.includes("@") ? `mailto:${email}` : email);
@@ -38,6 +42,7 @@ export function TopNav() {
       </Link>
       <div className={styles.topRight}>
         <ul className={styles.topLinks}>
+          <li><a href="#about">About</a></li>
           <li><a href="#projects">Projects</a></li>
           <li><a href="#skills">Skills</a></li>
           <li><a href="#journey">Journey</a></li>
@@ -118,7 +123,8 @@ function ProjectCard({ project, index }: { project: Project; index: number }) {
         </div>
         <div className={styles.cardBody}>
           <h3 className={styles.cardTitle}>{project.name}</h3>
-          <p className={styles.cardTag}>{project.tagline}</p>
+          <p className={styles.cardTag}>{taglineOf(project)}</p>
+          {project.disclaimer && <p className={styles.cardNote}>{project.disclaimer}</p>}
           <ul className={styles.chips} aria-label="Tech stack">
             {project.stack.map((s) => (
               <li key={s}>{s}</li>
@@ -155,9 +161,11 @@ function ProjectCard({ project, index }: { project: Project; index: number }) {
 export function Projects() {
   return (
     <ProjectsGallery header={<SectionHead id="projects-title" eyebrow="Selected work" title="Projects" />}>
-      {profile.projects.map((p, i) => (
-        <ProjectCard key={p.id} project={p} index={i} />
-      ))}
+      <LeadOrder>
+        {profile.projects.map((p, i) => (
+          <ProjectCard key={p.id} project={p} index={i} />
+        ))}
+      </LeadOrder>
     </ProjectsGallery>
   );
 }
@@ -188,6 +196,69 @@ function SkillRing({ level }: { level: number }) {
         {level}
       </text>
     </svg>
+  );
+}
+
+export function About({ photo = null }: { photo?: string | null }) {
+  const about = profile.about;
+  if (!about) return null;
+  return (
+    <section id="about" className={styles.section} aria-labelledby="about-title">
+      <Reveal>
+        <SectionHead id="about-title" eyebrow="Meet me" title="About" />
+        <div className={styles.aboutGrid} data-reveal>
+          <div className={styles.aboutCard} role={photo ? undefined : "img"} aria-label={photo ? undefined : `Portrait card of ${profile.name}`}>
+            {photo ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={photo} alt={`Portrait of ${profile.name}`} />
+            ) : (
+              initials(profile.name)
+            )}
+          </div>
+          <div className={styles.aboutStory}>
+            {about.story.map((l, i) => (
+              <p key={i}>{l}</p>
+            ))}
+            {about.loves.length > 0 && (
+              <>
+                <h3 className={styles.h3}>What I love building</h3>
+                <ul className={styles.aboutChips}>
+                  {about.loves.map((l) => (
+                    <li key={l}>{l}</li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {about.funFacts && about.funFacts.length > 0 && (
+              <>
+                <h3 className={styles.h3}>Fun facts</h3>
+                <ul className={styles.aboutChips}>
+                  {about.funFacts.map((l) => (
+                    <li key={l}>{l}</li>
+                  ))}
+                </ul>
+              </>
+            )}
+            {about.cta && about.cta.length > 0 && (
+              <div className={styles.aboutBtns}>
+                {about.cta.map((c) => {
+                  const st = ctaState(c.href);
+                  return st.kind === "link" ? (
+                    <a key={c.label} className={styles.aboutBtn} href={st.href} {...extProps(st.href)}>
+                      {c.label}
+                    </a>
+                  ) : (
+                    <span key={c.label} className={`${styles.aboutBtn} ${styles.aboutBtnOff}`} aria-disabled="true">
+                      {c.label} · coming soon
+                    </span>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </Reveal>
+    </section>
   );
 }
 
@@ -231,30 +302,35 @@ type Milestone = {
   sort: number;
 };
 
+/** Newest first, like the world's scroll. Empty fields are left out (see lib/robot/journey.ts). */
 function milestones(): Milestone[] {
   const exp: Milestone[] = profile.experience.map((e) => ({
     id: e.id,
     kind: "Experience",
     heading: e.role,
     org: e.company,
-    period: `${e.start} – ${e.end}`,
+    period: expPeriod(e),
     points: e.points,
-    sort: Number.parseInt(e.start, 10) || 0,
+    sort: isNow(e.end) ? 10000 : Number.parseInt(e.start, 10) || 0,
   }));
-  const edu: Milestone[] = profile.education.map((e) => ({
-    id: e.id,
-    kind: "Education",
-    heading: `${e.degree}, ${e.field}`,
-    org: e.school,
-    period: `${e.start} – ${e.end}`,
-    points: [e.grade, ...e.highlights],
-    sort: Number.parseInt(e.start, 10) || 0,
-  }));
+  const edu: Milestone[] = profile.education.map((e) => {
+    const { title, meta } = eduRow(e);
+    return {
+      id: e.id,
+      kind: "Education",
+      heading: title,
+      org: meta,
+      period: "",
+      points: [e.grade, ...e.highlights].filter(Boolean),
+      sort: eduSortKey(e),
+    };
+  });
   return [...exp, ...edu].sort((a, b) => b.sort - a.sort);
 }
 
 export function Journey() {
   const items = milestones();
+  const noJobs = profile.experience.length === 0;
   // #experience / #education point at the first entry of each kind (the list is newest first).
   const firstOf = (kind: Milestone["kind"]) => items.find((m) => m.kind === kind)?.id;
   const anchorId = (m: Milestone) =>
@@ -269,6 +345,21 @@ export function Journey() {
           <div className={styles.tlLine} data-tl-line />
         </div>
         <ol className={styles.tlList}>
+          {noJobs && (
+            <li id="experience" className={styles.tlItem} data-tl-item>
+              <span className={styles.tlDot} data-tl-dot aria-hidden="true" />
+              <div className={styles.tlCard}>
+                <p className={styles.tlPeriod}>
+                  <span className={styles.badge}>Experience</span> Next milestone
+                </p>
+                <h3 className={styles.tlTitle}>Open to my first full-time role</h3>
+                <p className={styles.tlOrg}>Recent work is the projects above. Your company could be the next stone on this path.</p>
+                <p>
+                  <a className={styles.tlOrg} href="#contact">Let&apos;s talk →</a>
+                </p>
+              </div>
+            </li>
+          )}
           {items.map((m) => (
             <li key={m.id} id={anchorId(m)} className={styles.tlItem} data-tl-item>
               <span className={styles.tlDot} data-tl-dot aria-hidden="true" />
@@ -277,18 +368,21 @@ export function Journey() {
                   <span className={styles.badge}>{m.kind}</span> {m.period}
                 </p>
                 <h3 className={styles.tlTitle}>{m.heading}</h3>
-                <p className={styles.tlOrg}>{m.org}</p>
-                <ul className={styles.highlights}>
-                  {m.points.map((p) => (
-                    <li key={p}>{p}</li>
-                  ))}
-                </ul>
+                {m.org && <p className={styles.tlOrg}>{m.org}</p>}
+                {m.points.length > 0 && (
+                  <ul className={styles.highlights}>
+                    {m.points.map((p) => (
+                      <li key={p}>{p}</li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </li>
           ))}
         </ol>
       </TimelineMotion>
 
+      {profile.certificates.length > 0 && (
       <Reveal className={styles.subBlock}>
         <h3 className={styles.h3} data-reveal>Certificates</h3>
         <ul className={styles.certGrid}>
@@ -303,7 +397,9 @@ export function Journey() {
           ))}
         </ul>
       </Reveal>
+      )}
 
+      {profile.courses.length > 0 && (
       <Reveal className={styles.subBlock}>
         <h3 className={styles.h3} data-reveal>Courses</h3>
         <ul className={styles.books}>
@@ -327,6 +423,7 @@ export function Journey() {
           ))}
         </ul>
       </Reveal>
+      )}
     </section>
   );
 }

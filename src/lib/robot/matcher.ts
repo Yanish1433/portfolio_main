@@ -66,6 +66,7 @@ const ZONE_ALIASES: Record<ZoneId, string[]> = {
   education: ["education", "school", "university", "college", "classroom", "campus", "academy"],
   "skills-lab": ["skills", "skill", "skills lab", "lab", "laboratory", "workshop"],
   timeline: ["timeline", "time line", "journey", "career", "history", "experience"],
+  about: ["ghar", "about me", "about page", "about house"],
   mailbox: ["mailbox", "mail box", "mail", "contact", "post", "letterbox"],
   kiosk: ["kiosk", "booth", "terminal", "desk"],
 };

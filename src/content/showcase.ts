@@ -54,9 +54,54 @@ export function projectsForSkill(skillName: string, data: Data = profile): Proje
   return data.projects.filter((p) => p.stack.some((t) => sameTech(t, skillName)));
 }
 
-/** The flagship: the first project marked `featured`, else the first project, else undefined. */
+/**
+ * Every flagship: the projects marked `featured`, in profile order. With none marked, the first
+ * project stands in as the only flagship. Empty when there are no projects.
+ */
+export function featuredProjects(data: Pick<Profile, "projects"> = profile): Project[] {
+  const list = data.projects.filter((p) => p.featured);
+  if (list.length) return list;
+  return data.projects.length ? [data.projects[0]] : [];
+}
+
+/** A small stable hash of a seed (number or text) into 0..2^32-1. */
+function hashSeed(seed: number | string): number {
+  const text = String(seed);
+  let h = 2166136261;
+  for (let i = 0; i < text.length; i++) h = Math.imul(h ^ text.charCodeAt(i), 16777619);
+  return h >>> 0;
+}
+
+/**
+ * The lead flagship: the one that gets the first place (hall, Recruiter Mode, robot). With a
+ * `seed` it is picked from the flagships by that seed (same seed, same lead); without one it is
+ * the first flagship.
+ */
+export function leadProject(seed?: number | string, data: Pick<Profile, "projects"> = profile): Project | undefined {
+  const list = featuredProjects(data);
+  if (!list.length) return undefined;
+  if (seed === undefined) return list[0];
+  return list[hashSeed(seed) % list.length];
+}
+
+/** The flagship (the lead): kept for older callers. Same as leadProject() with no seed. */
 export function featuredProject(data: Pick<Profile, "projects"> = profile): Project | undefined {
-  return data.projects.find((p) => p.featured) ?? data.projects[0];
+  return leadProject(undefined, data);
+}
+
+/** Projects with the lead first and the rest in their own order. An unknown id changes nothing. */
+export function leadFirst<T extends { id: string }>(list: T[], leadId: string | undefined): T[] {
+  const i = leadId ? list.findIndex((p) => p.id === leadId) : -1;
+  return i <= 0 ? list : [list[i], ...list.slice(0, i), ...list.slice(i + 1)];
+}
+
+/**
+ * The tagline to show. When the project has a `disclaimer`, a trailing "(concept, ...)" note in
+ * the tagline is dropped, because the disclaimer is shown on its own line right beside it.
+ */
+export function taglineOf(p: Pick<Project, "tagline" | "disclaimer">): string {
+  if (!p.disclaimer) return p.tagline;
+  return p.tagline.replace(/\s*\((?:concept|not affiliated)[^)]*\)\s*$/i, "") || p.tagline;
 }
 
 export type ArchLayer = { label: string; tech: string };

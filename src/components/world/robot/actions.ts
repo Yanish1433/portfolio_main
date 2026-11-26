@@ -3,13 +3,14 @@
 // any visitor input (ground click, WASD, joystick, chat) aborts them.
 import { createLocalBrain, ZONE_LABEL, type RobotAction, type RobotBrain, type RobotReply, type RobotSuggestion, type ZoneId } from "@/lib/robot";
 import { profile } from "@/content/profile";
+import { leadFirst } from "@/content/showcase";
 import { useWorld } from "@/store/world";
 import { zoneById, type ZoneId as WorldZoneId } from "../zones";
 import { avatarMotion, playerPos, worldControl } from "../input";
 import { LABELS } from "../nepal/labels";
 import { NAVIGATE_EVENT } from "../nepal/navigate";
 import { robotMotion, useRobot } from "./robotStore";
-import { realUrl } from "../halls/content";
+import { LEAD_ID, realUrl } from "../halls/content";
 import { spotByKey, ZONE_FACE } from "../halls/layout";
 import { projectInfo, visit } from "../halls/visit";
 
@@ -18,7 +19,7 @@ import { projectInfo, visit } from "../halls/visit";
 type Same<A, B> = [A] extends [B] ? ([B] extends [A] ? true : false) : false;
 export const ZONE_IDS_MATCH: Same<ZoneId, WorldZoneId> = true;
 
-export const TOUR: ZoneId[] = ["plaza", "project-hall", "education", "skills-lab", "timeline", "mailbox", "kiosk"];
+export const TOUR: ZoneId[] = ["plaza", "about", "project-hall", "education", "skills-lab", "timeline", "mailbox", "kiosk"];
 
 const TOUR_LINES: Record<ZoneId, string> = {
   plaza: `This is Durbar Square, the heart of ${profile.name}'s portfolio. Every path starts here.`,
@@ -26,6 +27,7 @@ const TOUR_LINES: Record<ZoneId, string> = {
   education: "The pathshala, the old school house. Degree plaques, certificates and a bookshelf of courses are in the courtyard.",
   "skills-lab": "Pottery Square! Each row of pots is one group of skills.",
   timeline: "The brick lane is the work journey, one milestone stone per step.",
+  about: `${profile.name.split(" ")[0]}'s Ghar, the home of the person behind this portfolio. Step up to the doormat to read the story.`,
   mailbox: "The hulak (post box). This is where you can get in touch.",
   kiosk: `Last stop: the chiya pasal. In a hurry? Recruiter Mode (${LABELS.zones.kiosk.ne}) has everything on one page.`,
 };
@@ -40,12 +42,14 @@ const INTENT_ZONE: Partial<Record<string, ZoneId>> = {
   certificates: "education",
   courses: "education",
   experience: "timeline",
+  about_owner: "about",
   contact: "mailbox",
   recruiter_mode: "kiosk",
 };
 
 let brain: RobotBrain | null = null;
-const getBrain = () => (brain ??= createLocalBrain(profile));
+// The robot suggests this session's lead project first (the profile it reads is lead-first).
+const getBrain = () => (brain ??= createLocalBrain({ ...profile, projects: leadFirst(profile.projects, LEAD_ID) }));
 
 let current: AbortController | null = null;
 let watching = false;

@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import WorldClient from "@/components/world/WorldClient";
+import { aboutPhoto } from "@/content/aboutPhoto";
 import { CHARACTERS, type CharacterId } from "@/components/world/characters";
 
 // Check the models and thumbnails on every request so dropping in a .glb / .webp needs no rebuild.
@@ -37,7 +38,7 @@ export default function Home() {
   ).map((c) => c.id);
   return (
     <main>
-      <WorldClient characters={available} thumbs={projectThumbs()} posters={showcasePosters()} />
+      <WorldClient characters={available} thumbs={projectThumbs()} posters={showcasePosters()} aboutPhoto={aboutPhoto()} />
     </main>
   );
 }

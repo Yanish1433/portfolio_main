@@ -16,7 +16,8 @@ import { avatarMotion, playerPos, pointerClaim } from "../input";
 import { FONT_FAMILY, loadLabelFonts } from "../nepal/LabelSprites";
 import { register, themeTargets } from "../nepal/themeState";
 import { robotMotion, useRobot } from "../robot/robotStore";
-import { accentAt, HALL, projectPoster } from "./content";
+import { accentAt, HALL, LEAD_ID, projectPoster } from "./content";
+import { leadFirst } from "@/content/showcase";
 import type { MediaFiles } from "./showcaseView";
 import LiveScreen from "./LiveScreen";
 import FlagshipHalo from "./FlagshipHalo";
@@ -307,7 +308,8 @@ function HallLogic() {
       const t = performance.now() / 1000;
       if (t - lastSaid < ENTRY_COOLDOWN_S) return;
       lastSaid = t;
-      const first = HALL.projects[0];
+      const ordered = leadFirst(HALL.projects, LEAD_ID);
+      const first = ordered[0];
       const name = profile.name.split(" ")[0];
       useRobot.getState().say(
         HALL.projects.length
@@ -315,7 +317,7 @@ function HallLogic() {
           : `The stands are waiting for ${name}'s first project. Check back soon!`,
         first
           ? [
-              ...HALL.projects.slice(0, 2).map((p) => ({ label: `Open ${p.name}`, action: { type: "openProject" as const, projectId: p.id } })),
+              ...ordered.slice(0, 2).map((p) => ({ label: `Open ${p.name}`, action: { type: "openProject" as const, projectId: p.id } })),
               { label: "Show me around", message: "Show me around" },
             ]
           : [{ label: "Show me around", message: "Show me around" }],
@@ -332,6 +334,7 @@ function DebugHook() {
     if (process.env.NODE_ENV === "production" && !new URLSearchParams(window.location.search).has("debug")) return;
     const w = window as unknown as { __halls?: unknown };
     w.__halls = {
+      lead: LEAD_ID,
       counts: { projects: HALL.projects.length, stands: STANDS.length, spots: SPOTS.length, courses: HALL.courses.length },
       /** Clear the robot's speech bubble (clean screenshots). */
       hideBubble: () => useRobot.getState().hide(),
@@ -340,7 +343,7 @@ function DebugHook() {
       dioramas: dioramaDebug,
       /** Hide/show a showcase layer ("halo", "live", "packets", "labels") to measure its cost. */
       hide: (part: string, on = true) => (on ? debugHidden.add(part) : debugHidden.delete(part)),
-      books: () => SHELF.books.map((b) => ({ x: b.x, y: b.y, z: SHELF.z + SHELF.d / 2 - 0.02 })),
+      books: () => (SHELF?.books ?? []).map((b) => ({ x: b.x, y: b.y, z: SHELF!.z + SHELF!.d / 2 - 0.02 })),
       /** World point -> CSS px in the canvas. */
       screen: (x: number, y: number, z: number) => {
         const v = new THREE.Vector3(x, y, z).project(camera);

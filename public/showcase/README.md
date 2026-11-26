@@ -82,3 +82,5 @@ node --no-warnings --import ./scripts/ts-resolve.mjs --test "src/**/*.test.ts"  
 
 If you edit `src/content/profile.ts` on `main` while a feature branch is also changing it, git will
 need to merge the two. Make big profile edits after the feature has been merged.
+
+Note: `/recruiter` is prerendered, so a new or changed About photo (`about/photo.webp`) needs a rebuild there. The 3D world checks the file on every request.

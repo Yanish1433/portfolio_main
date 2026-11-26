@@ -30,7 +30,7 @@ export const INTENTS: IntentDef[] = [
     phrases: {
       "who are you": 4, "what are you": 4, "your name": 3, "what is your name": 4,
       "are you a robot": 4, "are you real": 3, "are you ai": 4, "are you human": 4, "are you a bot": 4,
-      "about yourself": 4, "introduce yourself": 4, "who is this": 2, "who am i talking to": 4,
+      "about yourself": 4, "what about you": 5, "how about you": 5, "introduce yourself": 4, "who is this": 2, "who am i talking to": 4,
     },
   },
   {
@@ -39,7 +39,7 @@ export const INTENTS: IntentDef[] = [
     phrases: {
       "who made": 3, "who built": 3, "who created": 3, "who is he": 3, "who is she": 3, "who is they": 3,
       "who is the": 2, "tell me about him": 3, "tell me about her": 3, "tell me about them": 3,
-      "about the developer": 3, "about the owner": 3,
+      "about the developer": 3, "about the owner": 3, "about you": 3, "your story": 3,
     },
   },
   {

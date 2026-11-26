@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { gsap, ScrollTrigger, useGSAP, MOTION_OK } from "./gsap-setup";
 import styles from "./recruiter.module.css";
 
@@ -15,6 +15,19 @@ export function ProjectsGallery({ header, children }: Props) {
   const viewport = useRef<HTMLDivElement>(null);
   const track = useRef<HTMLUListElement>(null);
   const bar = useRef<HTMLDivElement>(null);
+  // true when every card fits on screen: then no pinned scroll, and the cards are centred
+  const [fits, setFits] = useState(false);
+
+  useEffect(() => {
+    const measure = () => {
+      const tr = track.current;
+      if (tr) setFits(tr.scrollWidth <= window.innerWidth);
+    };
+    measure();
+    window.addEventListener("resize", measure);
+    document.fonts.ready.then(measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
 
   useGSAP(
     () => {
@@ -23,7 +36,7 @@ export function ProjectsGallery({ header, children }: Props) {
         const sec = section.current;
         const vp = viewport.current;
         const tr = track.current;
-        if (!sec || !vp || !tr) return;
+        if (!sec || !vp || !tr || fits) return;
 
         vp.style.overflow = "visible";
         const dist = () => Math.max(0, tr.scrollWidth - window.innerWidth);
@@ -61,11 +74,11 @@ export function ProjectsGallery({ header, children }: Props) {
       });
       return () => mm.revert();
     },
-    { scope: section },
+    { scope: section, dependencies: [fits] },
   );
 
   return (
-    <section ref={section} id="projects" className={styles.gallery} aria-labelledby="projects-title">
+    <section ref={section} id="projects" className={styles.gallery} data-fits={fits ? "" : undefined} aria-labelledby="projects-title">
       {header}
       <div ref={viewport} className={styles.galleryViewport}>
         <ul ref={track} className={styles.galleryTrack}>
