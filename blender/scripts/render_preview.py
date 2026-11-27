@@ -205,6 +205,19 @@ def shot_dance(objs):
     body_shot(objs, "dance", 28, clip=("Dance", 0.0), warm=True, dist=5.0, el=0.75, tgt_z=0.85)
 
 
+def shot_dance_flag(objs):
+    """Dance mid flag-wave (frame 200 of 450): right fist raised, grip closed."""
+    body_shot(objs, "dance_flag", 20, clip=("Dance", 200 / 30), warm=True, dist=5.0, el=1.0, tgt_z=1.0)
+
+
+def shot_run_contact(objs):
+    body_shot(objs, "run_contact", 90, clip=("Run", 0.0), dist=5.4, el=0.95, tgt_z=0.9)
+
+
+def shot_run_flight(objs):
+    body_shot(objs, "run_flight", 90, clip=("Run", 9 / 30), dist=5.4, el=0.95, tgt_z=0.9)
+
+
 def shot_testpose(objs):
     """Two copies: walk extreme (left) and the low dance stance mid-sweep (right)."""
     objs2 = import_glb(args.glb)

@@ -9,6 +9,16 @@ import s from "./recruiterBook.module.css";
 
 type Props = { name: string; year: number; video: string | null; poster: string | null; shot: string | null };
 
+/** Two small leather photo corners over the picture's bottom corners (decorative). */
+export function PhotoCorners() {
+  return (
+    <span className={s.corners} aria-hidden="true">
+      <i />
+      <i />
+    </span>
+  );
+}
+
 export function TapedMedia({ name, year, video, poster, shot }: Props) {
   const active = usePageActive();
   const ref = useRef<HTMLVideoElement>(null);
@@ -67,6 +77,7 @@ export function TapedMedia({ name, year, video, poster, shot }: Props) {
           <span aria-hidden="true">▶</span>
         </button>
       )}
+      <PhotoCorners />
       <figcaption>{year}</figcaption>
     </figure>
   );

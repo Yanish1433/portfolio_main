@@ -55,11 +55,23 @@ export function lookOf(minutes: number): { theme: Theme; glow: number } {
   return { theme: themeAt(minutes), glow: timeToLook(minutes).t };
 }
 
-/** Put a time on a wrapper element (data-theme, --glow) and tell listeners. */
+export type Tod = "morning" | "day" | "evening" | "night";
+
+/** Four looks for pictures: morning 05:30-10:00, day 10:00-16:30, evening 16:30-19:15, night otherwise. timeScript.ts repeats it inline. */
+export function todAt(minutes: number): Tod {
+  const m = wrapMinutes(Math.round(minutes));
+  if (m >= 330 && m < 600) return "morning";
+  if (m >= 600 && m < 990) return "day";
+  if (m >= 990 && m < 1155) return "evening";
+  return "night";
+}
+
+/** Put a time on a wrapper element (data-theme, data-tod, --glow) and tell listeners. */
 export function applyClock(el: HTMLElement | null, minutes: number) {
   const { theme, glow } = lookOf(minutes);
   if (el) {
     el.dataset.theme = theme;
+    el.dataset.tod = todAt(minutes);
     el.style.setProperty("--glow", glow.toFixed(3));
   }
   document.documentElement.dataset.theme = theme === "night" ? "dark" : "light";

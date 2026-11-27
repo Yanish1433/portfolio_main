@@ -1,0 +1,78 @@
+/* The antique cover. Layered gradients + two tiny tiled WebPs (/book/leather.webp, /book/noise.webp). No blur filters, no blend modes.
+   Only transform and opacity animate. --g is the shared night glow (0 day .. 1 deep night). */
+.wrap { position: absolute; inset: 0; z-index: 20; cursor: pointer; --g: var(--glow, 0); perspective: 2600px; }
+:global([data-cover="seen"]) .wrap { display: none; }
+.defs { position: absolute; width: 0; height: 0; }
+
+/* gilded page edges peeking out under the cover (the right fore-edge and the foot) */
+.edgeR, .edgeB { position: absolute; z-index: 0; background: repeating-linear-gradient(90deg, #e9cf86 0 1.5px, #bf9a45 1.5px 2.5px); box-shadow: 0 0 calc(var(--g) * 6px) rgba(255, 205, 110, calc(var(--g) * 0.9)); }
+.edgeR { top: 6px; bottom: -4px; right: -6px; width: 8px; border-radius: 0 3px 3px 0; }
+.edgeB { left: 8px; right: -4px; bottom: -6px; height: 8px; border-radius: 0 0 3px 3px; background: repeating-linear-gradient(180deg, #e9cf86 0 1.5px, #bf9a45 1.5px 2.5px); }
+/* the cast shadow the swinging cover throws on the pages */
+.shade { position: absolute; inset: 0; z-index: 1; border-radius: 6px; opacity: 0; pointer-events: none; background: linear-gradient(90deg, rgba(20, 8, 0, 0.7), rgba(20, 8, 0, 0.1) 70%, transparent); }
+
+.cover { position: absolute; inset: 0; z-index: 2; overflow: hidden; border-radius: 4px 8px 8px 4px; transform-origin: left center; backface-visibility: hidden;
+  background: radial-gradient(ellipse at 50% 45%, rgba(0, 0, 0, 0) 40%, rgba(10, 4, 0, 0.55) 100%), linear-gradient(135deg, #5a2616, #3a170d 55%, #4b1e10), #3a170d;
+  box-shadow: inset 0 0 0 1px rgba(255, 220, 160, 0.25), inset 0 0 40px rgba(0, 0, 0, 0.55), 0 8px 18px rgba(0, 0, 0, 0.55); color: #f3d98a; }
+.grain { position: absolute; inset: 0; opacity: 0.85; background: url(/book/leather.webp) repeat; background-size: 192px 192px; }
+/* rubbed, scuffed edges and a few worn patches */
+.wear { position: absolute; inset: 0; box-shadow: inset 0 0 0 2px rgba(222, 170, 108, 0.28); background:
+  radial-gradient(ellipse at 100% 100%, rgba(214, 160, 96, 0.45), transparent 22%), radial-gradient(ellipse at 0% 100%, rgba(214, 160, 96, 0.3), transparent 18%),
+  radial-gradient(ellipse at 100% 0%, rgba(214, 160, 96, 0.35), transparent 20%), radial-gradient(circle at 78% 62%, rgba(190, 130, 80, 0.22), transparent 90px),
+  radial-gradient(circle at 18% 34%, rgba(190, 130, 80, 0.16), transparent 70px), url(/book/noise.webp) repeat; }
+/* day: soft window light from the upper left; night: the lamp rakes across the leather */
+.window { position: absolute; inset: 0; opacity: calc(1 - var(--g)); background: linear-gradient(118deg, rgba(255, 248, 222, 0.34), rgba(255, 248, 222, 0.08) 42%, transparent 62%); }
+.lamp { position: absolute; inset: 0; opacity: var(--g); background: radial-gradient(ellipse 70% 60% at 30% 0%, rgba(255, 190, 100, 0.55), transparent 70%), radial-gradient(ellipse at 50% 120%, rgba(0, 0, 0, 0.35), transparent 60%); }
+.sheen { position: absolute; top: -10%; bottom: -10%; left: 0; width: 22%; pointer-events: none; opacity: calc(0.15 + var(--g) * 0.5); background: linear-gradient(100deg, transparent, rgba(255, 236, 180, 0.55), transparent); transform: translateX(-120%) skewX(-14deg); animation: sheen 9s ease-in-out 1.2s infinite; }
+@keyframes sheen { 0%, 55% { transform: translateX(-120%) skewX(-14deg); } 100% { transform: translateX(560%) skewX(-14deg); } }
+
+/* tooled lines and the Dhaka border */
+.line { position: absolute; border-radius: 3px; pointer-events: none; }
+.line[data-k="outer"] { inset: 14px; border: 1.5px solid rgba(8, 3, 0, 0.55); box-shadow: 0 1px 0 rgba(231, 183, 122, 0.3), inset 0 1px 0 rgba(231, 183, 122, 0.2); }
+.line[data-k="inner"] { inset: 52px; border: 1.5px solid rgba(8, 3, 0, 0.55); box-shadow: 0 1px 0 rgba(231, 183, 122, 0.3); }
+.border { position: absolute; inset: 33px; width: calc(100% - 66px); height: calc(100% - 66px); overflow: visible; pointer-events: none; }
+/* raised bands on the spine (hinge) side */
+.spineStrip { position: absolute; top: 0; bottom: 0; left: 0; width: 26px; background:
+  linear-gradient(180deg, transparent 12%, rgba(255, 215, 150, 0.4) 12.4%, rgba(0, 0, 0, 0.6) 14.2%, transparent 14.8%, transparent 31%, rgba(255, 215, 150, 0.4) 31.4%, rgba(0, 0, 0, 0.6) 33.2%, transparent 33.8%, transparent 49%, rgba(255, 215, 150, 0.4) 49.4%, rgba(0, 0, 0, 0.6) 51.2%, transparent 51.8%, transparent 67%, rgba(255, 215, 150, 0.4) 67.4%, rgba(0, 0, 0, 0.6) 69.2%, transparent 69.8%, transparent 85%, rgba(255, 215, 150, 0.4) 85.4%, rgba(0, 0, 0, 0.6) 87.2%, transparent 87.8%),
+  linear-gradient(90deg, rgba(0, 0, 0, 0.55), rgba(255, 200, 140, 0.12) 55%, rgba(0, 0, 0, 0.45)); }
+
+.corner { position: absolute; width: 64px; height: 64px; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6)); }
+.corner[data-c="tl"] { top: 0; left: 0; } .corner[data-c="tr"] { top: 0; right: 0; transform: scaleX(-1); }
+.corner[data-c="bl"] { bottom: 0; left: 0; transform: scaleY(-1); } .corner[data-c="br"] { bottom: 0; right: 0; transform: scale(-1, -1); }
+
+/* the gilt title plate */
+.plate { position: absolute; left: 50%; top: 50%; width: min(86%, 36rem); padding: 20px 8px 24px; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center; font-family: "Palatino Linotype", Palatino, "Book Antiqua", Georgia, serif; }
+.lotus { width: 54px; height: 54px; opacity: 0.92; filter: drop-shadow(0 1px 0 rgba(0, 0, 0, 0.7)); }
+.name { padding: 0 6px; font-size: clamp(1.5rem, 4.6vw, 2.9rem); line-height: 1.05; font-weight: 700; letter-spacing: 0.06em; white-space: nowrap; text-transform: uppercase; color: #e6c15a;
+  background: url(/book/noise.webp) repeat, linear-gradient(180deg, #fff1b8 0%, #e2b947 38%, #9b6b16 62%, #f0cf72 100%);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; filter: drop-shadow(0 1.5px 0 rgba(0, 0, 0, 0.75)); }
+.rule { width: min(220px, 70%); height: 14px; }
+.sub { font-size: clamp(0.7rem, 1.9vw, 1rem); letter-spacing: 0.16em; text-transform: uppercase; color: #d8b45a; text-shadow: 0 1px 0 rgba(0, 0, 0, 0.8); }
+.hint { position: absolute; left: 0; right: 0; bottom: 70px; text-align: center; font-family: "Palatino Linotype", Palatino, Georgia, serif; font-size: 0.8rem; letter-spacing: 0.3em; text-transform: uppercase; color: #d8b45a; opacity: 0.75; text-shadow: 0 1px 0 rgba(0, 0, 0, 0.8); }
+
+/* the brass clasp on the fore-edge */
+.clasp { position: absolute; right: -4px; top: 50%; width: 54px; height: 116px; margin-top: -58px; filter: drop-shadow(0 2px 2px rgba(0, 0, 0, 0.6)); }
+.clasp svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.tongue { transform-origin: 28px 0; transform-box: view-box; }
+.glint { position: absolute; left: 50%; top: 22%; width: 10px; height: 10px; margin: -5px 0 0 -5px; border-radius: 50%; opacity: 0; background: radial-gradient(circle, #fff 0%, rgba(255, 244, 190, 0.9) 30%, transparent 70%); }
+
+/* dust motes in the lamp light (transform + opacity only) */
+.motes { position: absolute; inset: 0; z-index: 3; pointer-events: none; overflow: hidden; border-radius: 6px; }
+.motes i { position: absolute; left: var(--x); top: var(--y); width: var(--s); height: var(--s); border-radius: 50%; background: #ffe6a8; opacity: 0; box-shadow: 0 0 4px rgba(255, 220, 140, 0.9); animation: mote var(--d) ease-in-out var(--w) infinite; }
+@keyframes mote { 0% { transform: translate(0, 0); opacity: 0; } 20% { opacity: 0.85; } 60% { opacity: 0.5; } 100% { transform: translate(18px, -46px); opacity: 0; } }
+
+/* opening: the clasp unlatches with a glint, then the cover swings on its hinge */
+.wrap[data-open="true"] .tongue { animation: unlatch 380ms cubic-bezier(0.3, 0, 0.3, 1) forwards; }
+.wrap[data-open="true"] .glint { animation: glint 520ms ease-out 80ms; }
+.wrap[data-open="true"] .cover { animation: coverOpen 1100ms cubic-bezier(0.55, 0, 0.25, 1) 420ms forwards; }
+.wrap[data-open="true"] .shade { animation: shade 1100ms ease-in-out 420ms forwards; }
+@keyframes unlatch { to { transform: rotate(-34deg) translate(6px, -4px); } }
+@keyframes glint { 0% { transform: scale(0.2); opacity: 0; } 35% { transform: scale(2.6); opacity: 1; } 100% { transform: scale(1); opacity: 0; } }
+@keyframes coverOpen { 0% { transform: rotateY(0); opacity: 1; } 72% { opacity: 1; } 100% { transform: rotateY(-172deg); opacity: 0; } }
+@keyframes shade { 0% { opacity: 0; } 45% { opacity: 0.85; } 100% { opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) { .wrap { display: none; } }
+@media (max-width: 640px) {
+  .corner { width: 48px; height: 48px; } .line[data-k="inner"] { inset: 40px; } .border { inset: 27px; width: calc(100% - 54px); height: calc(100% - 54px); }
+  .border rect { stroke-width: 18; } .clasp { width: 38px; height: 82px; margin-top: -41px; } .hint { bottom: 52px; }
+}

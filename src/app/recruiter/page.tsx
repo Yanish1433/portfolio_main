@@ -1,3 +1,4 @@
+import { preload } from "react-dom";
 import { RobotChatClient } from "@/components/recruiter/RobotChatClient";
 import { PagodaHero } from "@/components/recruiter/PagodaHero";
 import { RecruiterBook } from "@/components/recruiter/book/RecruiterBook";
@@ -8,6 +9,8 @@ import { profile } from "@/content/profile";
 import TimePill from "@/lib/time/TimePill";
 
 export default function RecruiterPage() {
+  // The cover is the first thing painted: fetch its leather early.
+  preload("/book/leather.webp", { as: "image" });
   return (
     <>
       <PagodaHero />

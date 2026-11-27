@@ -10,6 +10,9 @@ import { AVATAR_HEIGHT, characterById, GAIT_CLIPS, gaitCycleRate, type Character
 import { avatarMotion, RUN_SPEED, WALK_SPEED } from "./input";
 import { applyLookdev, releaseLookdev } from "./lookdev";
 import { useWorld } from "@/store/world";
+import { createDanceAura, createDanceFlag, type DanceAura, type DanceFlag } from "./dance/danceFx";
+import { FLAG_HIDE_BEFORE_END, FLAG_SHOW_FROM, HAND_BONE_RE } from "./dance/danceMath";
+import { themeState } from "./nepal/themeState";
 
 const DRACO_PATH = "/draco/";
 const TARGET_HEIGHT = AVATAR_HEIGHT;
@@ -263,7 +266,14 @@ function CharacterModel({ url, gait, idleRelax, idleArmDown }: { url: string; ga
   const gltf = useGLTF(url, DRACO_PATH) as unknown as GLTF;
   loaded.set(url, gltf);
   const root = useRef<THREE.Group>(null);
-  const { gl } = useThree();
+  const { gl, scene: threeScene, camera } = useThree();
+  const fx = useRef<{ flag: DanceFlag | null; aura: DanceAura | null; reduced: boolean; lite: boolean; centre: THREE.Vector3 }>({
+    flag: null,
+    aura: null,
+    reduced: false,
+    lite: false,
+    centre: new THREE.Vector3(),
+  });
 
   // Clone so the cached glTF scene (and its skeleton) can be reused safely.
   const { scene, scale, offsetY } = useMemo(() => {
@@ -306,6 +316,25 @@ function CharacterModel({ url, gait, idleRelax, idleArmDown }: { url: string; ga
     return { mixer, idle, dance, walk, run, walkDur: walkClip?.duration ?? 1, runDur: runClip?.duration ?? 1 };
   }, [scene, gltf.animations]);
 
+  // Dance flag (right hand) and background aura: built once per model, mounted in the draw list only while dancing.
+  useEffect(() => {
+    const f = fx.current;
+    f.reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    f.lite = window.matchMedia("(pointer: coarse)").matches || new URLSearchParams(window.location.search).getAll("perf").includes("low");
+    let hand: THREE.Object3D | null = null;
+    scene.traverse((o) => {
+      if (!hand && (o as THREE.Bone).isBone && HAND_BONE_RE.test(o.name)) hand = o;
+    });
+    if (hand) f.flag = createDanceFlag(hand);
+    else if (process.env.NODE_ENV !== "production") console.warn("[Avatar] no right-hand bone found; the dance flag is off");
+    if (!f.lite) f.aura = createDanceAura(threeScene);
+    return () => {
+      f.flag?.dispose();
+      f.aura?.dispose();
+      f.flag = f.aura = null;
+    };
+  }, [scene, threeScene]);
+
   const st = useRef({
     rig: null as Rig | null,
     /** Arm bones captured at the relaxed (idleArmDown) pose. */
@@ -343,7 +372,16 @@ function CharacterModel({ url, gait, idleRelax, idleArmDown }: { url: string; ga
     };
     mixer.addEventListener("finished", onFinished);
     st.current.stopDance = backToIdle;
+    // Esc stops the dance, unless it is closing a panel / the video / the picker this same keypress.
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape" || !st.current.dancing) return;
+      const w = useWorld.getState();
+      if (w.info || w.cinema || w.pickerOpen || w.panelOpen) return;
+      backToIdle();
+    };
+    window.addEventListener("keydown", onKey);
     return () => {
+      window.removeEventListener("keydown", onKey);
       mixer.removeEventListener("finished", onFinished);
       mixer.stopAllAction();
       mixer.uncacheRoot(scene);
@@ -380,10 +418,13 @@ function CharacterModel({ url, gait, idleRelax, idleArmDown }: { url: string; ga
     }
 
     // Dance emote (G / button) or a fresh spawn.
-    const wantDance = world.danceSeq !== s.danceSeq || world.spawnSeq !== s.spawnSeq;
+    const gPressed = world.danceSeq !== s.danceSeq;
+    const wantDance = gPressed || world.spawnSeq !== s.spawnSeq;
     s.danceSeq = world.danceSeq;
     s.spawnSeq = world.spawnSeq;
-    if (wantDance && dance && avatarMotion.speed < 0.3) {
+    if (gPressed && s.dancing && world.spawnSeq === s.spawnSeq) {
+      s.stopDance?.(); // G again stops the dance
+    } else if (wantDance && dance && avatarMotion.speed < 0.3) {
       s.dancing = true;
       dance.reset();
       dance.setEffectiveWeight(0);
@@ -507,6 +548,18 @@ function CharacterModel({ url, gait, idleRelax, idleArmDown }: { url: string; ga
       const bounce = g("bounce", run) * w * lerp(walkBob, runBob, run);
       const hips = r.hips?.bone;
       if (hips && s.up) hips.position.addScaledVector(s.up, bounce);
+    }
+    // Flag + aura: only in the follow camera (not eagle / cinema), and only while dancing.
+    const f = fx.current;
+    const night = themeState.t;
+    const fxOn = world.cameraMode === "follow" && !world.cinema;
+    const dt0 = dance?.time ?? 0;
+    const inWindow = dt0 >= FLAG_SHOW_FROM && dt0 < (dance?.getClip().duration ?? 15) - FLAG_HIDE_BEFORE_END;
+    f.flag?.update(dt, s.dancing && fxOn && inWindow, { reduced: f.reduced, night });
+    if (f.aura && root.current) {
+      root.current.getWorldPosition(f.centre);
+      f.centre.y += 1.1;
+      f.aura.update(dt, fxOn ? s.dw : 0, camera, f.centre, { reduced: f.reduced, night });
     }
     if (root.current) root.current.position.y = offsetY;
   });

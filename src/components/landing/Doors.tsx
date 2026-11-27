@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import type { MouseEvent } from "react";
 import { BOOK_VIDEO_EVENT } from "@/components/recruiter/book/active";
+import { todAt } from "@/lib/time/clock";
 import { RECRUITER_HREF, WORLD_HREF } from "./routes";
 import s from "./landing.module.css";
 
@@ -17,6 +18,27 @@ export function ExploreDoor() {
   const router = useRouter();
   const card = useRef<HTMLAnchorElement>(null);
   const video = useRef<HTMLVideoElement>(null);
+  const fade = useRef<HTMLSpanElement>(null);
+
+  // The still overview follows the shared clock: when the time-of-day band changes, the old picture fades out.
+  useEffect(() => {
+    let last = card.current?.closest<HTMLElement>("[data-time-root]")?.dataset.tod;
+    const onTime = (e: Event) => {
+      const next = todAt((e as CustomEvent<number>).detail);
+      const f = fade.current;
+      if (f && last && next !== last && !reduced()) {
+        f.style.transition = "none";
+        f.dataset.from = last;
+        f.style.opacity = "1";
+        void f.offsetWidth;
+        f.style.transition = "opacity 0.7s ease";
+        f.style.opacity = "0";
+      }
+      last = next;
+    };
+    window.addEventListener("world-time", onTime);
+    return () => window.removeEventListener("world-time", onTime);
+  }, []);
 
   const canPlay = () =>
     window.matchMedia("(min-width: 901px) and (hover: hover)").matches &&
@@ -56,8 +78,9 @@ export function ExploreDoor() {
       onTouchStart={() => router.prefetch(WORLD_HREF)}
       onClick={go}
     >
-      <span className={s.preview} aria-hidden="true">
-        <video ref={video} muted loop playsInline preload="none" tabIndex={-1} />
+      <span className={s.preview} role="img" aria-label="Overview of the 3D Bhaktapur town">
+        <span ref={fade} className={s.fade} aria-hidden="true" />
+        <video aria-hidden="true" ref={video} muted loop playsInline preload="none" tabIndex={-1} />
       </span>
       <span className={s.doorTitle}>Explore my 3D world</span>
       <span className={s.doorMeta}>~3 min · fun</span>

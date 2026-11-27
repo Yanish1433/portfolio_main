@@ -85,8 +85,11 @@ Bakes are 2048² (normal, base colour, roughness, AO -> ORM), downscaled to 1024
 * **Bells:** rigid `Hips`. **Capes:** `Shoulder`/`Spine2` → `Arm`. **Wrist bands:** `ForeArm`. **Sandals:** `Foot`/`ToeBase`.
 * **Clips** (30 fps, exported as separate glTF animations):
   `Idle` is a 2 s loop with arms relaxed, breathing and a slight sway.
-  `Dance` is a 2.5 s in-place loop: low wide stance, a stomp on each side, slow arm sweeps, the raised hand switching sides.
-  The Hips move only vertically; the feet are re-grounded on every key.
+  `Walk` 1.07 s, `Run` 0.7 s (21 frames, ground speed 4.2811 model m/s, stride 3.0 m per cycle; stance foot locked to that speed).
+  `Dance` is a 15 s one-shot flag dance (450 frames; first/last frame = Idle t=0): stomps + half-turn, overhead flag wave, one-foot spin,
+  big flag sweep, step-together + deep bow. The RIGHT hand keeps a closed grip on a 3 cm pole (`mixamorig:RightHand`, grip centre
+  (-0.0069, 0.0867, 0.0059) m in bone-local space, pole up-axis (0.4513, 0.2419, 0.859)); planted feet are solved onto the floor per frame
+  (`foot_state`/`solve_foot` in `clips.py`). Preview any clip: `scripts/clips_preview.py --clip Dance --pole --frames 200,300`.
 * **Materials:** `Mask` (2048 base/ORM/normal, no coat), `Metal` (gold factor), `Hair` (512 strand textures),
   `Robe` (1024 atlas: skirt, sash, capes, wrist bands, sandals), `Tunic` (1024 ORM/normal, saffron factor), `Skin` (factor).
   The visible gloss comes from the roughness maps (lacquer 0.26, worn edges up to 0.46). Use an environment map in three.js.

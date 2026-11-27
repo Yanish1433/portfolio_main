@@ -15,7 +15,12 @@ import {
   DEFAULT_VIEW,
   EAGLE_DEFAULT,
   EAGLE_SECS,
-  FLY_IN_SECS,
+  CINE_SECS,
+  CAM_FOV,
+  cinematicFlyPose,
+  skipBlend,
+  smoothstep,
+  SKIP_SECS,
   GestureTracker,
   WHEEL_ZOOM,
   clampDist,
@@ -27,7 +32,6 @@ import {
   type Pose,
   clampPitch,
   clampYaw,
-  flyInPose,
   frozenFlyT,
   moveVector,
   newFrameState,
@@ -107,6 +111,9 @@ type DebugApi = {
 };
 
 // ?debug only (set through window.__world.cam): never set in normal use.
+/** ?debug only: per-frame dt (ms) during the fly-in, `window.__flyDt`. */
+const debugFlyDt: number[] | null =
+  typeof window !== "undefined" && new URLSearchParams(window.location.search).has("debug") ? ((window as unknown as { __flyDt: number[] }).__flyDt = []) : null;
 let debugCamView: { pos: [number, number, number]; look: [number, number, number] } | null = null;
 
 export default function Player({ characters, reducedMotion }: { characters: CharacterId[]; reducedMotion: boolean }) {
@@ -150,7 +157,7 @@ export default function Player({ characters, reducedMotion }: { characters: Char
     /** First-visit fly-in: checked once when the world has loaded; `t0` in performance.now() ms, `frozen` for screenshots. */
     /** Eagle (sky) view: orbit targets + the glide. `t` 0..1 (in = up, out = down); `from` = the pose the glide leaves. */
     eagle: { on: false, out: false, t: 1, yaw: 0, pitch: EAGLE_DEFAULT.pitch, dist: EAGLE_DEFAULT.dist, yawT: 0, pitchT: EAGLE_DEFAULT.pitch, distT: EAGLE_DEFAULT.dist, from: null as Pose | null },
-    fly: { checked: false, on: false, t0: 0, frozen: null as number | null, off: null as (() => void) | null },
+    fly: { checked: false, on: false, t: 0, frozen: null as number | null, off: null as (() => void) | null, skipV: null as null | [number, number, number], skipLV: null as null | [number, number, number], skip: null as null | { t: number; pos: [number, number, number]; look: [number, number, number]; v: [number, number, number]; lv: [number, number, number]; roll: number; fov: number }, prev: null as null | { pos: [number, number, number]; look: [number, number, number]; roll: number; fov: number } },
   });
   const blob = useRef<THREE.Mesh>(null);
   const blobMat = useMemo(
@@ -196,6 +203,15 @@ export default function Player({ characters, reducedMotion }: { characters: Char
     f.on = false;
     f.off?.();
     f.off = null;
+    f.skip = null;
+    f.prev = null;
+    // restore the exact follow-camera lens and horizon (cinema / shoulder view assume FOV 45, no roll)
+    const cam = camera as THREE.PerspectiveCamera;
+    cam.up.set(0, 1, 0);
+    if (cam.fov !== CAM_FOV) {
+      cam.fov = CAM_FOV;
+      cam.updateProjectionMatrix();
+    }
     if (land && !reducedMotion) s.current.showcaseUntil = performance.now() / 1000 + SHOWCASE_SECS;
   };
   /** Every visit: the camera starts high above the island and glides down. Any click / key / touch skips it. */
@@ -204,10 +220,17 @@ export default function Player({ characters, reducedMotion }: { characters: Char
     if (!shouldFlyIn({ reducedMotion, search })) return;
     const f = s.current.fly;
     f.on = true;
-    f.t0 = performance.now();
+    f.t = 0;
+    f.skip = null;
+    f.prev = null;
     f.frozen = frozenFlyT(search);
     s.current.showcaseUntil = 0;
-    const skip = () => endFly(false);
+    // any input: a short smooth blend to the follow pose (never a jump); the blend itself is in useFrame
+    const skip = () => {
+      const p = f.prev;
+      if (!f.skip && p) f.skip = { t: 0, pos: [...p.pos], look: [...p.look], v: f.skipV ?? [0, 0, 0], lv: f.skipLV ?? [0, 0, 0], roll: p.roll, fov: p.fov };
+      else if (!p) endFly(false);
+    };
     const opts = { capture: true } as const;
     for (const ev of ["pointerdown", "keydown", "touchstart", "wheel"] as const) window.addEventListener(ev, skip, opts);
     f.off = () => {
@@ -743,13 +766,47 @@ export default function Player({ characters, reducedMotion }: { characters: Char
     camera.lookAt(camRig.look.x, camRig.look.y, camRig.look.z);
     if (st.fly.on) {
       // Only the camera write is blended: camRig keeps the normal pose (cinema flies back to it), and the
-      // fly pose ends exactly on it, so landing has no jump.
-      const t = st.fly.frozen ?? (performance.now() - st.fly.t0) / 1000 / FLY_IN_SECS;
-      if (t >= 1) endFly(true);
-      else {
-        const pose = flyInPose(t, { pos: [camRig.pos.x, camRig.pos.y, camRig.pos.z], look: [camRig.look.x, camRig.look.y, camRig.look.z] });
+      // fly pose ends exactly on it, so landing has no jump. Progress is accumulated frame time (clamped
+      // so a hitch can't skip the shot), not the wall clock.
+      const f = st.fly;
+      const cam = camera as THREE.PerspectiveCamera;
+      const end: Pose = { pos: [camRig.pos.x, camRig.pos.y, camRig.pos.z], look: [camRig.look.x, camRig.look.y, camRig.look.z] };
+      let pose: { pos: [number, number, number]; look: [number, number, number]; roll: number; fov: number } | null = null;
+      if (f.skip) {
+        const k = f.skip;
+        k.t += dt;
+        if (k.t >= SKIP_SECS) endFly(false);
+        else {
+          const e = smoothstep(k.t / SKIP_SECS);
+          pose = {
+            pos: skipBlend(k.t, k.pos, k.v, end.pos),
+            look: skipBlend(k.t, k.look, k.lv, end.look),
+            roll: k.roll * (1 - e),
+            fov: k.fov + (CAM_FOV - k.fov) * e,
+          };
+        }
+      } else {
+        if (f.frozen === null) f.t += dt;
+        const t = f.frozen ?? f.t / CINE_SECS;
+        if (t >= 1) endFly(true);
+        else pose = cinematicFlyPose(t, end);
+      }
+      if (pose && st.fly.on) {
+        const prev = f.prev;
+        if (prev && dt > 0 && !f.skip) {
+          // live velocity, handed to a skip that may start next frame
+          f.skipV = [0, 1, 2].map((i) => (pose!.pos[i] - prev.pos[i]) / dt) as [number, number, number];
+          f.skipLV = [0, 1, 2].map((i) => (pose!.look[i] - prev.look[i]) / dt) as [number, number, number];
+        }
         camera.position.set(...pose.pos);
+        camera.up.set(Math.sin(pose.roll), Math.cos(pose.roll), 0);
         camera.lookAt(...pose.look);
+        if (Math.abs(cam.fov - pose.fov) > 1e-4) {
+          cam.fov = pose.fov;
+          cam.updateProjectionMatrix();
+        }
+        f.prev = { pos: pose.pos, look: pose.look, roll: pose.roll, fov: pose.fov };
+        if (debugFlyDt && f.frozen === null) debugFlyDt.push(Math.round(dtRaw * 1000 * 10) / 10);
       }
     }
     if (debugCamView) {

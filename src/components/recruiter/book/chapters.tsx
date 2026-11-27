@@ -5,7 +5,7 @@ import Link from "next/link";
 import type { CSSProperties, ReactNode } from "react";
 import { profile } from "@/content/profile";
 import type { Project } from "@/content/profile";
-import { taglineOf } from "@/content/showcase";
+import { featuredProjects, taglineOf } from "@/content/showcase";
 import { videoUrl } from "@/components/world/halls/showcaseView";
 import { ctaState, initials } from "@/components/world/about/aboutView";
 import { WORLD_HREF } from "@/components/landing/routes";
@@ -16,7 +16,8 @@ import { DownloadIcon, GithubIcon, LinkedinIcon, MailIcon } from "../icons";
 import { isPlaceholder, isRealEmail, isRealLink } from "../links";
 import type { PageDef } from "./RecruiterBook";
 import type { PageMeta } from "./nav";
-import { TapedMedia } from "./TapedMedia";
+import { PhotoCorners, TapedMedia } from "./TapedMedia";
+import { GENERIC, logoFor } from "./skillLogos";
 import s from "./recruiterBook.module.css";
 
 const isExternal = (url: string) => /^https?:/.test(url);
@@ -25,7 +26,38 @@ const extProps = (url: string) => (isExternal(url) ? { target: "_blank", rel: "n
 
 const page = (meta: PageMeta, node: ReactNode): PageDef => ({ meta, node });
 
+// Small ink doodles in the margin (decorative, not content).
+function Doodle({ kind }: { kind: "pagoda" | "flags" }) {
+  if (kind === "flags")
+    return (
+      <svg className={s.doodle} data-k="flags" viewBox="0 0 120 36" aria-hidden="true" focusable="false">
+        <path d="M2 6C30 22 90 22 118 6" />
+        {[["f1", 14, 12], ["f2", 36, 17], ["f3", 58, 19], ["f4", 80, 17], ["f5", 102, 12]].map(([c, x, y]) => (
+          <path key={c as string} className={s[c as string]} d={`M${x} ${y}h11v12h-11z`} />
+        ))}
+      </svg>
+    );
+  return (
+    <svg className={s.doodle} data-k="pagoda" viewBox="0 0 64 48" aria-hidden="true" focusable="false">
+      <path d="M32 2v6M24 14c4-2 12-2 16 0l6 4H18zM21 24c6-2 16-2 22 0l5 4H16zM18 34c8-3 20-3 28 0l5 4H13z" />
+      <path d="M22 18v6M42 18v6M20 28v6M44 28v6M16 38v8M48 38v8M28 38v8M36 38v8M10 46h44" />
+    </svg>
+  );
+}
+
 // ---------------------------------------------------------------- 2. contents
+
+/** Three real highlights: the featured projects first, then the strongest skills. Nothing invented. */
+function highlights(): { label: string; href: string }[] {
+  const out = featuredProjects().slice(0, 3).map((p) => ({ label: p.name, href: `#${p.id}` }));
+  for (const g of profile.skills) {
+    for (const sk of g.skills) {
+      if (out.length >= 3) return out;
+      if (sk.level >= 80 && !out.some((o) => o.label === sk.name)) out.push({ label: sk.name, href: "#skills" });
+    }
+  }
+  return out;
+}
 
 function Contents() {
   const { name, title, tagline, location } = profile;
@@ -36,7 +68,19 @@ function Contents() {
         {title}
         {!isPlaceholder(location) && <> · {location}</>}
       </p>
-      <p>{tagline}</p>
+      <p className={s.lede}>{tagline}</p>
+      <div className={s.wow}>
+        <ul className={s.chips} aria-label="Highlights">
+          {highlights().map((h) => (
+            <li key={h.label}>
+              <a href={h.href}>{h.label}</a>
+            </li>
+          ))}
+        </ul>
+        <a className={s.contactSeal} href="#contact">
+          Contact me <span aria-hidden="true">→</span>
+        </a>
+      </div>
       <p className={s.muted}>
         <span lang="ne">छिटो परिचय</span>: too busy to explore my 3D town? Here&rsquo;s my quick portfolio. When you have time, come back and walk through the city.
       </p>
@@ -79,6 +123,7 @@ function About({ photo }: { photo: string | null }) {
             {initials(profile.name)}
           </span>
         )}
+        <PhotoCorners />
       </figure>
       {about.story.map((l, i) => (
         <p key={i}>{l}</p>
@@ -218,29 +263,19 @@ function Workshop() {
   );
 }
 
-// ---------------------------------------------------------------- 5. skills: ink-sketch brass wheels
+// ---------------------------------------------------------------- 5. skills: real logos printed like ink stamps
 
-function gearPath(teeth: number, outer: number, inner: number): string {
-  const pts: string[] = [];
-  const step = (Math.PI * 2) / teeth;
-  for (let i = 0; i < teeth; i++) {
-    const a = i * step;
-    const at = (r: number, off: number) => `${(24 + Math.cos(a + off) * r).toFixed(1)} ${(24 + Math.sin(a + off) * r).toFixed(1)}`;
-    pts.push(`${i ? "L" : "M"}${at(inner, 0)}`, `L${at(outer, step * 0.2)}`, `L${at(outer, step * 0.5)}`, `L${at(inner, step * 0.7)}`);
-  }
-  return `${pts.join(" ")}Z`;
-}
-const GEAR = gearPath(9, 22, 17);
-
-function Wheel({ level, spin }: { level: number; spin: number }) {
-  // stronger skill = quicker wheel; neighbours turn opposite ways like meshing gears
-  const style = { "--dur": `${(16 - level * 0.1).toFixed(1)}s`, "--dir": spin % 2 ? "reverse" : "normal" } as CSSProperties;
+function Stamp({ name }: { name: string }) {
+  const l = logoFor(name);
+  if (l.kind === "brand")
+    return (
+      <svg className={s.stamp} style={{ "--c": `#${l.logo.hex}` } as CSSProperties} viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+        <path d={l.logo.path} />
+      </svg>
+    );
   return (
-    <svg className={s.gear} style={style} viewBox="0 0 48 48" aria-hidden="true" focusable="false">
-      <path d={GEAR} />
-      <circle cx="24" cy="24" r="7" />
-      <line x1="24" y1="17" x2="24" y2="31" />
-      <line x1="17" y1="24" x2="31" y2="24" />
+    <svg className={s.stamp} data-generic="true" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d={GENERIC[l.icon]} />
     </svg>
   );
 }
@@ -255,8 +290,8 @@ function Skills() {
           <h3>{group.label}</h3>
           <ul className={s.wheels}>
             {group.skills.map((sk) => (
-              <li key={sk.name} className={s.wheel}>
-                <Wheel level={sk.level} spin={n++} />
+              <li key={sk.name} className={s.wheel} style={{ "--r": `${[-1.2, 0.8, -0.5, 1.4, -1.6, 0.4][n++ % 6]}deg` } as CSSProperties}>
+                <Stamp name={sk.name} />
                 <span>
                   {sk.name}
                   <span className={s.srOnly}>, {sk.level} out of 100</span>
@@ -266,6 +301,8 @@ function Skills() {
           </ul>
         </div>
       ))}
+      <p className={s.footnote}>Logos are trademarks of their owners.</p>
+      <Doodle kind="flags" />
     </>
   );
 }
@@ -450,6 +487,7 @@ function Contact() {
           </a>
         )}
       </div>
+      <Doodle kind="pagoda" />
     </>
   );
 }

@@ -262,3 +262,68 @@ test("eagle toggle, and cinema exits eagle", () => {
   assert.equal(w.getState().cameraMode, "cinema", "no eagle during cinema");
   w.setState({ cameraMode: "follow", cinema: null });
 });
+
+// --- cinematic fly-in (step20a) ------------------------------------------------------------------
+import { DEG, CAM_FOV, CINE_SECS, cinematicFlyPose, cinematicFlyVelocity, skipBlend, smootherstep, SKIP_SECS } from "./cameraRig";
+import { warmupReady } from "./warmup/gate";
+
+const cEnd = { pos: [3, 17, 25] as [number, number, number], look: [3, 1, 8.5] as [number, number, number] };
+
+test("cinematic fly-in ends exactly on the follow pose, roll 0, fov 45", () => {
+  const e = cinematicFlyPose(1, cEnd);
+  assert.deepEqual({ pos: e.pos, look: e.look }, cEnd);
+  assert.equal(e.roll, 0);
+  assert.equal(e.fov, CAM_FOV);
+  const s = cinematicFlyPose(0, cEnd);
+  assert.ok(s.pos[1] > 40 && s.fov === 55 && s.roll === 0);
+  assert.ok(Math.abs(cinematicFlyPose(0.9999999, cEnd).pos[2] - cEnd.pos[2]) < 1e-3);
+});
+
+test("cinematic path is continuous (no jumps), height falls, roll <= 3 deg", () => {
+  let prev = cinematicFlyPose(0, cEnd);
+  let maxStep = 0;
+  for (let i = 1; i <= 2000; i++) {
+    const p = cinematicFlyPose(i / 2000, cEnd);
+    maxStep = Math.max(maxStep, Math.hypot(p.pos[0] - prev.pos[0], p.pos[1] - prev.pos[1], p.pos[2] - prev.pos[2]));
+    assert.ok(p.pos[1] <= prev.pos[1] + 1e-6, `height rose at ${i / 2000}`);
+    assert.ok(Math.abs(p.roll) <= 3 * DEG + 1e-9);
+    prev = p;
+  }
+  assert.ok(maxStep < 1.2, `jump of ${maxStep} m between samples`);
+  assert.ok(CINE_SECS >= 4 && CINE_SECS <= 5);
+});
+
+test("easing is monotonic with zero speed at both ends; velocity at the landing is 0 (matches a still rig)", () => {
+  let prev = 0;
+  for (let i = 1; i <= 100; i++) {
+    const v = smootherstep(i / 100);
+    assert.ok(v >= prev);
+    prev = v;
+  }
+  assert.equal(smootherstep(0), 0);
+  assert.equal(smootherstep(1), 1);
+  const v1 = cinematicFlyVelocity(1, cEnd);
+  const v0 = cinematicFlyVelocity(0, cEnd);
+  assert.ok(Math.hypot(...v1) < 0.5 && Math.hypot(...v0) < 0.5, "starts and lands almost at rest");
+  assert.ok(Math.hypot(...cinematicFlyVelocity(0.5, cEnd)) > 5, "moves in the middle");
+});
+
+test("skip blend starts at the live pose with its velocity and lands on the follow pose at rest", () => {
+  const from: [number, number, number] = [10, 30, 40];
+  const v: [number, number, number] = [-4, -6, -8];
+  const to: [number, number, number] = [3, 17, 25];
+  assert.deepEqual(skipBlend(0, from, v, to), from);
+  assert.deepEqual(skipBlend(SKIP_SECS, from, v, to), to);
+  const h = 1e-5;
+  const d = skipBlend(h, from, v, to);
+  for (let i = 0; i < 3; i++) assert.ok(Math.abs((d[i] - from[i]) / h - v[i]) < 0.05, "initial velocity carried");
+  const e = skipBlend(SKIP_SECS - h, from, v, to);
+  for (let i = 0; i < 3; i++) assert.ok(Math.abs((to[i] - e[i]) / h) < 0.05, "comes to rest");
+});
+
+test("warm-up gate: needs compiled (or the 1 s cap) plus 3 stable frames", () => {
+  assert.equal(warmupReady({ compiled: false, elapsedMs: 200, frames: 10 }), false);
+  assert.equal(warmupReady({ compiled: true, elapsedMs: 200, frames: 2 }), false);
+  assert.equal(warmupReady({ compiled: true, elapsedMs: 200, frames: 3 }), true);
+  assert.equal(warmupReady({ compiled: false, elapsedMs: 1000, frames: 3 }), true);
+});

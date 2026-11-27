@@ -50,8 +50,18 @@
 .doorMeta { font-size: 1.05rem; color: #6b2414; }
 .doorWorld[data-go="true"] { transform: scale(1.18); opacity: 0.2; transition: transform 0.42s ease-in, opacity 0.42s ease-in; }
 
-.preview { position: relative; width: 100%; aspect-ratio: 16 / 10; margin-bottom: 8px; overflow: hidden; border-radius: 8px; background: #1b120c url("/recruiter/poster-day.webp") center / cover no-repeat; }
-.root[data-theme="night"] .preview { background-image: url("/recruiter/poster-night.webp"); }
+.preview { position: relative; width: 100%; aspect-ratio: 16 / 10; margin-bottom: 8px; overflow: hidden; border-radius: 8px; background: #1b120c center / cover no-repeat; }
+/* the town overview for the current time: one background per [data-tod], so only that picture downloads (set before first paint by timeScript) */
+.root[data-tod="morning"] .preview { background-image: url("/landing/town-morning.webp"); }
+.root[data-tod="day"] .preview { background-image: url("/landing/town-day.webp"); }
+.root[data-tod="evening"] .preview { background-image: url("/landing/town-evening.webp"); }
+.root[data-tod="night"] .preview { background-image: url("/landing/town-night.webp"); }
+/* cross-fade: the picture just left sits on top, then fades out */
+.fade { position: absolute; inset: 0; opacity: 0; pointer-events: none; background: center / cover no-repeat; }
+.fade[data-from="morning"] { background-image: url("/landing/town-morning.webp"); }
+.fade[data-from="day"] { background-image: url("/landing/town-day.webp"); }
+.fade[data-from="evening"] { background-image: url("/landing/town-evening.webp"); }
+.fade[data-from="night"] { background-image: url("/landing/town-night.webp"); }
 .preview video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; opacity: 0; transition: opacity 0.4s; }
 .door:hover .preview video, .door:focus-visible .preview video { opacity: 1; }
 @media (max-width: 900px), (hover: none) { .preview video { display: none; } }

@@ -12,6 +12,7 @@ import type { PointerEvent as RPointerEvent, ReactNode } from "react";
 import { inkWrite } from "@/components/book";
 import { isTypingTarget } from "@/store/world";
 import { PageActive } from "./active";
+import { Cover } from "./Cover";
 import { RIBBONS, chapterOfView, dragProgress, easeTurn, hashForPage, hashToPage, leafAngle, riffleCount, shouldComplete, viewStart } from "./nav";
 import type { PageMeta } from "./nav";
 import s from "./recruiterBook.module.css";
@@ -26,7 +27,7 @@ const reducedNow = () => typeof window !== "undefined" && window.matchMedia("(pr
 const inkSeen = new Set<string>(); // "page index" keys already written this session
 const TURN_MS = 700;
 const RIFFLE_MS = 600;
-const COVER_WAIT_MS = 900;
+const COVER_WAIT_MS = 2200; // long enough to admire the cover; a tap, a key or a #hash skips it
 const NO_DRAG = "a,button:not([data-corner]),input,textarea,select,video,summary,label,[data-nodrag]";
 
 const subWide = (cb: () => void) => {
@@ -497,24 +498,18 @@ export function RecruiterBook({ pages, name, title }: { pages: PageDef[]; name: 
             </>
           )}
           {!coverGone && (
-            <div
-              className={s.cover}
-              data-open={opening}
-              aria-hidden="true"
-              onClick={() => setOpening(true)}
-              onAnimationEnd={() => {
+            <Cover
+              name={name}
+              title={title}
+              open={opening}
+              onOpen={() => setOpening(true)}
+              onDone={() => {
                 markCover();
                 setCoverGone(true);
               }}
-            >
-              <i className={s.coverCorner} data-c="tl" />
-              <i className={s.coverCorner} data-c="tr" />
-              <i className={s.coverCorner} data-c="bl" />
-              <i className={s.coverCorner} data-c="br" />
-              <span className={s.coverName}>{name}</span>
-              <span className={s.coverTitle}>{title}</span>
-            </div>
+            />
           )}
+          {coverGone && <i className={s.bookmark} aria-hidden="true" />}
         </div>
 
         <nav className={s.ribbons} aria-label="Chapters">

@@ -13,7 +13,7 @@ import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import bpy  # noqa: E402
 import numpy as np  # noqa: E402
-from mathutils import Vector  # noqa: E402
+from mathutils import Matrix, Vector  # noqa: E402
 
 import common as C  # noqa: E402
 import clips as CL  # noqa: E402
@@ -25,6 +25,10 @@ ap.add_argument("--n", type=int, default=8)
 ap.add_argument("--t0", type=int, default=-1)
 ap.add_argument("--t1", type=int, default=-1)
 ap.add_argument("--size", type=int, default=400)
+ap.add_argument("--frames", default="")        # explicit comma-separated frames (overrides --n/--t0/--t1)
+ap.add_argument("--pole", action="store_true")  # draw the 3 cm x 1.6 m pole in the right grip (checks the hand offset)
+ap.add_argument("--zoom", type=float, default=2.35)  # orthographic scale (m)
+ap.add_argument("--camz", type=float, default=0.98)
 ap.add_argument("--out", default="strip.png")
 args = ap.parse_args(C.script_args())
 
@@ -67,13 +71,13 @@ for i in range(-4, 5):
     ln.data.materials[0].diffuse_color = (0.12, 0.12, 0.12, 1)
 cam_d = bpy.data.cameras.new("Cam")
 cam_d.type = "ORTHO"
-cam_d.ortho_scale = 2.35
+cam_d.ortho_scale = args.zoom
 cam = bpy.data.objects.new("Cam", cam_d)
 sc.collection.objects.link(cam)
 sc.camera = cam
 az = math.radians(args.view)
 dist = 8.0
-cam.location = Vector((math.sin(az) * dist, -math.cos(az) * dist, 0.98))
+cam.location = Vector((math.sin(az) * dist, -math.cos(az) * dist, args.camz))
 cam.rotation_euler = (math.radians(90), 0, az)
 
 f0 = act.frame_range[0] if args.t0 < 0 else args.t0
@@ -81,10 +85,26 @@ f1 = act.frame_range[1] if args.t1 < 0 else args.t1
 span = f1 - f0
 n = args.n
 frames = [round(f0 + span * i / n) for i in range(n)]  # whole cycle, last frame not repeated
+if args.frames:
+    frames = [int(x) for x in args.frames.split(",")]
+    n = len(frames)
+pole = None
+if args.pole:
+    g = CL.GAIT_INFO["Grip"]
+    bpy.ops.mesh.primitive_cylinder_add(radius=0.015, depth=1.6, location=(0, 0, 0))
+    pole = bpy.context.object
+    pm = bpy.data.materials.new("Pole")
+    pm.diffuse_color = (0.95, 0.75, 0.1, 1)
+    pole.data.materials.append(pm)
 tiles = []
 tmp = os.path.dirname(os.path.abspath(args.out))
 for i, f in enumerate(frames):
     sc.frame_set(f)
+    if pole is not None:
+        hb = arm.evaluated_get(bpy.context.evaluated_depsgraph_get()).pose.bones[C.pbone(arm, "RightHand").name]
+        up = Vector(g["pole_up"]).normalized()
+        T = Matrix.Translation(Vector(g["centre"])) @ Vector((0, 0, 1)).rotation_difference(up).to_matrix().to_4x4()
+        pole.matrix_world = arm.matrix_world @ hb.matrix @ T
     path = os.path.join(tmp, "_tile%d.png" % i)
     sc.render.filepath = path
     bpy.ops.render.render(write_still=True)

@@ -249,7 +249,7 @@ export class GestureTracker {
 
 /** Length of the fly-in, seconds. */
 export const FLY_IN_SECS = 3.2;
-/** Where it starts: high above the island's south-west, looking at its heart. */
+/** (eagle view only now; the visit fly-in is cinematicFlyPose) Where it starts: high above the island's south-west, looking at its heart. */
 export const FLY_IN_START = { pos: [-30, 46, 80] as const, look: [0, -10, 0] as const };
 /** Sideways swing of the path (m): the glide curves in rather than running straight. */
 const FLY_SWING = 15;
@@ -274,6 +274,102 @@ export function flyBetween(t: number, start: { pos: readonly number[]; look: rea
     pos: [lerp(start.pos[0], end.pos[0]) + swing, lerp(start.pos[1], end.pos[1]), lerp(start.pos[2], end.pos[2])],
     look: [lerp(start.look[0], end.look[0]), lerp(start.look[1], end.look[1]), lerp(start.look[2], end.look[2])],
   };
+}
+
+// --- Cinematic fly-in (step20a) -----------------------------------------------------------------------
+// A Catmull-Rom spline from high in the sky, swinging round the island and settling behind Lakhey, on a
+// smootherstep progress (zero speed AND zero acceleration at both ends). The look target eases on its own
+// curve and leads slightly; a tiny bank roll and a 55 -> 45 FOV ease settle exactly to 0 / CAM_FOV.
+// Eagle view keeps using flyInPose / flyBetween above (unchanged).
+
+/** Cinematic fly-in length (s). */
+export const CINE_SECS = 4.4;
+export const CINE_FOV_START = 55;
+/** Peak bank (rad): <= 3 degrees. */
+export const CINE_ROLL_MAX = 2.5 * DEG;
+/** Skip: the camera blends from where it is to the follow pose in this long (s). */
+export const SKIP_SECS = 0.4;
+
+/** Quintic smootherstep: 0 at 0, 1 at 1, zero 1st and 2nd derivative at both ends, monotonic. */
+export const smootherstep = (t: number) => {
+  const u = clamp(t, 0, 1);
+  return u * u * u * (u * (u * 6 - 15) + 10);
+};
+export const smoothstep = (t: number) => {
+  const u = clamp(t, 0, 1);
+  return u * u * (3 - 2 * u);
+};
+
+type P3 = readonly [number, number, number];
+
+/** Uniform Catmull-Rom through p1..p2 (u 0..1) with neighbours p0 / p3; passes exactly through p1 and p2. */
+function catmull(p0: P3, p1: P3, p2: P3, p3: P3, u: number): [number, number, number] {
+  const u2 = u * u;
+  const u3 = u2 * u;
+  const f = (i: 0 | 1 | 2): number =>
+    0.5 * (2 * p1[i] + (-p0[i] + p2[i]) * u + (2 * p0[i] - 5 * p1[i] + 4 * p2[i] - p3[i]) * u2 + (-p0[i] + 3 * p1[i] - 3 * p2[i] + p3[i]) * u3);
+  return [f(0), f(1), f(2)];
+}
+
+/** The sky path's control points for a given landing pose (a swing out east, then in over the south approach). */
+function cinePoints(end: Pose): P3[] {
+  const [ex, ey, ez] = end.pos;
+  const start = FLY_IN_START.pos;
+  return [
+    [start[0] - 30, start[1] + 10, start[2] + 12], // phantom lead-in
+    [start[0], start[1], start[2]],
+    [48, ey + 0.62 * (start[1] - ey), 50],
+    [ex + 18, ey + 0.2 * (start[1] - ey), ez + 14],
+    [ex, ey, ez],
+    [ex, ey - 2, ez + 6], // phantom lead-out (tangent only)
+  ];
+}
+
+/** Position on the spline, s 0..1 over the whole path (exact at both ends). */
+function cineSpline(s: number, end: Pose): [number, number, number] {
+  const pts = cinePoints(end);
+  const segs = pts.length - 3; // 3 visible segments
+  const x = clamp(s, 0, 1) * segs;
+  const i = Math.min(segs - 1, Math.floor(x));
+  return catmull(pts[i], pts[i + 1], pts[i + 2], pts[i + 3], x - i);
+}
+
+export type CinePose = Pose & { roll: number; fov: number };
+
+/** Cinematic fly-in pose `t` (0..1) ending exactly on `end` with roll 0 and fov CAM_FOV. */
+export function cinematicFlyPose(t: number, end: Pose): CinePose {
+  const u = clamp(t, 0, 1);
+  if (u >= 1) return { pos: [end.pos[0], end.pos[1], end.pos[2]], look: [end.look[0], end.look[1], end.look[2]], roll: 0, fov: CAM_FOV };
+  const e = smootherstep(u);
+  const pos = cineSpline(e, end);
+  // the look target leads the camera a little
+  const le = smootherstep(Math.min(1, u * 1.12 + 0.03 * (1 - u)));
+  const l0 = FLY_IN_START.look;
+  const look: [number, number, number] = [0, 1, 2].map((i) => l0[i] + (end.look[i] - l0[i]) * le) as [number, number, number];
+  return { pos, look, roll: Math.sin(Math.PI * e) * (1 - e) * 1.6 * CINE_ROLL_MAX, fov: CINE_FOV_START + (CAM_FOV - CINE_FOV_START) * e };
+}
+
+/** Per-second velocity of the camera position at `t` (central difference; one-sided at the ends). */
+export function cinematicFlyVelocity(t: number, end: Pose): [number, number, number] {
+  const h = 1e-4;
+  const a = cinematicFlyPose(clamp(t - h, 0, 1), end).pos;
+  const b = cinematicFlyPose(clamp(t + h, 0, 1), end).pos;
+  const dt = (clamp(t + h, 0, 1) - clamp(t - h, 0, 1)) * CINE_SECS;
+  return [(b[0] - a[0]) / dt, (b[1] - a[1]) / dt, (b[2] - a[2]) / dt];
+}
+
+/**
+ * Skip blend: from the live pose `from` (moving at `v` m/s) to `to` over SKIP_SECS, cubic Hermite so the
+ * speed carries on smoothly and eases to rest at `to`. `t` is seconds since the skip.
+ */
+export function skipBlend(t: number, from: P3, v: P3, to: P3): [number, number, number] {
+  const s = clamp(t / SKIP_SECS, 0, 1);
+  const s2 = s * s;
+  const s3 = s2 * s;
+  const h00 = 2 * s3 - 3 * s2 + 1;
+  const h10 = s3 - 2 * s2 + s;
+  const h01 = -2 * s3 + 3 * s2;
+  return [0, 1, 2].map((i) => h00 * from[i] + h10 * SKIP_SECS * v[i] + h01 * to[i]) as [number, number, number];
 }
 
 // --- Eagle view (on-demand sky camera) ----------------------------------------------------------------

@@ -91,14 +91,14 @@
 .playBtn { position: absolute; left: 18px; bottom: 34px; display: grid; place-items: center; width: 46px; height: 46px; padding: 0 0 0 3px; font-size: 1.1rem; color: #fbe3c8; border: 0; border-radius: 50%; cursor: pointer; background: radial-gradient(circle at 32% 28%, #cf4a2d, #9a2314 62%, #741609); box-shadow: 0 3px 5px rgba(0, 0, 0, 0.4); }
 .playBtn:hover { filter: brightness(1.12); }
 
-/* ---- skills: little ink-sketch brass wheels */
-.wheels { display: grid; grid-template-columns: repeat(auto-fill, minmax(8.4rem, 1fr)); gap: 8px 10px; margin-bottom: 6px; }
-.wheel { display: flex; align-items: center; gap: 8px; }
-.gear { flex: none; width: 44px; height: 44px; color: #6b4a12; animation: spin var(--dur, 10s) linear infinite; animation-direction: var(--dir, normal); animation-play-state: paused; }
-.page[data-active="true"] .gear { animation-play-state: running; }
-@keyframes spin { to { transform: rotate(360deg); } }
-.gear path, .gear circle { fill: rgba(201, 162, 39, 0.3); stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
-.gear line { stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; }
+/* ---- skills: real logos printed like ink stamps on the paper */
+.wheels { display: grid; grid-template-columns: repeat(auto-fill, minmax(8.6rem, 1fr)); gap: 10px 10px; margin-bottom: 8px; }
+.wheel { position: relative; display: flex; align-items: center; gap: 9px; min-height: 52px; padding: 5px 8px; border-radius: 7px 10px 8px 11px / 10px 7px 11px 8px; background: rgba(255, 250, 232, 0.35); box-shadow: inset 0 0 0 1.5px rgba(43, 29, 20, 0.28); transform: rotate(var(--r, 0deg)); font-weight: 700; line-height: 1.2; }
+.wheel::after { content: ""; position: absolute; inset: 0; border-radius: inherit; pointer-events: none; background: url(/book/noise.webp) repeat; opacity: 0.75; }
+.stamp { flex: none; width: 34px; height: 34px; }
+.stamp path { fill: var(--c); stroke: #2b1d14; stroke-opacity: 0.5; stroke-width: 0.4; paint-order: stroke; }
+.stamp[data-generic="true"] path { fill: none; stroke: #2b1d14; stroke-opacity: 0.85; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; paint-order: normal; }
+.footnote { margin-top: 14px; font-size: 0.8em; opacity: 0.85; font-style: italic; }
 
 /* ---- journey: an ink line that draws itself */
 .tl { position: relative; padding-left: 30px; margin-bottom: 8px; }
@@ -138,19 +138,6 @@
 .folio { position: absolute; bottom: -26px; left: 50%; transform: translateX(-50%); z-index: 8; margin: 0; padding: 0 10px; font-size: 14px; line-height: 20px; white-space: nowrap; color: #f3d98a; pointer-events: none; }
 .frame { padding-bottom: 30px; }
 
-/* ---- the cover (first time per session): wood, brass corners, swings open on its hinge */
-.cover { position: absolute; inset: 0; z-index: 20; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center; cursor: pointer; border-radius: 6px; transform-origin: left center; backface-visibility: hidden;
-  background: var(--wood) url(/textures/ui/lokta-wood.png) repeat; box-shadow: inset 0 0 0 3px rgba(229, 193, 88, 0.55), inset 0 0 50px rgba(0, 0, 0, 0.5); color: #f3d98a; }
-.cover[data-open="true"] { animation: coverOpen 900ms cubic-bezier(0.55, 0, 0.2, 1) forwards; }
-:global([data-cover="seen"]) .cover { display: none; }
-.coverName { padding: 0 28px; font-size: clamp(1.8rem, 5vw, 3rem); font-weight: 700; letter-spacing: 0.04em; text-shadow: 0 1px 0 #1f120a, 0 0 calc(var(--g) * 16px) rgba(255, 196, 90, calc(var(--g) * 0.8)); }
-.coverTitle { padding: 0 28px; font-size: clamp(1rem, 2.4vw, 1.4rem); opacity: 0.92; }
-.coverCorner { position: absolute; width: 34px; height: 34px; background: linear-gradient(135deg, #f3d98a, #b88a1c); }
-.coverCorner[data-c="tl"] { top: 0; left: 0; border-radius: 6px 0 100% 0; } .coverCorner[data-c="tr"] { top: 0; right: 0; border-radius: 0 6px 0 100%; }
-.coverCorner[data-c="bl"] { bottom: 0; left: 0; border-radius: 0 100% 0 6px; } .coverCorner[data-c="br"] { bottom: 0; right: 0; border-radius: 100% 0 6px 0; }
-@keyframes coverOpen { from { transform: rotateY(0); } to { transform: rotateY(-170deg); opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .cover { display: none; } }
-
 /* ---- ribbon tabs on the edge (a bottom bar on phones) */
 .ribbons { position: absolute; left: calc(100% - 4px); top: 44px; z-index: 9; display: flex; flex-direction: column; gap: 10px; }
 .tab { --c: #8f2a1a; display: block; min-width: 5.6rem; padding: 7px 16px 7px 14px; font-size: 15px; font-weight: 700; line-height: 1.2; text-decoration: none; color: #fff7e6; background: linear-gradient(90deg, var(--c), color-mix(in srgb, var(--c) 78%, #000)); border-radius: 0 6px 6px 0; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4); text-shadow: 0 1px 1px rgba(0, 0, 0, 0.5); transition: transform 0.15s; }
@@ -163,7 +150,7 @@
 .sparks { position: absolute; inset: 0; z-index: 12; pointer-events: none; opacity: var(--g); }
 .sparks i { position: absolute; bottom: 14px; width: 5px; height: 5px; border-radius: 50%; background: #ffd27a; box-shadow: 0 0 7px 2px rgba(255, 190, 80, 0.85); opacity: 0; animation: rise 6s ease-in infinite; }
 @keyframes rise { 0% { transform: translate(0, 0) scale(1); opacity: 0; } 15% { opacity: 0.95; } 100% { transform: translate(14px, -150px) scale(0.4); opacity: 0; } }
-@media (prefers-reduced-motion: reduce) { .sparks, .gear { animation: none; } .sparks { display: none; } .gear { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .sparks { display: none; } .bookmark { animation: none; } }
 @media (prefers-reduced-motion: reduce) {
   .frame[data-js="true"] .tlLine path, .frame[data-js="true"] .tlItem { animation: none; stroke-dashoffset: 0; }
 }
@@ -181,3 +168,47 @@
   .tab { flex: 1 1 0; min-width: 0; padding: 10px 2px; font-size: 13px; text-align: center; border-radius: 6px; margin: 0 2px; }
   .tab:hover, .tab[aria-current="page"] { transform: translateY(-4px); }
 }
+
+/* ================= step 18d: an antique, more attractive book ================= */
+/* faint ageing: foxing at the edges, a warmer margin. Gradients only (cheap), the lokta texture stays underneath */
+.page { background-image: radial-gradient(ellipse 120px 90px at 0 0, rgba(150, 100, 50, 0.16), transparent), radial-gradient(ellipse 110px 100px at 100% 100%, rgba(150, 100, 50, 0.18), transparent), radial-gradient(circle 26px at 86% 7%, rgba(150, 95, 45, 0.1), transparent), radial-gradient(circle 18px at 8% 82%, rgba(150, 95, 45, 0.12), transparent), url(/textures/ui/lokta-paper.png); }
+.page[data-kind="back"] { background-image: url(/textures/ui/lokta-wood.png); }
+
+/* ink flourish under headings */
+.page :is(h1, h2)::after { content: ""; display: block; width: 168px; max-width: 70%; height: 12px; margin-top: 4px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 168 12'%3E%3Cpath d='M2 7C20 1 34 11 52 6S84 3 100 7s30 3 40 0' fill='none' stroke='%238f3320' stroke-width='1.6' stroke-linecap='round'/%3E%3Cpath d='M146 6l5-3 5 3-5 3z M160 6h6' fill='%238f3320' stroke='%238f3320' stroke-width='1' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat; }
+.page[data-kind="back"] :is(h1, h2)::after { display: none; }
+.page h3 { margin: 16px 0 5px; font-size: 0.95em; text-transform: uppercase; letter-spacing: 0.09em; }
+.eyebrow { text-transform: uppercase; letter-spacing: 0.14em; font-size: 0.74em; }
+.page p { margin-bottom: 10px; }
+.drop::first-letter { float: left; margin: 2px 8px 0 0; font-size: 3.1em; line-height: 0.82; font-weight: 700; color: var(--red); }
+
+/* the first spread: name, title, a one-line value, three highlights and the wax seal */
+.lede { margin: 2px 0 10px; font-size: 1.14em; line-height: 1.4; }
+.wow { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; margin: 10px 0 12px; }
+.wow .chips { margin: 0; }
+.wow .chips a { display: inline-block; padding: 5px 0; text-decoration: none; color: inherit; }
+.wow .chips li { padding: 0 12px; background: rgba(255, 250, 232, 0.4); }
+.wow .chips a:hover { color: var(--red); }
+.contactSeal { display: inline-flex; align-items: center; gap: 8px; min-height: 52px; padding: 8px 24px 8px 18px; font: inherit; font-weight: 700; font-size: 1.02em; text-decoration: none; color: #fff3e0; border-radius: 26px 30px 27px 24px / 28px 24px 30px 26px; background: radial-gradient(circle at 32% 28%, #cf4a2d, #9a2314 62%, #741609); box-shadow: inset 0 0 0 3px rgba(0, 0, 0, 0.16), inset 0 2px 3px rgba(255, 190, 160, 0.35), 0 3px 6px rgba(0, 0, 0, 0.4); text-shadow: 0 1px 1px rgba(0, 0, 0, 0.5); animation: sealPulse 3.2s ease-in-out 1.5s 3; }
+.contactSeal:hover { filter: brightness(1.12); }
+.contactSeal:focus-visible { outline: 3px solid #a67c00; outline-offset: 3px; }
+@keyframes sealPulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+@media (prefers-reduced-motion: reduce) { .contactSeal { animation: none; } }
+
+/* photo corners and washi tape on pictures */
+.taped::before, .taped::after { top: -10px; width: 70px; height: 22px; background: repeating-linear-gradient(135deg, rgba(222, 170, 120, 0.82) 0 6px, rgba(240, 214, 160, 0.82) 6px 12px); clip-path: polygon(0 8%, 4% 0, 8% 10%, 12% 0, 100% 0, 96% 20%, 100% 40%, 96% 60%, 100% 80%, 97% 100%, 8% 100%, 4% 90%, 0 100%, 3% 55%); box-shadow: none; }
+.corners { position: absolute; inset: 8px 8px 24px; pointer-events: none; }
+.corners i { position: absolute; width: 24px; height: 24px; background: #4a2f1c; }
+.corners i:nth-child(1) { left: 0; bottom: 0; clip-path: polygon(0 0, 0 100%, 100% 100%); background: linear-gradient(45deg, #3a2314, #6b4528); }
+.corners i:nth-child(2) { right: 0; bottom: 0; clip-path: polygon(100% 0, 0 100%, 100% 100%); background: linear-gradient(-45deg, #3a2314, #6b4528); }
+
+/* ribbon bookmark that sways a little */
+.bookmark { position: absolute; top: -6px; right: 40px; z-index: 8; width: 15px; height: 92px; pointer-events: none; background: linear-gradient(90deg, #7a1a10, #b5361f 55%, #8a2214); clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 90%, 0 100%); box-shadow: 0 2px 3px rgba(0, 0, 0, 0.4); transform-origin: 50% 0; animation: sway 6s ease-in-out infinite; }
+@keyframes sway { 0%, 100% { transform: rotate(-1.6deg); } 50% { transform: rotate(1.8deg); } }
+
+/* marginal doodles in ink */
+.doodle { position: absolute; right: 24px; top: 14px; width: 56px; height: 44px; color: var(--ink); opacity: 0.5; pointer-events: none; }
+.doodle[data-k="flags"] { top: 18px; width: 110px; height: 34px; }
+.doodle path, .doodle line, .doodle rect { fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.doodle .f1 { fill: #3d5f8a; stroke: none; } .doodle .f2 { fill: #f3ead2; stroke: currentColor; stroke-width: 0.8; } .doodle .f3 { fill: #a63a2a; stroke: none; } .doodle .f4 { fill: #3a6b4a; stroke: none; } .doodle .f5 { fill: #c9a227; stroke: none; }
+@media (max-width: 640px) { .bookmark { right: 22px; } .doodle { right: 52px; } }

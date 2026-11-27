@@ -26,6 +26,7 @@ import CinemaCamera from "./halls/CinemaCamera";
 import WheelGallery from "./wheels/WheelGallery";
 import WheelLabels from "./wheels/WheelLabels";
 import Threads from "./wheels/ThreadsLayer";
+import Warmup from "./warmup/Warmup";
 import Guestbook from "./guestbook/Guestbook";
 import { themeTargets } from "./nepal/themeState";
 import { initTime, useWorld } from "@/store/world";
@@ -56,15 +57,6 @@ function Exposure({ value }: { value: number }) {
   useEffect(() => {
     gl.toneMappingExposure = value;
   }, [gl, value]);
-  return null;
-}
-
-/** Marks the world as loaded after everything inside the Suspense boundary has rendered. */
-function Ready() {
-  const frames = useRef(0);
-  useFrame(() => {
-    if (frames.current < 3 && ++frames.current === 3) useWorld.getState().setLoaded(true);
-  });
   return null;
 }
 
@@ -191,7 +183,7 @@ export default function World({ characters, thumbs, posters = [], aboutPhoto = n
         <Weather reducedMotion={reducedMotion} lite={!liveVideo} />
         <Suspense fallback={null}>
           <Town />
-          <Island lite={coarse} />
+          <Island lite={coarse} reducedMotion={reducedMotion} />
           <Places />
           <Props lite={coarse} reducedMotion={reducedMotion || !liveVideo} />
           <Ghar photo={aboutPhoto} />
@@ -208,7 +200,7 @@ export default function World({ characters, thumbs, posters = [], aboutPhoto = n
           <CinemaCamera reducedMotion={reducedMotion} />
           <Player characters={characters} reducedMotion={reducedMotion} />
           <Robot reducedMotion={reducedMotion} />
-          <Ready />
+          <Warmup />
         </Suspense>
         {bloom && <Post tone={tone} />}
         <Stats />

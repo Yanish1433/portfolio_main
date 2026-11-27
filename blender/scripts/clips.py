@@ -3,8 +3,8 @@
   Idle  : 2 s loop, arms relaxed, breathing + slight sway
   Walk  : 1.2 s in-place loop (heel -> toe, hip sway, counter-rotation, arm swing)
   Run   : 0.8 s in-place loop (contact -> down -> passing -> up, flight phases, forward lean)
-  Dance : ~7.2 s masked-dancer routine (low wide stance, stomps, weight shifts, a half-turn and back,
-          broad arm sweeps, wrist flicks, head tilts, small hops); starts and ends upright
+  Dance : 15 s flag dance (stomps + half-turn, overhead flag wave, one-foot spin, big flag sweep, step-together
+          + deep bow); right hand grips a 3 cm pole throughout; first/last frame = Idle t=0
 
 Poses are WORLD-axis rotations (degrees) of each bone relative to the T-pose rest. A bone's pose is either
 a list of (axis, degrees) applied in order (relative to its parent), or `World(R)`, an absolute world
@@ -43,6 +43,16 @@ class World:
 
     def __init__(self, R):
         self.R = R
+
+
+class Pole:
+    """Right hand holding a vertical-ish pole: the knuckle axis is aligned with the pole (tilted `side` degrees
+    toward the character's left and `fwd` degrees forward from vertical, then turned with the body by `spin`),
+    and the palm faces the pole. The wrist takes up the difference to the forearm. `w` blends it with the plain
+    wrist pose (0 = plain, 1 = pole)."""
+
+    def __init__(self, side, fwd, spin, w, plain):
+        self.side, self.fwd, self.spin, self.w, self.plain = side, fwd, spin, w, plain
 
 
 def q_from_R(arm, pb, R):
@@ -93,9 +103,34 @@ def sole_drop(arm):
     return low
 
 
-def apply_pose(arm, pose, sway=0.0, lift=0.0, ground=True):
+def pole_R(arm, pb, v, P):
+    """World rotation (relative to rest) of the right hand that puts the grip axis along the pole."""
+    b = pb.bone
+    L0 = (b.tail_local - b.head_local).normalized()
+    K0 = Vector((0.0, 1.0, 0.0))
+    N0 = L0.cross(K0)
+    pw = Vector((math.tan(math.radians(v.side)), -math.tan(math.radians(v.fwd)), 1.0)).normalized()
+    pw = Rm("Z", v.spin) @ pw
+    a = P @ L0
+    Kp = -pw
+    Lp = a - a.dot(Kp) * Kp
+    if Lp.length < 0.15:
+        Lp = Vector((0.0, -1.0, 0.0)) - Vector((0.0, -1.0, 0.0)).dot(Kp) * Kp
+    Lp.normalize()
+    Np = Lp.cross(Kp)
+    Mt = Matrix(((Lp.x, Kp.x, Np.x), (Lp.y, Kp.y, Np.y), (Lp.z, Kp.z, Np.z)))
+    Mr = Matrix(((L0.x, K0.x, N0.x), (L0.y, K0.y, N0.y), (L0.z, K0.z, N0.z)))
+    Rp = Mt @ Mr.transposed()
+    if v.w >= 0.999:
+        return Rp
+    Rn = P @ rots_to_R(v.plain)
+    return slerp_R(Rn, Rp, v.w)
+
+
+def apply_pose(arm, pose, sway=0.0, lift=0.0, ground=True, off=(0.0, 0.0), drop=None):
     """Set every bone's rotation from `pose`, then move the hips so the lowest sole point rests on the
-    ground (+`lift` metres of air, +`sway` metres to the character's left)."""
+    ground (+`lift` metres of air, +`sway` metres to the character's left, `off` = extra world XY offset).
+    `drop` overrides the grounding drop (used by the foot-lock solver)."""
     C.reset_pose(arm)
     want = {C.pbone(arm, k).name: v for k, v in pose.items()}
 
@@ -114,22 +149,59 @@ def apply_pose(arm, pose, sway=0.0, lift=0.0, ground=True):
             Rl = Matrix.Identity(3)
         elif isinstance(v, World):
             Rl = P.inverted() @ v.R
+        elif isinstance(v, Pole):
+            Rl = P.inverted() @ pole_R(arm, pb, v, P)
         else:
             Rl = rots_to_R(v)
         acc[pb.name] = P @ Rl
         pb.rotation_quaternion = q_from_R(arm, pb, Rl)
     hips = C.pbone(arm, "Hips")
     bpy.context.view_layer.update()
-    drop = sole_drop(arm) if ground else 0.0
+    if drop is None:
+        drop = sole_drop(arm) if ground else 0.0
     m3 = (arm.matrix_world.to_3x3() @ hips.bone.matrix_local.to_3x3()).inverted()
-    hips.location = m3 @ Vector((sway, 0.0, -drop + lift))
+    hips.location = m3 @ Vector((sway + off[0], off[1], -drop + lift))
     bpy.context.view_layer.update()
+    return drop
 
 
 def key_all(arm, frame):
     for pb in arm.pose.bones:
         pb.keyframe_insert("rotation_quaternion", frame=frame)
     C.pbone(arm, "Hips").keyframe_insert("location", frame=frame)
+
+
+# ----------------------------------------------------------------------------- grip measurement
+def grip_info(arm):
+    """Fit the fist cavity of the right hand at full curl: centre + pole axis in RightHand BONE-LOCAL space (m).
+    Circle fitted to the finger joints in the plane perpendicular to the knuckle axis."""
+    C.reset_pose(arm)
+    apply_pose(arm, body_pose({"curlR": 1.0}), ground=False)
+    hand = C.pbone(arm, "RightHand")
+    Minv = hand.matrix.inverted()
+    K = Minv.to_3x3() @ Vector((0.0, 1.0, 0.0))   # knuckle axis in hand-local (pole axis; thumb side is -K)
+    K.normalize()
+    pts = []
+    for fn in FINGER_FULL:
+        for j in (1, 2, 3):
+            pb = C.pbone(arm, f"RightHand{fn}{j}")
+            pts.append(Minv @ pb.head)
+        pts.append(Minv @ C.pbone(arm, f"RightHand{fn}3").tail)
+    # plane basis
+    u = (Vector((1.0, 0.0, 0.0)) - K * K.x).normalized()
+    v = K.cross(u)
+    P2 = [(p.dot(u), p.dot(v)) for p in pts]
+    # algebraic least-squares circle (Kasa)
+    import numpy as np
+    A = np.array([[2 * x, 2 * y, 1.0] for x, y in P2])
+    bb = np.array([x * x + y * y for x, y in P2])
+    cx, cy, c0 = np.linalg.lstsq(A, bb, rcond=None)[0]
+    r = math.sqrt(max(c0 + cx * cx + cy * cy, 0.0))
+    kmid = sum(p.dot(K) for p in pts) / len(pts)
+    centre = u * cx + v * cy + K * kmid
+    up = -K  # pole "up" (thumb side) in hand-local
+    return dict(centre=tuple(round(x, 4) for x in centre), radius=round(r, 4), pole_up=tuple(round(x, 4) for x in up),
+                hand_bone_len=round(hand.bone.length, 4))
 
 
 # ----------------------------------------------------------------------------- Idle
@@ -167,7 +239,26 @@ STAND = dict(
     lean=0, hyaw=0, hrl=0, cyaw=0, cpt=0, crl=0, nyaw=0, npt=0, nrl=0,
     aabL=24, aabR=24, aswL=0, aswR=0, afwL=0, afwR=0, aflL=14, aflR=14,
     wxL=0, wxR=0, wyL=0, wyR=0, wzL=0, wzR=0,
+    curlL=0, curlR=0,             # finger curl 0 (flat) .. 1 (full fist / pole grip)
+    polew=0, pside=0, pfwd=45,    # right hand on the pole: blend, pole tilt toward the left / forward (deg)
+    spin=0,                       # whole-body yaw (deg) about the vertical, for the spin
 )
+
+# finger joint angles (deg: knuckle, middle, tip) at full curl; the right-hand grip is sized for a 3 cm pole
+FINGER_FULL = {"Index": (58, 80, 52), "Middle": (62, 82, 52), "Ring": (66, 82, 50), "Pinky": (70, 80, 48)}
+THUMB_FULL = ((28, 40), (42, 0), (35, 0))   # per joint: (about Z, about Y) degrees at full curl
+
+
+def finger_pose(side, curl):
+    """Finger + thumb entries for one hand. Curl is about the knuckle axis (world Y at rest); sign flips per side."""
+    sg = 1 if side == "Left" else -1
+    out = {}
+    for fn, angs in FINGER_FULL.items():
+        for j, a in enumerate(angs, 1):
+            out[f"{side}Hand{fn}{j}"] = [("Y", sg * a * curl)]
+    for j, (az, ay) in enumerate(THUMB_FULL, 1):
+        out[f"{side}HandThumb{j}"] = [("Z", sg * az * curl), ("Y", sg * ay * curl)]
+    return out
 
 
 def body_pose(P):
@@ -193,7 +284,17 @@ def body_pose(P):
         # arm: sweep forward (horizontal), then raise from hanging, then pitch forward
         pose[side + "Arm"] = [("Z", -sg * p["asw" + s]), ("Y", sg * (90 - p["aab" + s])), ("X", -p["afw" + s])]
         pose[side + "ForeArm"] = [("Z", -sg * p["afl" + s])]
-        pose[side + "Hand"] = [("Z", -sg * p["wz" + s]), ("Y", p["wy" + s]), ("X", p["wx" + s])]
+        plain = [("Z", -sg * p["wz" + s]), ("Y", p["wy" + s]), ("X", p["wx" + s])]
+        pose[side + "Hand"] = plain
+        if p["curl" + s] > 0:
+            pose.update(finger_pose(side, p["curl" + s]))
+        if s == "R" and p["polew"] > 0:
+            pose["RightHand"] = Pole(p["pside"], p["pfwd"], p["spin"], p["polew"], plain)
+    if p["spin"]:
+        Rs = Rm("Z", p["spin"])
+        for k, v in pose.items():
+            if isinstance(v, World):
+                v.R = Rs @ v.R
     return pose
 
 
@@ -230,9 +331,9 @@ WALK_LEG = [
 ]
 
 GAITS = {
-    "Run": dict(frames=21, legs=RUN_LEG, stance=0.38, thmax=40, lean=15, spine_lean=5, hyaw=10, cyaw=8,
-                arm=50, elbow=95, elbow_var=14, sway=0.016, roll=2.5, air=0.06, air_win=(0.38, 0.50),
-                head_pitch=1.0, abd=26),
+    "Run": dict(frames=21, legs=RUN_LEG, stance=0.38, thmax=40, lean=6.5, spine_lean=3, hyaw=9, cyaw=13,
+                arm=52, elbow=92, elbow_var=16, sway=0.016, roll=2.5, air=0.06, air_win=(0.38, 0.50),
+                head_pitch=3.0, abd=22, fist=0.55, lock_v=4.2811),
     "Walk": dict(frames=32, legs=WALK_LEG, stance=0.62, thmax=26, lean=1.5, spine_lean=1, hyaw=5, cyaw=5,
                  arm=17, elbow=20, elbow_var=6, sway=0.026, roll=2.0, air=0.0, air_win=(0, 0),
                  head_pitch=0.0, abd=24),
@@ -272,6 +373,8 @@ def gait_params(g, p):
         out["aab" + s] = g["abd"]
         out["afl" + s] = g["elbow"] + g["elbow_var"] * fwd
         out["wx" + s] = -6 * fwd
+        if g.get("fist"):
+            out["curl" + s] = g["fist"]
     return out, sw
 
 
@@ -292,18 +395,95 @@ def air_lift(g, p):
     return g["air"] * amount
 
 
+def foot_state(arm, side):
+    """(ball xy, lowest sole point height above the ground) of one foot at the current pose."""
+    pts, z0 = _sole_points(arm)
+    mw = arm.matrix_world
+    ps = pts[0:3] if side == "L" else pts[3:6]
+    zs, ball = [], None
+    for k, (pb, p) in enumerate(ps):
+        q = (mw @ pb.matrix) @ (mw @ pb.bone.matrix_local).inverted() @ p
+        zs.append(q.z - z0)
+        if k == 1:
+            ball = Vector((q.x, q.y))
+    return ball, min(zs)
+
+
+LEG_VARS = ("th", "ab", "kn")
+
+
+def solve_foot(arm, P, s, target, w, drop, lift, off, sway, use_z=True):
+    """Adjust this leg's thigh pitch / abduction / knee so the ball sits on `target` and the sole on the floor."""
+    import numpy as np
+
+    def res(PP):
+        apply_pose(arm, body_pose(PP), sway=sway, lift=lift, drop=drop, off=off)
+        b, z = foot_state(arm, s)
+        return np.array([b.x - target.x, b.y - target.y, (z - lift) if use_z else 0.0])
+
+    r = res(P)
+    for _ in range(8):
+        if np.abs(r).max() < 3e-4 or w <= 0:
+            break
+        J = np.zeros((3, 3))
+        for c, v in enumerate(LEG_VARS):
+            PP = dict(P)
+            PP[v + s] = P[v + s] + 1.0
+            J[:, c] = res(PP) - r
+        dx = np.linalg.solve(J.T @ J + 1e-5 * np.eye(3), -J.T @ (r * w))
+        step, ok = 1.0, False
+        for _t in range(4):                                   # damped step: accept only if the error shrinks
+            Q = dict(P)
+            for c, v in enumerate(LEG_VARS):
+                Q[v + s] = P[v + s] + float(np.clip(dx[c] * step, -15, 15))
+            rq = res(Q)
+            if np.linalg.norm(rq) < np.linalg.norm(r):
+                P, r, ok = Q, rq, True
+                break
+            step *= 0.5
+        if not ok:
+            res(P)
+            break
+    return P, r
+
+
+def sole_world(arm):
+    """World positions of the 6 sole points (heel/ball/toe, left then right) at the current pose."""
+    pts, z0 = _sole_points(arm)
+    mw = arm.matrix_world
+    return [(mw @ pb.matrix) @ (mw @ pb.bone.matrix_local).inverted() @ p for pb, p in pts], z0
+
+
 def make_gait(arm, name, g):
     arm.animation_data.action = None
     n = g["frames"]
     foot_y = {"L": [], "R": []}
     foot_low = {"L": [], "R": []}
-    hips_z = []
+    hips_z, sole_tr = [], []
+    lock_v = g.get("lock_v")
+    td = {}
+    if lock_v:   # touchdown ball position of each foot (left at phase 0, right at 0.5)
+        for sd, ph in (("L", 0.0), ("R", 0.5)):
+            prm0, sw0 = gait_params(g, ph)
+            apply_pose(arm, body_pose(prm0), sway=g["sway"] * sw0, lift=0.0, ground=True)
+            td[sd] = foot_state(arm, sd)[0]
     for f in range(n + 1):
         p = f / n
         prm, sw = gait_params(g, p)
-        apply_pose(arm, body_pose(prm), sway=g["sway"] * sw, lift=air_lift(g, p), ground=True)
+        lift, sway = air_lift(g, p), g["sway"] * sw
+        drop = apply_pose(arm, body_pose(prm), sway=sway, lift=lift, ground=True)
+        if lock_v:   # stance foot: ball travels back at exactly the ground speed (no sliding), others free
+            for sd, off in (("L", 0.0), ("R", 0.5)):
+                q = (p + off) % 1.0
+                if q < g["stance"]:
+                    ss = lambda x: (lambda u: u * u * (3 - 2 * u))(min(max(x, 0.0), 1.0))
+                    w = ss(q / 0.05) * ss((g["stance"] - q) / 0.06)
+                    tgt = Vector((td[sd].x, td[sd].y + lock_v * q * n / FPS))
+                    prm, _ = solve_foot(arm, prm, sd, tgt, w, drop, lift, (0.0, 0.0), sway, use_z=False)
+            apply_pose(arm, body_pose(prm), sway=sway, lift=lift, ground=True)
         key_all(arm, f)
         hips_z.append((arm.matrix_world @ C.pbone(arm, "Hips").head).z)
+        sole_tr.append(sole_world(arm))
         for s, side in (("L", "Left"), ("R", "Right")):
             foot = C.pbone(arm, side + "Foot")
             foot_y[s].append((arm.matrix_world @ foot.head).y)
@@ -320,16 +500,49 @@ def make_gait(arm, name, g):
             speeds.append((foot_y[s][i + 1] - foot_y[s][i]) * FPS)
     speeds.sort()
     v = speeds[len(speeds) // 2] if speeds else 0.0
+    # sole points in contact (< 1.2 cm above the floor in two successive frames) must travel back at the ground speed
+    cs = []
+    for i in range(n):
+        for k in range(6):
+            (a, z0), (b, _) = sole_tr[i], sole_tr[i + 1]
+            if a[k].z - z0 < 0.012 and b[k].z - z0 < 0.012:
+                cs.append((b[k].y - a[k].y) * FPS)
+    cs.sort()
+    cv = cs[len(cs) // 2] if cs else 0.0
+    slide = max((abs(x - cv) for x in cs), default=0.0)
+    C.log(name, "contact point speeds (m/s):", [round(x, 2) for x in cs])
     GAIT_INFO[name] = dict(frames=n, duration=n / FPS, ground_speed=v, stride=v * n / FPS,
-                           hips_z_min=min(hips_z), hips_z_max=max(hips_z), planted_frames=len(speeds))
+                           hips_z_min=min(hips_z), hips_z_max=max(hips_z), planted_frames=len(speeds),
+                           contact_speed=cv, contact_speed_dev=slide, contact_samples=len(cs))
     C.log(name, GAIT_INFO[name])
     return act
 
 
-# ----------------------------------------------------------------------------- Dance
+# ----------------------------------------------------------------------------- Dance (15 s, v2)
+# A joyful guardian dance in 25 counts of 18 frames (100 bpm), 450 frames = 15.0 s. Frame 0 and the last frame are
+# EXACTLY Idle's t=0 pose (the web plays Dance once and eases back to Idle). Phrases:
+#   1  stomps and a half-turn (counts 0-9)        2  FLAG WAVE overhead (9-13.5)       3  one-foot SPIN (13.5-15.5)
+#   4  big side-to-side FLAG SWEEP (15.5-19.3)    5  step-together + DEEP BOW (19.3-24)  6  settle to Idle
+# The right hand holds a pole (fist closed around a 3 cm cylinder, `Pole` + `curlR`) from frame ~8 to ~441.
+# Everything is sampled per frame from a key table (params, not bones), then planted feet are locked to the floor.
 def dp(**kw):
     return kw
 
+
+def _idle_arm_params():
+    """Dance-style arm parameters (aab, asw, afw) that reproduce Idle's t=0 arm rotations exactly."""
+    out = {}
+    for s, sg, rots in (("L", 1, ARMS_DOWN["LeftArm"]), ("R", -1, ARMS_DOWN["RightArm"])):
+        e = rots_to_R(rots).to_euler("ZYX")
+        out["aab" + s] = 90 - sg * math.degrees(e.y)
+        out["asw" + s] = -sg * math.degrees(e.z)
+        out["afw" + s] = -math.degrees(e.x)
+    return out
+
+
+IDLE_BASE = dict(knL=0, knR=0, abL=0, abR=0, twL=0, twR=0, aflL=14, aflR=14, **_idle_arm_params())
+DANCE_BASE = dict(IDLE_BASE, curlL=0.22, curlR=1.0, polew=1.0, pside=-25, pfwd=40)
+IDLE_KEY = dict(curlL=0, curlR=0, polew=0)
 
 # Stances. Left = +X side of the character.
 WIDE = dict(thL=-24, thR=-24, knL=58, knR=58, abL=30, abR=30, twL=20, twR=20, lean=5, cpt=7,
@@ -342,84 +555,222 @@ def wide(**kw):
     return p
 
 
+def flag(**kw):
+    """A medium, bouncy stance for the flag phrases (right arm high, pole up)."""
+    p = wide(thL=-20, thR=-20, knL=40, knR=40, abL=22, abR=22, twL=14, twR=14, lean=3, cpt=2,
+             aabL=88, aflL=22, aswL=0, aswR=0, aabR=160, aflR=34, npt=-5, pside=0, pfwd=4)
+    p.update(kw)
+    return p
+
+
+def idle_stand(**kw):
+    p = dict(IDLE_BASE)
+    p.update(kw)
+    return p
+
+
 def dance_keys():
-    """[(frame, params, lift metres, sway metres, (interp, easing) for the segment that follows)]"""
+    """[dict(f, P, lift, sway, hy, seg, plant)]. plant = feet on the floor for the segment that FOLLOWS the key."""
     K = []
 
-    def key(f, P, lift=0.0, sway=0.0, seg=("BEZIER", "AUTO")):
-        K.append((f, P, lift, sway, seg))
+    def key(f, P, lift=0.0, sway=0.0, hy=0.0, seg=("BEZIER", "AUTO"), plant="LR"):
+        K.append(dict(f=f, P=P, lift=lift, sway=sway, hy=hy, seg=seg, plant=plant))
 
-    # count length: 18 frames (0.6 s, 100 bpm); 12 counts -> 216 frames
-    key(0, dict())                                                                   # upright
-    key(8, dp(lean=-1, aabL=20, aabR=20, aflL=8, aflR=8, knL=0, knR=0, npt=2, cpt=-2))  # anticipation: tall
-    key(18, wide(nrl=-9, nyaw=8), seg=("SINE", "EASE_OUT"))                          # 1 sink into the low wide stance
-    # 2: stomp right (lift, hold, strike)
+    # ---- 1: stomp and turn (counts 0-9)
+    key(0, dict(IDLE_KEY))                                                            # exact Idle t=0
+    key(8, dp(lean=-1, aabL=20, aabR=20, aflL=8, aflR=8, npt=2, cpt=-2))                # anticipation: tall, grip closes
+    key(18, wide(nrl=-9, nyaw=8), seg=("SINE", "EASE_OUT"), plant="L")                  # sink; right foot starts to lift
     key(27, wide(thR=-62, knR=108, abR=20, thL=-22, knL=62, lean=4, nrl=10, hrl=-3, crl=5,
-                 aabR=125, aflR=55, aswR=-10, aabL=78, aflL=22, wzR=-10, nyaw=-8), sway=0.05,
-        seg=("QUAD", "EASE_IN"))
+                 aabR=125, aflR=55, aswR=-10, aabL=78, aflL=22, wzR=-10, nyaw=-8, pfwd=15), sway=0.05,
+        seg=("QUAD", "EASE_IN"), plant="L")                                            # stomp right: lift
     key(35, wide(thR=-24, knR=64, lean=7, aabL=92, aabR=92, aflL=10, aflR=10, aswL=22, aswR=22,
-                 wxL=30, wxR=30, nrl=-4), sway=0.0, seg=("QUAD", "EASE_OUT"))        # STOMP (compressed)
-    key(42, wide(lean=4, aabL=86, aabR=86, aflL=18, aflR=18, wxL=-14, wxR=-14, nrl=-8, nyaw=6))  # recoil
-    # 3: weight over the left leg, right toe taps, left arm sweeps over the head
+                 wxL=30, wxR=30, nrl=-4), seg=("QUAD", "EASE_OUT"))                   # STOMP
+    key(42, wide(lean=4, aabL=86, aabR=86, aflL=18, aflR=18, wxL=-14, wxR=-14, nrl=-8, nyaw=6), plant="L")
     key(54, wide(thL=-20, knL=72, thR=-16, knR=28, abR=40, fpR=18, lean=6, hrl=4, crl=-5,
-                 aabL=150, aabR=34, aflL=30, aflR=40, aswL=20, nrl=-12, nyaw=10), sway=0.075)
+                 aabL=150, aabR=34, aflL=30, aflR=40, aswL=20, nrl=-12, nyaw=10), sway=0.075, plant="L")
     key(63, wide(thL=-20, knL=68, thR=-30, knR=92, abR=22, lean=5, aabL=128, aabR=62, aflL=26, nrl=-9),
-        sway=0.06, seg=("QUAD", "EASE_IN"))
+        sway=0.06, seg=("QUAD", "EASE_IN"), plant="L")
     key(72, wide(thL=-22, knL=62, thR=-24, knR=62, lean=7, aabL=92, aabR=92, aflL=10, aflR=10, aswL=20,
-                 aswR=20, wxL=28, wxR=28), sway=0.02, seg=("QUAD", "EASE_OUT"))      # 4: STOMP
+                 aswR=20, wxL=28, wxR=28), sway=0.02, seg=("QUAD", "EASE_OUT"))      # STOMP
     key(80, wide(lean=4, aabL=70, aabR=70, aflL=24, aflR=24, wxL=-12, wxR=-12))
-    # 5: squat, arms swing back (anticipation), then a small hop with a tuck
     key(90, wide(thL=-34, thR=-34, knL=88, knR=88, lean=14, cpt=18, aabL=22, aabR=22, aswL=-30, aswR=-30,
-                 aflL=16, aflR=16, npt=-8), seg=("QUAD", "EASE_IN"))
+                 aflL=16, aflR=16, npt=-8), seg=("QUAD", "EASE_IN"), plant="")
     key(98, wide(thL=-30, thR=-30, knL=70, knR=70, abL=26, abR=26, lean=2, cpt=-2, aabL=100, aabR=100,
-                 aswL=45, aswR=45, aflL=20, aflR=20, npt=-2), lift=0.12, seg=("QUAD", "EASE_OUT"))   # in the air
-    key(107, wide(thL=-26, thR=-26, knL=74, knR=74, lean=9, cpt=10, aabL=60, aabR=60, aswL=10, aswR=10,
-                  fpL=0, fpR=0), seg=("QUAD", "EASE_OUT"))                                 # 6: land, soft
-    # twist: pelvis, chest and head open to the left over planted feet (the half-turn)
+                 aswL=45, aswR=45, aflL=20, aflR=20, npt=-2), lift=0.12, seg=("QUAD", "EASE_OUT"), plant="")  # hop
+    key(107, wide(thL=-26, thR=-26, knL=74, knR=74, lean=9, cpt=10, aabL=60, aabR=60, aswL=10, aswR=10))  # land, soft
     key(120, wide(hyaw=38, cyaw=74, nyaw=118, thL=-24, knL=58, lean=5, aabL=88, aabR=108, aswL=-20,
-                  aswR=50, aflL=14, aflR=30, wxR=-20, wzR=15, nrl=8, npt=-4), sway=-0.02)
+                  aswR=50, aflL=14, aflR=30, wxR=-20, wzR=15, nrl=8, npt=-4), sway=-0.02)   # half-turn: pelvis, chest, head
     key(130, wide(hyaw=52, cyaw=98, nyaw=148, thL=-30, knL=64, thR=-18, knR=50, abR=36, lean=6,
                   aabL=70, aabR=150, aswL=-35, aswR=30, aflL=40, aflR=20, wxR=30, wzR=-20, nrl=-8, npt=-6),
-        sway=-0.03, seg=("QUAD", "EASE_IN"))                                              # 7: facing back
+        sway=-0.03, seg=("QUAD", "EASE_IN"))                                              # facing back
     key(138, wide(hyaw=50, cyaw=96, nyaw=146, thL=-26, knL=70, thR=-24, knR=64, lean=9, aabL=92, aabR=92,
                   aswL=10, aswR=10, aflL=10, aflR=10, wxL=32, wxR=32), seg=("QUAD", "EASE_OUT"))   # stomp
     key(146, wide(hyaw=48, cyaw=92, nyaw=140, aabL=80, aabR=80, aflL=22, aflR=22, wxL=-18, wxR=-18))
-    # 8: unwind with a hop back to the front
     key(158, wide(hyaw=8, cyaw=14, nyaw=18, thL=-30, thR=-30, knL=84, knR=84, lean=12, cpt=14, aabL=30,
-                  aabR=30, aswL=-25, aswR=-25), seg=("QUAD", "EASE_IN"))
-    key(165, wide(hyaw=0, cyaw=0, nyaw=0, thL=-28, thR=-28, knL=64, knR=64, lean=2, cpt=-2, aabL=150,
-                  aabR=150, aflL=18, aflR=18, npt=3), lift=0.11, seg=("QUAD", "EASE_OUT"))    # 9: arms overhead
-    key(173, wide(lean=8, aabL=135, aabR=135, aflL=14, aflR=14, thL=-24, thR=-24, knL=62, knR=62), seg=("QUAD", "EASE_OUT"))
-    # 10-11: quick stomps right, left with big sweeps
-    key(184, wide(thR=-56, knR=100, abR=22, thL=-22, knL=66, aabR=170, aabL=60, aflR=20, aflL=30, nrl=10,
-                  lean=5), sway=0.05, seg=("QUAD", "EASE_IN"))
-    key(190, wide(thR=-24, knR=66, lean=8, aabL=95, aabR=95, aflL=10, aflR=10, aswL=22, aswR=22, wxL=26,
-                  wxR=26), seg=("QUAD", "EASE_OUT"))
-    key(198, wide(thL=-56, knL=100, abL=22, thR=-22, knR=66, aabL=170, aabR=60, aflL=20, aflR=30, nrl=-10,
-                  lean=5), sway=-0.05, seg=("QUAD", "EASE_IN"))
-    key(204, wide(thL=-24, knL=66, lean=8, aabL=95, aabR=95, aflL=10, aflR=10, aswL=22, aswR=22, wxL=26, wxR=26),
-        seg=("QUAD", "EASE_OUT"))
-    key(212, dp(thL=-8, thR=-8, knL=24, knR=24, abL=10, abR=10, lean=2, aabL=40, aabR=40, aflL=18, aflR=18, npt=4))  # rise
-    key(224, dict())                                                                  # settle upright
+                  aabR=30, aswL=-25, aswR=-25), seg=("QUAD", "EASE_IN"), plant="")        # unwind, load the hop
+    key(165, flag(thL=-28, thR=-28, knL=64, knR=64, abL=30, abR=30, lean=2, cpt=-2, aabL=150, aabR=165,
+                  aflL=18, aflR=20, npt=3), lift=0.11, seg=("QUAD", "EASE_OUT"), plant="")  # hop: FLAG UP
+    # ---- 2: FLAG WAVE overhead (frames 173-245): seven half-count waves, hips sway and knees bounce on the beat
+    key(173, flag(knL=44, knR=44), seg=("QUAD", "EASE_OUT"))                              # land, flag high
+    for k in range(1, 8):
+        s = 1 if k % 2 else -1
+        key(173 + 9 * k, flag(aabR=158 + 20 * s, aflR=36 - 10 * s, pside=32 * s, pfwd=6, aabL=90 - 18 * s,
+                              aflL=22, wxL=16 * s, knL=36 + 8 * s, knR=36 - 8 * s, hrl=-3 * s, crl=-5 * s,
+                              cyaw=8 * s, nyaw=10 * s, nrl=-6 * s, npt=-6), sway=0.03 * s)
+    # ---- 3: SPIN on the left foot (frames 245-278), right foot in passe, flag overhead
+    sa = dict(aabR=170, aflR=20, pside=0, pfwd=0, aabL=100, aflL=12, aswL=0, npt=-2)
+    key(245, flag(spin=-32, knL=60, knR=48, **sa), plant="L")                            # coil, right foot lifts
+    key(252, idle_stand(spin=40, thL=-4, knL=16, fpL=38, thR=-74, knR=124, abR=36, twR=40, **sa), plant="L")
+    key(259, idle_stand(spin=140, thL=-2, knL=8, fpL=40, thR=-76, knR=126, abR=38, twR=42, **sa), plant="L")
+    key(266, idle_stand(spin=250, thL=-2, knL=8, fpL=40, thR=-70, knR=120, abR=34, twR=40, **sa), plant="L")
+    key(272, idle_stand(spin=335, thL=-14, knL=34, fpL=14, thR=-36, knR=58, abR=26, twR=24, lean=3, **sa),
+        plant="L")
+    key(278, wide(spin=360, knL=62, knR=62, aabR=120, aflR=30, pside=-30, pfwd=8, aabL=60, aflL=22),
+        seg=("QUAD", "EASE_OUT"))                                                         # land wide
+    # ---- 4: big FLAG SWEEP side to side (frames 278-348), four strokes, body leans away from the flag
+    SW = dict(spin=360)
+    for f, s in ((296, 1), (314, -1), (332, 1), (348, -1)):
+        key(f, wide(aabR=150 + 55 * s, aflR=24, pside=36 * s, pfwd=4, aabL=95 - 50 * s, aflL=20,
+                    aswL=0, aswR=0, thL=-22, thR=-22, knL=58 - 14 * s, knR=58 + 14 * s,
+                    crl=-9 * s, hrl=-4 * s, cyaw=10 * s, cpt=5, nrl=7 * s, nyaw=-12 * s, npt=-3, **SW),
+            sway=0.055 * s)
+    key(358, wide(thL=-34, thR=-34, knL=88, knR=88, lean=12, cpt=14, aabR=60, aabL=40, aflR=30, aflL=30,
+                  pside=10, pfwd=10, npt=-6, **SW), seg=("QUAD", "EASE_IN"), plant="")      # crouch, then jump
+    key(366, flag(thL=-28, thR=-28, knL=66, knR=66, abL=28, abR=28, aabL=150, aabR=168, aflL=16, aflR=18,
+                  npt=4, **SW), lift=0.11, seg=("QUAD", "EASE_OUT"), plant="")            # jump, flag thrust up
+    key(374, flag(knL=60, knR=60, aabR=165, aflR=24, **SW), seg=("QUAD", "EASE_OUT"))   # land
+    # ---- 5: two closing steps, then the DEEP BOW
+    key(383, flag(knL=56, knR=70, thL=-22, thR=-18, abL=16, abR=20, aabR=90, aflR=50, pside=-20, pfwd=30,
+                  aabL=70, **SW), sway=-0.08, plant="R")                                  # weight right, left foot lifts
+    key(391, idle_stand(knL=16, knR=40, abR=24, thR=-16, twR=14, aabR=70, aflR=60, pside=-20, pfwd=45,
+                        aabL=60, aflL=40, **SW), sway=-0.10)                              # left foot placed in
+    key(398, idle_stand(knL=22, knR=30, abR=16, thR=-10, twR=8, aabR=60, aflR=60, pside=-20, pfwd=45,
+                        aabL=60, aflL=40, **SW), sway=-0.02, plant="L")                                                                         # weight left, right foot lifts
+    key(405, idle_stand(knL=8, knR=8, aabR=52, aflR=44, pside=-30, pfwd=40, aabL=38, aswL=70, aflL=100, **SW))
+    key(418, idle_stand(knL=8, knR=8, lean=76, cpt=26, npt=52, aabR=40, aswR=-20, aflR=24, pside=-55,
+                        pfwd=-10, aabL=38, aswL=70, aflL=104, **SW), hy=0.15, seg=("SINE", "EASE_OUT"))  # DEEP BOW
+    key(428, idle_stand(knL=8, knR=8, lean=78, cpt=26, npt=54, aabR=40, aswR=-20, aflR=24, pside=-55,
+                        pfwd=-10, aabL=38, aswL=70, aflL=104, **SW), hy=0.15)             # hold
+    key(441, dict(IDLE_KEY, **SW))                                                        # rise and settle: Idle
+    key(450, dict(IDLE_KEY, **SW))
     return K
 
 
+# per-parameter lag (frames) for follow-through: the head, forearms and wrists trail the body
+LAG = {"nyaw": 4, "npt": 4, "nrl": 4, "aflL": 3, "aflR": 3, "wxL": 3, "wxR": 3, "wyL": 3, "wyR": 3, "wzL": 3,
+       "wzR": 3, "pside": 2, "pfwd": 2}
+
+
+class ParamTable:
+    """Per-frame parameter sampling from a key table (monotone cubic between keys, easing on QUAD/SINE segments)."""
+
+    def __init__(self, keys):
+        self.keys = keys
+        self.f = [k["f"] for k in keys]
+        base = dict(STAND)
+        base.update(DANCE_BASE)
+        names = set(base) | {"lift", "sway", "hy"}
+        for k in keys:
+            names |= set(k["P"])
+        self.vals = {}
+        for n in names:
+            col = []
+            for k in keys:
+                if n in ("lift", "sway", "hy"):
+                    col.append(k[n])
+                else:
+                    col.append(k["P"].get(n, base.get(n, 0.0)))
+            self.vals[n] = col
+        self.tan = {n: self._tangents(col) for n, col in self.vals.items()}
+
+    def _tangents(self, v):
+        t, n = self.f, len(self.f)
+        m = [0.0] * n
+        for i in range(1, n - 1):
+            d0, d1 = (v[i] - v[i - 1]) / (t[i] - t[i - 1]), (v[i + 1] - v[i]) / (t[i + 1] - t[i])
+            m[i] = 0.0 if d0 * d1 <= 0 else 2 * d0 * d1 / (d0 + d1)
+        return m
+
+    def seg_index(self, f):
+        i = 0
+        while i < len(self.f) - 2 and f >= self.f[i + 1]:
+            i += 1
+        return i
+
+    def value(self, n, f):
+        f = min(max(f, 0), self.f[-1])
+        i = self.seg_index(f)
+        t0, t1 = self.f[i], self.f[i + 1]
+        u = (f - t0) / (t1 - t0)
+        v0, v1 = self.vals[n][i], self.vals[n][i + 1]
+        interp, ease = self.keys[i]["seg"]
+        if interp == "QUAD":
+            e = u * u if ease == "EASE_IN" else 1 - (1 - u) ** 2
+            return v0 + (v1 - v0) * e
+        if interp == "SINE":
+            return v0 + (v1 - v0) * math.sin(u * math.pi / 2)
+        h = t1 - t0
+        m0, m1 = self.tan[n][i] * h, self.tan[n][i + 1] * h
+        h00, h10, h01, h11 = 2 * u**3 - 3 * u**2 + 1, u**3 - 2 * u**2 + u, -2 * u**3 + 3 * u**2, u**3 - u**2
+        return h00 * v0 + h10 * m0 + h01 * v1 + h11 * m1
+
+    def sample(self, f):
+        P = {n: self.value(n, f - LAG.get(n, 0)) for n in self.vals if n not in ("lift", "sway", "hy")}
+        return P, self.value("lift", f), self.value("sway", f), self.value("hy", f)
+
+    def plant_at(self, f):
+        """(planted set, {side: lock weight}); a foot leaving the floor is released over 6 frames."""
+        i = self.seg_index(f)
+        cur = set(self.keys[i]["plant"])
+        w = {s: 1.0 for s in cur}
+        if i > 0:
+            gone = set(self.keys[i - 1]["plant"]) - cur
+            k = (f - self.f[i]) / 6.0
+            if k < 1.0:
+                for s in gone:
+                    w[s] = 1.0 - (k * k * (3 - 2 * k))
+        return cur, w
+
+
 def make_dance(arm):
+    import numpy as np
     arm.animation_data.action = None
-    K = dance_keys()
-    for f, P, lift, sway, seg in K:
-        apply_pose(arm, body_pose(P), sway=sway, lift=lift, ground=True)
+    keys = dance_keys()
+    T = ParamTable(keys)
+    N = keys[-1]["f"]
+    targets, drift = {}, {"L": 0.0, "R": 0.0}
+    hips_h = Vector(C.pbone(arm, "Hips").bone.head_local.xy)
+    for f in range(N + 1):
+        P, lift, sway, hy = T.sample(f)
+        cur, wts = T.plant_at(f)
+        spin = P["spin"]
+        off = (0.0, hy)
+        drop = apply_pose(arm, body_pose(P), sway=sway, lift=lift, off=off)   # natural pose, grounded
+        for s in "LR":
+            if wts.get(s, 0) > 0:
+                if s not in targets:
+                    targets[s] = foot_state(arm, s)[0]
+            else:
+                targets.pop(s, None)
+        if abs(spin) > 1e-3 and "L" in targets:                                  # pivot the body about the left ball
+            for _ in range(3):
+                e = targets["L"] - foot_state(arm, "L")[0]
+                off = (off[0] + e.x, off[1] + e.y)
+                drop = apply_pose(arm, body_pose(P), sway=sway, lift=lift, off=off)
+        for s in "LR":
+            if s in targets and wts.get(s, 0) > 0:
+                P, r = solve_foot(arm, P, s, targets[s], wts[s], drop, lift, off, sway)
+                if wts[s] >= 1.0:
+                    e = float(np.abs(r[:2]).max())
+                    drift[s] = max(drift[s], e)
+                    if e > 0.012:
+                        C.log("lock miss f", f, s, "xy err", round(e, 3), "z err", round(float(r[2]), 3))
+        apply_pose(arm, body_pose(P), sway=sway, lift=lift, drop=drop, off=off)
         key_all(arm, f)
     act = arm.animation_data.action
     act.name = "Dance"
     act.use_fake_user = True
-    segs = {f: seg for f, _, _, _, seg in K}
-    for fc in act.fcurves if hasattr(act, "fcurves") else _fcurves(act):
-        for kp in fc.keyframe_points:
-            interp, ease = segs.get(int(round(kp.co[0])), ("BEZIER", "AUTO"))
-            kp.interpolation = interp
-            kp.easing = ease
-    C.log("Dance frames", K[-1][0], "seconds", K[-1][0] / FPS)
+    C.log("Dance frames", N, "seconds", N / FPS, "max planted-foot residual (m)", drift)
     return act
 
 
@@ -438,6 +789,9 @@ def make_clips(arm):
     sc = bpy.context.scene
     sc.render.fps = FPS
     arm.animation_data_create()
+    meshes = [o for o in bpy.data.objects if o.type == "MESH" and not o.hide_viewport]
+    for o in meshes:
+        o.hide_viewport = True          # skinning is not needed while solving poses (much faster)
     C.select_only(arm)
     bpy.ops.object.mode_set(mode="POSE")
     # ---- Idle: 2 s loop, arms relaxed down, breathing + slight sway
@@ -452,7 +806,11 @@ def make_clips(arm):
     walk = make_gait(arm, "Walk", GAITS["Walk"])
     run = make_gait(arm, "Run", GAITS["Run"])
     dance = make_dance(arm)
+    GAIT_INFO["Grip"] = grip_info(arm)
+    C.log("Grip", GAIT_INFO["Grip"])
     bpy.ops.object.mode_set(mode="OBJECT")
+    for o in meshes:
+        o.hide_viewport = False
     arm.animation_data.action = idle
     sc.frame_start, sc.frame_end = 0, 60
     sc.frame_set(0)

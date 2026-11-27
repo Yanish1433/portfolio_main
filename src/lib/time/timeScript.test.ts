@@ -2,7 +2,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import vm from "node:vm";
 import { TIME_SCRIPT } from "./timeScript";
-import { resolveMinutes, lookOf } from "./clock";
+import { resolveMinutes, lookOf, todAt } from "./clock";
 import { paperLook } from "./paperLook";
 
 type Case = { search: string; saved?: string | null; legacy?: string | null; now: number; session?: string | null; hash?: string };
@@ -30,7 +30,7 @@ function runScript(c: Case) {
     isFinite,
   };
   vm.runInNewContext(TIME_SCRIPT, ctx);
-  return { theme: el.dataset.theme, cover: el.dataset.cover, glow: Number(style["--glow"]) };
+  return { theme: el.dataset.theme, tod: el.dataset.tod, cover: el.dataset.cover, glow: Number(style["--glow"]) };
 }
 
 const cases: Case[] = [
@@ -58,8 +58,18 @@ test("inline script and resolveMinutes agree on theme and glow", () => {
     const want = lookOf(m);
     const got = runScript(c);
     assert.equal(got.theme, want.theme, JSON.stringify(c));
+    assert.equal(got.tod, todAt(m), JSON.stringify(c));
     assert.ok(Math.abs(got.glow - want.glow) < 0.001, `${JSON.stringify(c)} glow ${got.glow} vs ${want.glow}`);
   }
+});
+
+test("data-tod bands match todAt on every minute", () => {
+  for (let m = 0; m < 1440; m++) {
+    const h = String(Math.floor(m / 60)).padStart(2, "0");
+    const mm = String(m % 60).padStart(2, "0");
+    assert.equal(runScript({ search: `?time=${h}:${mm}`, now: 0 }).tod, todAt(m), `${h}:${mm}`);
+  }
+  assert.deepEqual([329, 330, 599, 600, 989, 990, 1154, 1155].map(todAt), ["night", "morning", "morning", "day", "day", "evening", "evening", "night"]);
 });
 
 test("data-cover follows sessionStorage and a deep link", () => {
