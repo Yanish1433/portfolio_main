@@ -5,7 +5,11 @@ import { useEffect, useRef, useState } from "react";
 import { useWorld } from "@/store/world";
 import { characterById } from "../characters";
 import { LABELS } from "../nepal/labels";
-import { ask, greet } from "./actions";
+import { ask, greet, openGuideNow } from "./actions";
+import GuideChip from "./GuideChip";
+import { hotkeyAllowed, outsideClickCloses, walkedAway } from "./guideRules";
+import { playerPos } from "../input";
+import { robotMotion } from "./robotStore";
 import { useRobot } from "./robotStore";
 
 /** Keys drei's KeyboardControls tracks; released when the input takes focus so nothing stays "held". */
@@ -51,6 +55,51 @@ function useGreeting() {
   }, []);
 }
 
+/** Guide open/close controls: H opens; Esc, outside click, or walking away closes. */
+function useGuideControls() {
+  useEffect(() => {
+    const robot = () => useRobot.getState();
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && robot().guideOpen) {
+        robot().closeGuide();
+        return;
+      }
+      if (e.key !== "h" && e.key !== "H") return;
+      const w = useWorld.getState();
+      const t = e.target as HTMLElement | null;
+      const typing = !!t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable);
+      if (!hotkeyAllowed({ typing, panelOpen: !!w.info || w.pickerOpen, cinema: !!w.cinema, eagle: w.cameraMode === "eagle", modifier: e.ctrlKey || e.metaKey || e.altKey })) return;
+      if (!w.character || robot().guideOpen) return;
+      openGuideNow();
+    };
+    const onDown = (e: PointerEvent) => {
+      if (!robot().guideOpen) return;
+      const t = e.target as HTMLElement | null;
+      const insideGuide = !!t?.closest?.("[data-robot-guide]");
+      const insideChat = !!t?.closest?.("[data-robot-chat]");
+      if (outsideClickCloses(true, insideGuide, insideChat)) robot().closeGuide();
+    };
+    const timer = window.setInterval(() => {
+      const r = robot();
+      if (!r.guideOpen || !r.anchor) return;
+      const zone = useWorld.getState().activeZone;
+      if (robotMotion.leading) {
+        // The robot is leading the visitor somewhere: follow along instead of closing.
+        r.openGuide({ x: playerPos.x, z: playerPos.z, zone }, r.line);
+        return;
+      }
+      if (walkedAway(r.anchor, { x: playerPos.x, z: playerPos.z, zone })) r.closeGuide();
+    }, 300);
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("pointerdown", onDown);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("pointerdown", onDown);
+      window.clearInterval(timer);
+    };
+  }, []);
+}
+
 export default function RobotChat() {
   const ready = useWorld((s) => !!s.character && !s.pickerOpen && s.loaded);
   const tourActive = useWorld((s) => s.tourActive);
@@ -59,6 +108,10 @@ export default function RobotChat() {
   const [text, setText] = useState("");
   const input = useRef<HTMLInputElement>(null);
   useGreeting();
+  useGuideControls();
+  const guideOpen = useRobot((s) => s.guideOpen);
+  const [compact, setCompact] = useState(false);
+  useEffect(() => setCompact(window.matchMedia("(max-width: 767px), (pointer: coarse)").matches), []);
   // Hook for automated checks (?debug).
   useEffect(() => {
     if (!new URLSearchParams(window.location.search).has("debug")) return;
@@ -93,7 +146,9 @@ export default function RobotChat() {
               ■ {LABELS.ui.stopTour}
             </button>
           )}
+          {compact && !guideOpen && !tourActive && <GuideChip />}
           <form
+            data-robot-chat
             className={cardClass("flex w-full items-center gap-2 !rounded-xl !border-4 p-1 pl-3")}
             onSubmit={(e) => {
               e.preventDefault();

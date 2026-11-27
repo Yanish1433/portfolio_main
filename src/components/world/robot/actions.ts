@@ -310,6 +310,7 @@ export async function ask(text: string) {
     ]);
     return;
   }
+  openGuideNow(false); // a typed question always opens the guide (the reply shows in it)
   const robot = useRobot.getState();
   const c = ctx();
   robot.pushUser(msg);
@@ -327,7 +328,25 @@ export async function ask(text: string) {
 /** A chip under the bubble: run its action, or send its message. */
 export function pickSuggestion(s: RobotSuggestion) {
   if (s.action) {
+    useRobot.getState().closeGuide(); // acting (walk, tour, video): back to the small chip
     useWorld.getState().interrupt();
     runAction(s.action);
   } else void ask(s.message ?? s.label);
+}
+
+/** Open the guide: the latest tip (if any) plus the contextual chips for where the avatar is. */
+export function openGuideNow(withContent = true) {
+  const robot = useRobot.getState();
+  const anchor = { x: playerPos.x, z: playerPos.z, zone: useWorld.getState().activeZone };
+  if (!withContent) {
+    robot.openGuide(anchor, robot.pendingTip);
+    return;
+  }
+  const tip = robot.pendingTip;
+  const ctxSug = getBrain().greet(ctx());
+  const seen = new Set<string>();
+  const suggestions = [...(tip?.suggestions ?? []), ...ctxSug.suggestions]
+    .filter((sg) => (seen.has(sg.label) ? false : (seen.add(sg.label), true)))
+    .slice(0, 4);
+  robot.openGuide(anchor, { id: tip?.id ?? -1, text: tip?.text ?? ctxSug.text, suggestions });
 }

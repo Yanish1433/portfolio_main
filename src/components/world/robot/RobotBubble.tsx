@@ -6,6 +6,7 @@ import { useWorld } from "@/store/world";
 import { occlusion } from "../nepal/materials";
 import { pickSuggestion } from "./actions";
 import { useRobot } from "./robotStore";
+import GuideChip from "./GuideChip";
 
 const MARGIN = 16;
 /** Below the top UI bar (buttons / hint pill). */
@@ -37,6 +38,8 @@ function avatarBox(vh: number): Box | null {
 export default function RobotBubble({ reducedMotion }: { reducedMotion: boolean }) {
   const line = useRobot((s) => s.line);
   const thinking = useRobot((s) => s.thinking);
+  const guideOpen = useRobot((s) => s.guideOpen);
+  const tourActive = useWorld((s) => s.tourActive);
   const night = useWorld((s) => s.theme === "night");
   // On phones the info bottom sheet + bubble + chat + joystick is too much: hide the bubble while a panel is open.
   const [compact] = useState(() => typeof window !== "undefined" && window.matchMedia("(max-width: 767px), (pointer: coarse)").matches);
@@ -130,7 +133,17 @@ export default function RobotBubble({ reducedMotion }: { reducedMotion: boolean 
     return () => window.clearInterval(id);
   }, [line, reducedMotion]);
 
-  if (hidden || (!line && !thinking)) return null;
+  if (hidden) return null;
+  // Closed (and no tour): just the small chip. On phones the chip lives above the chat bar instead (RobotChat).
+  if (!guideOpen && !tourActive) {
+    if (compact) return null;
+    return (
+      <div className="flex w-max flex-col items-center" style={{ transform: "translate(-50%, calc(-100% - 6px))" }}>
+        <GuideChip />
+      </div>
+    );
+  }
+  if (!line && !thinking) return null;
   const done = !line || shown >= line.text.length;
   const tailClass = night ? "border-[#3e2416] bg-[#e6d6b2]" : "border-[#3e2416] bg-[#f6ead0]";
 
@@ -139,12 +152,22 @@ export default function RobotBubble({ reducedMotion }: { reducedMotion: boolean 
       className="flex w-max max-w-[280px] flex-col items-center"
       style={{ transform: "translate(-50%, calc(-100% - 6px))", fontFamily: "Mukta, system-ui, sans-serif" }}
     >
-      <div ref={fit} data-night={night} className={cardClass("relative w-max max-w-[280px] px-3 py-2 text-[15px] leading-snug")}>
+      <div ref={fit} data-night={night} data-robot-guide className={cardClass("pointer-events-auto relative w-max max-w-[260px] px-3 py-2 text-[14px] leading-snug")}>
+        {guideOpen && (
+          <button
+            type="button"
+            aria-label="Close guide"
+            onClick={() => useRobot.getState().closeGuide()}
+            className="absolute right-1 top-0.5 cursor-pointer px-1 text-[14px] leading-none text-[#2b1d14]/70 hover:text-[#2b1d14]"
+          >
+            ✕
+          </button>
+        )}
         {thinking || !line ? (
           <span className="tracking-widest" aria-hidden="true">…</span>
         ) : (
           // The full reply is announced by the aria-live region in RobotChat.
-          <span className="whitespace-pre-wrap" aria-hidden="true">{line.text.slice(0, shown)}</span>
+          <span className="whitespace-pre-wrap pr-4" aria-hidden="true">{line.text.slice(0, shown)}</span>
         )}
         {line && line.suggestions.length > 0 && !thinking && (
           <div

@@ -9,7 +9,8 @@ import * as THREE from "three";
 import { TEA_SIGN, zones } from "../zones";
 import { LABELS } from "./labels";
 import { NAVIGATE_EVENT } from "./navigate";
-import { pointerClaim, robotPos } from "../input";
+import { playerPos, pointerClaim, robotPos } from "../input";
+import { labelOpacity } from "./labelFade";
 import { useRobot } from "../robot/robotStore";
 import { occlusion } from "./materials";
 
@@ -81,7 +82,8 @@ function ZoneLabel({ position, en, ne, height = 1.35 }: { position: [number, num
   const mat = useRef<THREE.SpriteMaterial>(null);
   const v = useMemo(() => new THREE.Vector3(), []);
   const bubbleK = useRef(1);
-  // Fade out while the label is drawn on top of the avatar, and to ~25% while the robot's speech bubble is up beside it.
+  // Fade out while the label is drawn on top of the avatar, when it comes within ~6 m of the camera (a big label close to
+  // the lens would cover the view), and to ~25% while the robot's speech bubble is up beside it (nepal/labelFade.ts).
   useFrame(({ camera, gl }, dt) => {
     if (!mat.current) return;
     const h = gl.domElement.height;
@@ -92,7 +94,10 @@ function ZoneLabel({ position, en, ne, height = 1.35 }: { position: [number, num
     const { line, thinking } = useRobot.getState();
     const near = line || thinking ? 1 - THREE.MathUtils.smoothstep(Math.hypot(position[0] - robotPos.x, position[2] - robotPos.z), 3.2, 4.4) : 0;
     bubbleK.current = THREE.MathUtils.damp(bubbleK.current, 1 - 0.75 * near, 12, Math.min(dt, 0.1));
-    mat.current.opacity = (THREE.MathUtils.smoothstep(d, 0.12, 0.24) * 0.85 + 0.15) * bubbleK.current;
+    const cp = camera.position;
+    const camDist = Math.hypot(cp.x - position[0], cp.y - position[1], cp.z - position[2]);
+    const avatarDist = Math.hypot(cp.x - playerPos.x, cp.y - 1, cp.z - playerPos.z);
+    mat.current.opacity = labelOpacity(d, camDist, avatarDist, bubbleK.current);
   });
   return (
     <sprite position={position} scale={[height * aspect, height, 1]} renderOrder={5}>

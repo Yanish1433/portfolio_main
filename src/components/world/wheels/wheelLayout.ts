@@ -50,6 +50,13 @@ export const DRUM_TOP = DRUM_Y + DRUM_H * DRUM_GROW_Y;
 export const RING_CELL: [number, number] = [480, 152];
 export const RING_W = 2.1;
 export const RING_H = RING_W * (RING_CELL[1] / RING_CELL[0]);
+
+/** step14b/15 signboard: atlas cell (px) of a carved dark-wood board, and the font size range of the group name (Kalam Bold, px of the cell). */
+export const SIGN_CELL: [number, number] = [640, 320];
+export const SIGN_NAME_MAX = 150;
+export const SIGN_NAME_FLOOR = 140;
+/** On-screen height (px) of the name's font size, from the board width (m), the size in cell px and the px per metre of the camera. */
+export const signNamePx = (boardW: number, namePx: number, pxPerM: number) => (namePx / SIGN_CELL[0]) * boardW * pxPerM;
 /** Every other name is lifted by this much, so neighbours never overlap. */
 export const RING_LIFT = 1.1;
 

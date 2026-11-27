@@ -1,9 +1,10 @@
 "use client";
 
-// The prayer-wheel gallery's wheels: one golden drum per skill group (wheelData.ts), ONE InstancedMesh (1 draw call).
+// The prayer-wheel gallery's wheels: one brass drum per skill group (wheelData.ts, brass.ts), ONE InstancedMesh (1 draw call): all five names live in one atlas, the row is picked per instance.
 // The wooden frame, roof, pedestals and posts are merged into the town's buckets (wheels/frame.ts, 0 calls).
 // - spin: clockwise (seen from above), slowly while the avatar is within 2 m or the mouse is over the wheel,
 //   fast once it is chosen. Speeds ease toward their target, so a wheel coasts to a stop. Reduced motion: no spin.
+// - wave (spin.ts): while the visitor stands at the row the wheels turn one by one, left to right, and settle with a name facing the camera.
 // - pointing: a second, invisible InstancedMesh (material.visible = false: raycast only, never drawn) gives each
 //   wheel an easy target; its instanceId is the wheel's number. A click chooses it and stops there, so it never
 //   also starts a click-to-walk.
@@ -13,14 +14,18 @@ import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { isTypingTarget, useWorld } from "@/store/world";
 import { playerPos, pointerClaim } from "../input";
-import { getMaterials } from "../nepal/materials";
-import { lathe } from "../nepal/geom";
+import { getEnvironment } from "../nepal/materials";
+import { themeState } from "../nepal/themeState";
 import { cursor } from "../halls/three";
 import { GALLERY } from "../zones";
 import { useRobot } from "../robot/robotStore";
 import { chooseWheel } from "./choose";
 import { WHEEL_PROJECTS, WHEELS } from "./wheelData";
-import { DRUM_GROW_Y, DRUM_H, DRUM_R, DRUM_Y, nearestWheel } from "./wheelLayout";
+import { DRUM_GROW_Y, DRUM_R, DRUM_Y, nearestWheel } from "./wheelLayout";
+import { kalamBold, loadKalamBold, makeBrassAtlas, makeBrassGeo, pickAtlasRows } from "./brass";
+import { plainGroup } from "./wheelLayout";
+import { atRow, newWave, snapYaw, stepWave, waveSpin } from "./spin";
+import { avatarMotion } from "../input";
 
 /** Spin when the avatar is within this distance of a wheel (m). */
 export const NEAR_R = 2;
@@ -29,65 +34,9 @@ export const CULL_R = 35;
 const SLOW = 1.5; // rad/s while passing or pointing
 const FAST = 6; // rad/s once chosen
 const EASE = 2.2; // 1/s: how quickly the speed follows its target
-const DIM = new THREE.Color("#3a332e");
+/** Instance colours multiply the brass: dimmed wheels go neutral-dark (not muddy), highlighted ones brighten. */
+const DIM = new THREE.Color("#6a625a");
 const WHITE = new THREE.Color("#ffffff");
-
-/** Shared materials use vertexColors; give the geometry a colour attribute so instance colours show as they are. */
-function colourBy(g: THREE.BufferGeometry, body: [number, number, number], band: [number, number, number], bandY: [number, number][]) {
-  const pos = g.attributes.position;
-  const col = new Float32Array(pos.count * 3);
-  for (let i = 0; i < pos.count; i++) {
-    const y = pos.getY(i);
-    const inBand = bandY.some(([a, b]) => y >= a && y <= b);
-    const c = inBand ? band : body;
-    col.set(c, i * 3);
-  }
-  g.setAttribute("color", new THREE.BufferAttribute(col, 3));
-  return g;
-}
-
-/** A tall drum with a flared lip, two embossed bands, a collar and a little lotus finial (radius 0.3, 1.0 tall + finial). */
-export function makeDrumGeo() {
-  const H = DRUM_H;
-  const r = DRUM_R;
-  const g = lathe(
-    [
-      [0, 0],
-      [r * 0.7, 0],
-      [r * 0.82, 0.04],
-      [r * 1.0, 0.07], // lower lip
-      [r * 1.0, 0.13],
-      [r * 0.92, 0.16],
-      [r * 0.92, 0.3], // body
-      [r * 1.06, 0.32], // embossed band (lower)
-      [r * 1.06, 0.36],
-      [r * 0.92, 0.38],
-      [r * 0.92, 0.5],
-      [r * 1.1, 0.53], // embossed band (middle, widest)
-      [r * 1.1, 0.6],
-      [r * 0.92, 0.63],
-      [r * 0.92, 0.72],
-      [r * 1.06, 0.74], // embossed band (upper)
-      [r * 1.06, 0.78],
-      [r * 0.92, 0.8],
-      [r * 0.92, H - 0.12],
-      [r * 1.0, H - 0.1], // upper lip
-      [r * 1.0, H - 0.04],
-      [r * 0.7, H],
-      [r * 0.3, H + 0.02], // finial: a small lotus bud
-      [r * 0.36, H + 0.08],
-      [r * 0.2, H + 0.16],
-      [0, H + 0.24],
-    ],
-    14,
-  );
-  // body warm gold, bands near-white so they take the group accent through the instance colour
-  return colourBy(g, [0.92, 0.8, 0.55], [1, 1, 1], [
-    [0.31, 0.37],
-    [0.52, 0.61],
-    [0.73, 0.79],
-  ]);
-}
 
 const pickGeo = (() => {
   const g = new THREE.CylinderGeometry(0.5, 0.5, 2.0, 8).translate(0, 1.0, 0);
@@ -107,13 +56,35 @@ const _c = new THREE.Color();
 export const galleryDist = () => Math.hypot(playerPos.x - GALLERY.x, playerPos.z - GALLERY.z);
 
 export default function WheelGallery({ reducedMotion }: { reducedMotion: boolean }) {
-  const mats = getMaterials();
-  const drumGeo = useMemo(makeDrumGeo, []);
+  const gl = useThree((t) => t.gl);
+  const brass = useMemo(() => {
+    const geo = makeBrassGeo();
+    const n = WHEELS.length;
+    // the instance's row in the atlas (counted from the bottom of the texture): wheel i is row i from the top
+    const rows = new THREE.InstancedBufferAttribute(new Float32Array(WHEELS.map((_, i) => n - 1 - i)), 1);
+    geo.setAttribute("aRow", rows);
+    const atlas = makeBrassAtlas(n, kalamBold);
+    const names = WHEELS.map((w) => plainGroup(w.category, w.groupLabel).plain);
+    atlas.draw(names);
+    const mat = new THREE.MeshStandardMaterial({
+      color: "#e0a93e",
+      metalness: 0.9,
+      roughness: 0.35,
+      map: atlas.colour,
+      bumpMap: atlas.bump,
+      bumpScale: 2.2,
+    });
+    pickAtlasRows(mat, n);
+    return { geo, atlas, mat, names };
+  }, []);
+  const drumGeo = brass.geo;
+  const wave = useRef(newWave());
+  const canRef = useRef(false);
   const drumRef = useRef<THREE.InstancedMesh>(null);
   const pickRef = useRef<THREE.InstancedMesh>(null);
   const pickMat = useMemo(() => new THREE.MeshBasicMaterial({ visible: false }), []);
   // per-wheel animation: yaw (rad), spin speed (rad/s)
-  const anim = useRef(WHEELS.map((w, i) => ({ yaw: i * 1.3 + w.x, vel: 0, dirty: true })));
+  const anim = useRef(WHEELS.map(() => ({ yaw: 0, vel: 0, dirty: true })));
   const key = useRef("");
   const near = useRef<boolean[]>(WHEELS.map(() => false));
 
@@ -125,6 +96,19 @@ export default function WheelGallery({ reducedMotion }: { reducedMotion: boolean
     _q.setFromEuler(_e.set(0, anim.current[i].yaw, 0));
     m.setMatrixAt(i, _m.compose(_p.set(w.x, DRUM_Y, w.z), _q, _s.set(sc, DRUM_GROW_Y, sc)));
   };
+
+  // brass needs something to reflect; the lettering needs Kalam Bold (redraw once it is ready)
+  useEffect(() => {
+    brass.mat.envMap = getEnvironment(gl);
+    brass.mat.needsUpdate = true;
+    const aniso = gl.capabilities.getMaxAnisotropy();
+    brass.atlas.colour.anisotropy = brass.atlas.bump.anisotropy = Math.min(8, aniso);
+    let live = true;
+    loadKalamBold().then(() => live && brass.atlas.draw(brass.names));
+    return () => {
+      live = false;
+    };
+  }, [brass, gl]);
 
   useLayoutEffect(() => {
     const m = drumRef.current;
@@ -147,8 +131,11 @@ export default function WheelGallery({ reducedMotion }: { reducedMotion: boolean
     () => () => {
       pickMat.dispose();
       drumGeo.dispose();
+      brass.mat.dispose();
+      brass.atlas.colour.dispose();
+      brass.atlas.bump.dispose();
     },
-    [pickMat, drumGeo],
+    [pickMat, drumGeo, brass],
   );
 
   // Press E next to a wheel to choose it.
@@ -177,7 +164,7 @@ export default function WheelGallery({ reducedMotion }: { reducedMotion: boolean
     const now = state.clock.elapsedTime;
     if (now - last.current > 0.1) {
       last.current = now;
-      const can = !!w.character && !w.pickerOpen && !w.cinema && dist < 9;
+      const can = (canRef.current = !!w.character && !w.pickerOpen && !w.cinema && dist < 9);
       const nearest = can ? nearestWheel(WHEELS, playerPos.x, playerPos.z, NEAR_R) : -1;
       w.setWheelNear(nearest >= 0 ? nearest : null);
       WHEELS.forEach((wh, i) => {
@@ -193,25 +180,52 @@ export default function WheelGallery({ reducedMotion }: { reducedMotion: boolean
     if (k !== key.current) {
       key.current = k;
       WHEELS.forEach((wh, i) => {
-        // tint the bands toward the group colour; the gold body stays gold
-        _c.set(wh.colour).lerp(WHITE, 0.2);
-        if (w.skillFilter !== "all" && wh.category !== w.skillFilter) _c.lerp(DIM, 0.68);
-        else if (i === w.wheelSelected) _c.multiplyScalar(1.55);
-        else if (hl(i)) _c.multiplyScalar(1.25);
+        // same brass on every wheel: filtered-out groups are dimmed, the chosen / pointed-at one brightens
+        _c.set(WHITE);
+        if (w.skillFilter !== "all" && wh.category !== w.skillFilter) _c.lerp(DIM, 0.8);
+        else if (i === w.wheelSelected) _c.multiplyScalar(1.5);
+        else if (hl(i)) _c.multiplyScalar(1.22);
         m.setColorAt(i, _c);
       });
       if (m.instanceColor) m.instanceColor.needsUpdate = true;
     }
 
+    // the wave: while the visitor stands at the row the wheels spin one by one, left to right (see spin.ts)
+    const at = !reducedMotion && canRef.current && atRow(WHEELS, playerPos.x, playerPos.z, w.activeZone);
+    const ws = stepWave(wave.current, dt, at, avatarMotion.speed > 0.15, WHEELS.length);
+    const waving = ws.active;
+    // brass catches less light at night
+    brass.mat.envMapIntensity = 1.25 - 0.6 * themeState.t;
+
     let changed = false;
     WHEELS.forEach((_, i) => {
       const a = anim.current[i];
-      const target = reducedMotion ? 0 : i === w.wheelSelected ? FAST : near.current[i] || i === w.wheelHover ? SLOW : 0;
+      const chosen = i === w.wheelSelected;
+      const pointed = i === w.wheelHover;
+      // the visitor's choice always wins; a nudge for the wheel they walk past is dropped while the wave runs
+      const target = reducedMotion ? 0 : chosen ? FAST : pointed || (near.current[i] && !waving) ? SLOW : 0;
       const vel = a.vel + (target - a.vel) * (1 - Math.exp(-dt * EASE));
       a.vel = Math.abs(vel) < 0.01 && target === 0 ? 0 : vel;
       if (a.vel !== 0) {
         a.yaw -= a.vel * dt; // negative rotation about +y = clockwise seen from above
         a.dirty = true;
+      }
+      // wave: add this frame's share of the eased turns (whole turns per spin: it ends with a name facing the camera)
+      if (!reducedMotion && !chosen && !pointed) {
+        const cap = ws.lastCycle.length ? ws.lastCycle[i] : Infinity;
+        const d = waveSpin(ws.t, i, cap) - waveSpin(Math.max(0, ws.t - dt), i, cap);
+        if (d > 0 && (ws.active || ws.lastCycle.length)) {
+          a.yaw -= d;
+          a.dirty = true;
+        }
+      }
+      // at rest, settle to the nearest name so one always faces the camera
+      if (!reducedMotion && target === 0 && a.vel === 0 && !(ws.active || ws.lastCycle.length)) {
+        const diff = snapYaw(a.yaw) - a.yaw;
+        if (Math.abs(diff) > 1e-3) {
+          a.yaw += diff * (1 - Math.exp(-dt * 4));
+          a.dirty = true;
+        }
       }
       if (a.dirty) {
         place(i);
@@ -225,7 +239,7 @@ export default function WheelGallery({ reducedMotion }: { reducedMotion: boolean
   if (!WHEELS.length) return null;
   return (
     <group>
-      <instancedMesh ref={drumRef} args={[drumGeo, mats.gold, WHEELS.length]} frustumCulled={false} />
+      <instancedMesh ref={drumRef} args={[drumGeo, brass.mat, WHEELS.length]} frustumCulled={false} />
       <instancedMesh
         ref={pickRef}
         args={[pickGeo, pickMat, WHEELS.length]}

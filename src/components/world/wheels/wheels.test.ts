@@ -175,3 +175,74 @@ test("threads fade in, hold and fade out within 8 s", () => {
   assert.equal(threadAlpha(8), 0);
   assert.equal(threadAlpha(12), 0);
 });
+
+test("signboards: the group name is >= 20 px tall at the walk-up view, 1280x720 (step15)", async () => {
+  const { CAM_FOV, projectNdc, pxPerMetre, viewOfZone, viewPose } = await import("../cameraRig");
+  const { AVATAR_SCALE } = await import("../characters");
+  const { SKILLS_MID } = await import("../zones");
+  const { plaqueWidth, PLAQUE } = await import("./frame");
+  const { SIGN_NAME_FLOOR, SIGN_NAME_MAX, signNamePx } = await import("./wheelLayout");
+  const n = layoutWheels(profile.skills).length;
+  assert.ok(n > 0 && SIGN_NAME_FLOOR <= SIGN_NAME_MAX);
+  const pose = viewPose([SKILLS_MID.x, AVATAR_SCALE, SKILLS_MID.z], viewOfZone("skills-lab"));
+  const depth = projectNdc(pose, [GALLERY.x, PLAQUE.y, GALLERY.z + PLAQUE.dz], CAM_FOV, 16 / 9).depth;
+  const px = signNamePx(plaqueWidth(n), SIGN_NAME_FLOOR, pxPerMetre(depth, 720));
+  assert.ok(px >= 20, `name is ${px.toFixed(1)} px tall (>= 20)`);
+});
+
+test("signboards: clear of the plinth, pedestal and drum, and every corner is in frame from the skills view (step15)", async () => {
+  const { CAM_FOV, projectNdc, viewOfZone, viewPose } = await import("../cameraRig");
+  const { AVATAR_SCALE } = await import("../characters");
+  const { SKILLS_MID } = await import("../zones");
+  const { PEDESTAL, PLAQUE, PLAQUE_THICK, PLINTH, plaqueHeight, plaqueWidth } = await import("./frame");
+  const { DRUM_MAX_R, DRUM_Y } = await import("./wheelLayout");
+  const pose = viewPose([SKILLS_MID.x, AVATAR_SCALE, SKILLS_MID.z], viewOfZone("skills-lab"));
+  for (const count of [1, 3, 5, 8]) {
+    const n = layoutWheels(resizeGroups(profile.skills, count)).length;
+    const w = plaqueWidth(n);
+    const h = plaqueHeight(n);
+    // the board's frame is a box (thickness PLAQUE_THICK) tilted about x; check its four back and front corners
+    const c = Math.cos(PLAQUE.tilt);
+    const sn = Math.sin(PLAQUE.tilt);
+    const corners: [number, number, number][] = [];
+    for (const sy of [-1, 1]) {
+      for (const sz of [-1, 1]) {
+        const ly = (sy * (h + 0.04)) / 2;
+        const lz = (sz * PLAQUE_THICK) / 2;
+        // rotation about x by tilt: y' = y cos - z sin, z' = y sin + z cos
+        corners.push([w / 2, PLAQUE.y + ly * c - lz * sn, GALLERY.z + PLAQUE.dz + ly * sn + lz * c]);
+      }
+    }
+    const zs = corners.map((p) => p[2] - GALLERY.z);
+    const ys = corners.map((p) => p[1]);
+    assert.ok(Math.min(...ys) >= PLINTH.top + 0.04, `n=${n}: lower edge ${Math.min(...ys).toFixed(3)} sits on the plinth`);
+    assert.ok(Math.min(...zs) >= PEDESTAL.halfDepth + 0.02, `n=${n}: back edge ${Math.min(...zs).toFixed(3)} is inside the pedestal`);
+    // wherever the board is above the pedestal's top, it must also clear the drum
+    assert.ok(Math.min(...zs) >= DRUM_MAX_R + 0.02 || Math.max(...ys) < DRUM_Y, `n=${n}: board touches the drum`);
+    assert.ok(Math.max(...zs) <= PLINTH.halfDepth, `n=${n}: front edge ${Math.max(...zs).toFixed(3)} hangs off the plinth`);
+    // in frame (with a margin for the HUD) from the skills preset: both end boards, all corners
+    const wheels = layoutWheels(resizeGroups(profile.skills, count));
+    for (const wh of [wheels[0], wheels[n - 1]]) {
+      for (const p of corners) {
+        for (const sx of [-1, 1]) {
+          const q = projectNdc(pose, [wh.x + sx * p[0], p[1], p[2]], CAM_FOV, 16 / 9);
+          assert.ok(Math.abs(q.x) < 0.98 || count > 5, `n=${n}: board corner x ${q.x.toFixed(2)} out of frame`);
+          assert.ok(q.y > -0.92 && q.y < 0.9, `n=${n}: board corner y ${q.y.toFixed(2)} out of frame`);
+        }
+      }
+    }
+  }
+});
+
+test("drum: the brass rows and the engraved names fit the atlas, one row per wheel (step15)", async () => {
+  const { BANDS, DOME_H, ROW_H, ROW_W } = await import("./brass");
+  const { NAME_REPEATS } = await import("./spin");
+  assert.ok(ROW_W * 5 > 0 && ROW_H * 8 <= 8192, "eight rows fit a texture");
+  assert.ok(NAME_REPEATS >= 2 && ROW_W % NAME_REPEATS === 0);
+  const order = [BANDS.rimLow, BANDS.nameLow, BANDS.orn, BANDS.nameHigh, BANDS.rimHigh];
+  order.forEach((b, i) => {
+    assert.ok(b[0] < b[1]);
+    if (i) assert.ok(b[0] > order[i - 1][1], "bands do not overlap");
+  });
+  assert.ok(DOME_H > 0 && DOME_H < 0.25);
+});

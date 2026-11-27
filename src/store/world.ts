@@ -158,6 +158,10 @@ type WorldState = {
   setWheelNear: (i: number | null) => void;
   /** Choose a wheel (restarts its threads), or null to clear. */
   selectWheel: (i: number | null) => void;
+
+  /** The big mini-map (M key / expand corner) is open. */
+  minimapBig: boolean;
+  setMinimapBig: (v: boolean) => void;
 };
 
 /** The Skills filter chips: everything, or one group. */
@@ -244,6 +248,8 @@ export const useWorld = create<WorldState>((set, get) => ({
   setWheelHover: (wheelHover) => set((s) => (s.wheelHover === wheelHover ? s : { wheelHover })),
   setWheelNear: (wheelNear) => set((s) => (s.wheelNear === wheelNear ? s : { wheelNear })),
   selectWheel: (i) => set({ wheelSelected: i, wheelSelectedAt: performance.now() }),
+  minimapBig: false,
+  setMinimapBig: (minimapBig) => set((s) => (s.minimapBig === minimapBig ? s : { minimapBig })),
 }));
 
 /** Visitor movement (keys, joystick, ground clicks) is off while a project video is open or the camera is flying. */

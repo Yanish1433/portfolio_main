@@ -29,6 +29,7 @@ import { EASELS, SCROLL } from "./halls/layout";
 import type { InfoRef } from "@/store/world";
 import GuideMenu from "./guide/GuideMenu";
 import GuestbookButton from "./guestbook/GuestbookUi";
+import MiniMap from "./minimap/MiniMap";
 import { btnClass, cardClass, pillClass, rowClass } from "./ui/book";
 import { WheelCard, SkillFilterBar, WheelHint } from "./wheels/WheelUi";
 
@@ -476,6 +477,7 @@ export default function Overlay({ characters, thumbs = [], posters = [], aboutPh
       <WheelHint />
       <SkillFilterBar />
       <AvatarControls />
+      <MiniMap />
       <Toast />
       {/* Bottom dock: zone card above the robot chat; on touch screens it sits above the joystick. */}
       <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-3 p-4 pb-5 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] [@media(pointer:coarse)]:pb-[calc(168px+env(safe-area-inset-bottom))]">

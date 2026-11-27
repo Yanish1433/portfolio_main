@@ -64,8 +64,8 @@ function addWet(m: THREE.MeshStandardMaterial, key: string) {
     shader.uniforms.uWet = wetUniform;
     shader.fragmentShader = shader.fragmentShader
       .replace("#include <common>", "#include <common>\nuniform float uWet;")
-      .replace("#include <map_fragment>", "#include <map_fragment>\ndiffuseColor.rgb *= 1.0 - 0.32 * uWet;")
-      .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\nroughnessFactor = mix(roughnessFactor, roughnessFactor * 0.42, uWet);");
+      .replace("#include <map_fragment>", "#include <map_fragment>\ndiffuseColor.rgb *= 1.0 - 0.22 * uWet;")
+      .replace("#include <roughnessmap_fragment>", "#include <roughnessmap_fragment>\nroughnessFactor = max(0.1, roughnessFactor - 0.3 * uWet);");
   };
   m.customProgramCacheKey = () => `${prevKey.call(m)}-wet-${key}`;
 }

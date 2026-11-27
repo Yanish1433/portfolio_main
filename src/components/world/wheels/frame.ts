@@ -1,19 +1,33 @@
 // The gallery's static parts, merged into the town's material buckets (0 extra draw calls): a stone plinth,
-// a pedestal with a carved plaque board under every wheel, four carved posts, beams, a wooden back screen,
+// a pedestal with a carved signboard in front of every wheel, four carved posts, beams, a wooden back screen,
 // a small tiled roof with a gold finial, a pennant in each group's colour and two butter lamps.
-// The wheels themselves (the golden drums) are WheelGallery.tsx; the plaque TEXT is WheelLabels.tsx.
+// The wheels themselves (the brass drums, brass.ts) are WheelGallery.tsx; the plaque TEXT is WheelLabels.tsx.
 import * as THREE from "three";
 import { COL, type Anchors } from "../nepal/kit";
 import { T, beam, box, lathe, plane, type Parts } from "../nepal/geom";
 import { GALLERY } from "../zones";
-import { DRUM_Y, frameWidth, pitchFor, type WheelSpec } from "./wheelLayout";
+import { DRUM_GROW_Y, DRUM_H, SIGN_CELL, DRUM_Y, frameWidth, pitchFor, type WheelSpec } from "./wheelLayout";
+import { DOME_H } from "./brass";
 
-/** The tilted plaque board in front of each pedestal: height, forward offset and tilt about x (radians). */
-export const PLAQUE = { y: 0.34, dz: 0.38, tilt: -0.5 };
-/** Width of a plaque (m) for `n` wheels. */
-export const plaqueWidth = (n: number) => Math.min(1.17, pitchFor(n) * 0.9);
+/**
+ * The tilted signboard in front of each pedestal (step15): centre height, forward offset and tilt about x (radians).
+ * It stands clear of the pedestal and the drum, its lower edge above the plinth, tipped up toward the default camera.
+ */
+export const PLAQUE = { y: 0.46, dz: 0.66, tilt: -0.5 };
+/** Thickness of the board's wooden frame (m), and what the plinth / pedestal take up in front of the wheels. */
+export const PLAQUE_THICK = 0.06;
+export const PLINTH = { top: 0.1, halfDepth: 0.9 };
+export const PEDESTAL = { halfDepth: 0.335, top: 0.585 };
+/** Width of a plaque (m) for `n` wheels: nearly the whole pitch, so the name can be big. */
+export const plaqueWidth = (n: number) => Math.min(1.28, pitchFor(n) * 0.985);
+/** Height (m) of the board's face for `n` wheels (same ratio as the atlas cell). */
+export const plaqueHeight = (n: number) => plaqueWidth(n) * (SIGN_CELL[1] / SIGN_CELL[0]);
 
 const EAVE = 2.9;
+/** The carved beam the finial rods reach: its centre height, and where the rods start / end. */
+const BEAM_Y = 2.5;
+const ROD_BASE = DRUM_Y + (DRUM_H + DOME_H) * DRUM_GROW_Y - 0.01;
+const ROD_TOP = BEAM_Y - 0.05;
 const RIDGE = 3.4;
 
 export function buildWheelGallery(P: Parts, A: Anchors, wheels: WheelSpec[]) {
@@ -28,16 +42,22 @@ export function buildWheelGallery(P: Parts, A: Anchors, wheels: WheelSpec[]) {
     new THREE.Matrix4().compose(V(x, y, z), new THREE.Quaternion().setFromAxisAngle(V(1, 0, 0), a), V(1, 1, 1));
 
   // plinth
-  P.box("plain", W + 0.2, 0.1, 1.45, xc, 0.05, zc, COL.stoneDark);
-  P.box("plain", W + 0.3, 0.05, 1.5, xc, 0.025, zc, COL.stone);
+  P.box("plain", W + 0.2, PLINTH.top, PLINTH.halfDepth * 2, xc, PLINTH.top / 2, zc, COL.stoneDark);
+  P.box("plain", W + 0.3, 0.05, PLINTH.halfDepth * 2 + 0.05, xc, 0.025, zc, COL.stone);
 
   // pedestals, carved plaque boards and accent caps
   for (const w of wheels) {
     const pw = pitch * 0.94;
     P.box("wood", pw, 0.46, 0.62, w.x, 0.33, zc, COL.woodDark);
     P.box("plain", pw + 0.05, 0.05, 0.67, w.x, 0.585, zc, w.colour);
-    P.add("gold", lathe([[0, 0], [w.radius * 1.15, 0], [w.radius * 1.15, 0.02], [0, 0.02]], 10), COL.gold, T(w.x, DRUM_Y - 0.03, zc));
-    P.small(() => P.add("wood", box(plaqueWidth(n) + 0.07, 0.76, 0.06), COL.woodDark, rotX(w.x, PLAQUE.y, zc + PLAQUE.dz, PLAQUE.tilt)));
+    // dark red-brown wooden hub on a short brass spindle (the drum turns on it; both are round, so they never need to move)
+    const R = w.radius;
+    P.add("wood", lathe([[0, 0], [R * 1.08, 0], [R * 1.08, 0.03], [R * 0.95, 0.055], [R * 0.7, 0.085], [0, 0.09]], 16), "#5a2418", T(w.x, PEDESTAL.top, zc));
+    // thin brass finial rod from the dome up to the carved beam
+    P.small(() => P.add("gold", lathe([[0, 0], [0.022, 0], [0.022, ROD_TOP - ROD_BASE], [0, ROD_TOP - ROD_BASE]], 6), COL.gold, T(w.x, ROD_BASE, zc)));
+    P.small(() => P.add("wood", box(plaqueWidth(n) + 0.03, plaqueHeight(n) + 0.04, PLAQUE_THICK), COL.woodDark, rotX(w.x, PLAQUE.y, zc + PLAQUE.dz, PLAQUE.tilt)));
+    // little cloth tassel in the group's colour at the foot of the beam
+    P.small(() => P.add("cloth", plane(0.05, 0.16, 1), w.colour, T(w.x + R * 0.55, BEAM_Y - 0.16, zc + 0.05)));
   }
 
   // carved posts: plinth block, square shaft, flared capital and a diagonal strut to the beam
@@ -56,6 +76,19 @@ export function buildWheelGallery(P: Parts, A: Anchors, wheels: WheelSpec[]) {
   // beams along the front and back, and the ridge
   for (const sz of [-1, 1]) P.box("wood", W + 0.2, 0.18, 0.18, xc, EAVE + 0.08, zc + sz * 0.55, COL.woodDark);
   P.box("wood", W + 0.2, 0.14, 0.14, xc, RIDGE - 0.1, zc, COL.woodDark);
+
+  // carved beam over the wheels, with a small pagoda-style edge: a dark board, a lattice of tiny brackets under it and
+  // a thin sloping eave on top
+  P.box("wood", W - 0.1, 0.16, 0.34, xc, BEAM_Y, zc, COL.woodDark);
+  P.box("wood", W - 0.1, 0.05, 0.42, xc, BEAM_Y + 0.105, zc, COL.wood);
+  P.add("roof", box(W + 0.1, 0.035, 0.22), "#ffffff", rotX(xc, BEAM_Y + 0.16, zc + 0.23, 0.45));
+  P.small(() => {
+    const step = 0.14;
+    for (let x = xc - W / 2 + 0.2; x < xc + W / 2 - 0.15; x += step) {
+      P.box("wood", 0.07, 0.07, 0.07, x, BEAM_Y - 0.115, zc + 0.14, COL.woodDark);
+      P.box("wood", 0.025, 0.1, 0.03, x + step / 2, BEAM_Y - 0.1, zc + 0.16, COL.brickDark);
+    }
+  });
 
   // wooden back screen (a lattice band on top) so the golden drums read against it
   P.box("wood", W - 0.2, 2.0, 0.07, xc, 1.12, zc - 0.55, COL.wood);
