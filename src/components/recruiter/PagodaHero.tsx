@@ -2,17 +2,18 @@
 
 import { useEffect, useRef } from "react";
 import styles from "./recruiter.module.css";
+import { BOOK_VIDEO_EVENT } from "./book/active";
 
-const SRC = { light: "/recruiter/pagoda-day.mp4", dark: "/recruiter/pagoda-night.mp4" } as const;
-const THEME_EVENT = "themechange"; // same string as THEME_EVENT in theme.ts (kept local so this file stays tiny)
+const SRC = { day: "/recruiter/pagoda-day.mp4", night: "/recruiter/pagoda-night.mp4" } as const;
 
 type NetInfo = { connection?: { saveData?: boolean } };
 
 /**
- * Hero background: the poster (pure CSS, per theme, see .pagodaBg) is what paints first.
+ * The pagoda behind the book, dimmed: the poster (pure CSS, per theme, see .pagodaBg) is what paints first.
  * This component adds ONE <video> on top, only when it is worth it:
  * desktop width, no reduced motion, no Save-Data. It starts after window load + idle, pauses
- * when the hero is off-screen or the tab is hidden, and swaps `src` (never two decoders) on a theme change.
+ * when it is off-screen, the tab is hidden or a project video plays on the open page (one video at a time),
+ * and swaps `src` (never two decoders) when the clock crosses dusk or dawn.
  */
 export function PagodaHero() {
   const root = useRef<HTMLDivElement>(null);
@@ -22,7 +23,7 @@ export function PagodaHero() {
     const box = root.current;
     const v = video.current;
     if (!box || !v) return;
-    const wrap = box.closest<HTMLElement>("[data-recruiter-root]");
+    const wrap = box.closest<HTMLElement>("[data-time-root]");
     const mq = (q: string) => window.matchMedia(q).matches;
     if (!mq("(min-width: 641px)") || mq("(prefers-reduced-motion: reduce)")) return;
     if ((navigator as Navigator & NetInfo).connection?.saveData) return;
@@ -30,12 +31,13 @@ export function PagodaHero() {
     let alive = true;
     let started = false;
     let visible = true;
-    const mode = () => (wrap?.dataset.theme === "dark" ? "dark" : "light");
-    let current: "light" | "dark" | null = null;
+    let projectPlaying = false;
+    const mode = () => (wrap?.dataset.theme === "night" ? "night" : "day");
+    let current: "day" | "night" | null = null;
 
     const sync = () => {
       if (!started) return;
-      if (visible && !document.hidden) void v.play().catch(() => {});
+      if (visible && !document.hidden && !projectPlaying) void v.play().catch(() => {});
       else v.pause();
     };
     const load = () => {
@@ -50,8 +52,12 @@ export function PagodaHero() {
     const onPlaying = () => {
       v.dataset.on = "true";
     };
-    const onTheme = () => {
+    const onTime = () => {
       if (started) load();
+    };
+    const onProject = (e: Event) => {
+      projectPlaying = (e as CustomEvent<boolean>).detail === true;
+      sync();
     };
 
     const start = () => {
@@ -60,8 +66,7 @@ export function PagodaHero() {
       load();
     };
     const afterLoad = () => {
-      const idle = (window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number })
-        .requestIdleCallback;
+      const idle = (window as Window & { requestIdleCallback?: (cb: () => void, o?: { timeout: number }) => number }).requestIdleCallback;
       if (idle) idle(start, { timeout: 2500 });
       else window.setTimeout(start, 600);
     };
@@ -72,7 +77,8 @@ export function PagodaHero() {
     });
     io.observe(box);
     v.addEventListener("playing", onPlaying);
-    window.addEventListener(THEME_EVENT, onTheme);
+    window.addEventListener("world-time", onTime);
+    window.addEventListener(BOOK_VIDEO_EVENT, onProject);
     document.addEventListener("visibilitychange", sync);
     if (document.readyState === "complete") afterLoad();
     else window.addEventListener("load", afterLoad, { once: true });
@@ -81,7 +87,8 @@ export function PagodaHero() {
       alive = false;
       io.disconnect();
       v.removeEventListener("playing", onPlaying);
-      window.removeEventListener(THEME_EVENT, onTheme);
+      window.removeEventListener("world-time", onTime);
+      window.removeEventListener(BOOK_VIDEO_EVENT, onProject);
       document.removeEventListener("visibilitychange", sync);
       window.removeEventListener("load", afterLoad);
       v.pause();

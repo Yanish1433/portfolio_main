@@ -56,7 +56,7 @@ const localMinutes = () => {
 /**
  * ?time=HH:MM, then ?theme=day|night (12:00 / 22:00), then the saved choice ("world-time": minutes or "now";
  * the old "world-theme" is migrated), then the visitor's local time.
- * KEEP IN SYNC with THEME_SCRIPT (app/page.tsx, recruiter/themeScript.ts).
+ * KEEP IN SYNC with TIME_SCRIPT (lib/time/timeScript.ts; app/page.tsx has its own copy until 18b).
  */
 export function initialMinutes(): number {
   if (typeof window === "undefined") return DAY_AT;

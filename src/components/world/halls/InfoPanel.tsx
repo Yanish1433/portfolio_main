@@ -18,7 +18,7 @@ import { profile } from "@/content/profile";
 import { ctaState } from "../about/aboutView";
 import { WORKSHOP } from "./workshopLayout";
 import { LABELS } from "../nepal/labels";
-import { btnClass, chipClass, BookPanel, LINK_ARROW, wellClass } from "../ui/book";
+import { btnClass, chipClass, BookPanel, LINK_ARROW, wellClass } from "@/components/book";
 
 function useClose() {
   return () => useWorld.getState().closeInfo(true);

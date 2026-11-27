@@ -4,7 +4,7 @@
 // Everything a visitor typed is rendered as React text nodes (never innerHTML).
 import { useEffect, useRef, useState } from "react";
 import { cooldownLeft, MESSAGE_MAX, minutes, NAME_MAX, postNote, readLast, validate, writeLast } from "@/lib/guestbook";
-import { WaxSeal, btnClass, cardClass, fieldClass, floatClass, pillClass, useInk } from "../ui/book";
+import { WaxSeal, btnClass, cardClass, fieldClass, floatClass, pillClass, useInk } from "@/components/book";
 import { guestbookEnabled, loadNotes, useGuestbook } from "./store";
 
 const pill = pillClass("h-11 sm:h-10");

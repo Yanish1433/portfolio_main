@@ -5,7 +5,7 @@
 import { useEffect, useRef, useState } from "react";
 import { isTypingTarget, useWorld } from "@/store/world";
 import { QUICK_TIMES, formatTime, timeIcon } from "../nepal/timeLook";
-import { pillClass } from "../ui/book";
+import { pillClass } from "@/components/book";
 
 const STEP = 15;
 

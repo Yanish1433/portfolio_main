@@ -30,7 +30,7 @@ export default function LoadingOverlay() {
 
   useEffect(() => {
     if (!ready) return;
-    const id = setTimeout(() => setGone(true), 800);
+    const id = setTimeout(() => setGone(true), 450);
     return () => clearTimeout(id);
   }, [ready]);
 

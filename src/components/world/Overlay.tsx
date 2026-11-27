@@ -31,7 +31,7 @@ import type { InfoRef } from "@/store/world";
 import GuideMenu from "./guide/GuideMenu";
 import GuestbookButton from "./guestbook/GuestbookUi";
 import MiniMap from "./minimap/MiniMap";
-import { btnClass, cardClass, pillClass, rowClass } from "./ui/book";
+import { btnClass, cardClass, pillClass, rowClass } from "@/components/book";
 import { WheelCard, SkillFilterBar, WheelHint } from "./wheels/WheelUi";
 
 const RECRUITER_HREF = "/recruiter";

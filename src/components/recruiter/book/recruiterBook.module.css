@@ -1,0 +1,181 @@
+/* Recruiter Mode as a handwritten book. Same look as the town's book kit (lokta paper, Kalam, wax seals, ink links).
+   Night: --glow (0 day .. 1 deep night, set before paint by lib/time/timeScript) warms the paper like a lamp and gives
+   the ink a soft halo. No filter: blur anywhere. Only transform and opacity move. Paper vs ink stays >= 9:1; red vs paper >= 6:1. */
+@font-face { font-family: "Kalam"; font-weight: 400; font-display: swap; src: url(/fonts/Kalam-Regular-devanagari.woff2) format("woff2"); unicode-range: U+0900-097F, U+200C-200D, U+25CC; }
+@font-face { font-family: "Kalam"; font-weight: 400; font-display: swap; src: url(/fonts/Kalam-Regular-latin.woff2) format("woff2"); unicode-range: U+0000-00FF, U+2013-2014, U+2018-201D, U+2022, U+2026, U+20AC, U+2190-2193, U+2197, U+279A; }
+@font-face { font-family: "Kalam"; font-weight: 600 700; font-display: swap; src: url(/fonts/Kalam-Bold-latin.woff2) format("woff2"); unicode-range: U+0000-00FF, U+2013-2014, U+2018-201D, U+2022, U+2026, U+20AC, U+2190-2193, U+2197, U+279A; }
+
+.stage { position: relative; z-index: 2; box-sizing: border-box; height: 100svh; display: flex; align-items: center; justify-content: center; padding: 56px 64px 24px 20px; }
+
+.frame {
+  --g: var(--glow, 0);
+  --paper: color-mix(in srgb, #e6d6b2 calc(var(--g) * 100%), #f6ead0);
+  --ink: #2b1d14; --red: #8f3320; --gold: #c9a227; --wood: #3e2416;
+  position: relative; box-sizing: border-box; width: min(64rem, 100%); height: min(46rem, 100%); display: flex; padding: 8px; border-radius: 12px;
+  background: var(--wood) url(/textures/ui/lokta-wood.png) repeat; color: var(--ink); font-family: Kalam, Mukta, "Nirmala UI", system-ui, cursive;
+  box-shadow: 0 0 0 1.5px #1f120a, inset 0 0 0 1.5px rgba(229, 193, 88, 0.5), 0 14px 34px rgba(0, 0, 0, 0.45), 0 0 calc(var(--g) * 54px) rgba(255, 183, 77, calc(var(--g) * 0.55));
+}
+
+.book { position: relative; flex: 1 1 auto; min-width: 0; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: minmax(0, 1fr); perspective: 3200px; touch-action: pan-y; border-radius: 6px; background: var(--paper) url(/textures/ui/lokta-paper.png) repeat; }
+.spine { position: absolute; top: 0; bottom: 0; left: 50%; width: 30px; margin-left: -15px; z-index: 7; pointer-events: none; background: linear-gradient(90deg, transparent, rgba(60, 30, 10, 0.34) 50%, transparent); }
+
+/* ---- a page */
+.page {
+  grid-row: 1; position: relative; min-height: 0; box-sizing: border-box; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; isolation: isolate;
+  padding: 22px 28px 60px; background: var(--paper) url(/textures/ui/lokta-paper.png) repeat; backface-visibility: hidden; font-size: 17px; line-height: 1.5; overflow-wrap: anywhere;
+  text-shadow: 0 0 calc(var(--g) * 7px) rgba(255, 170, 60, calc(var(--g) * 0.4));
+}
+@media (min-width: 768px) { .page { font-size: 18px; } }
+.page[data-col="1"] { grid-column: 1; border-radius: 6px 0 0 6px; padding-right: 36px; box-shadow: inset -14px 0 18px -10px rgba(60, 30, 10, 0.4); }
+.page[data-col="2"] { grid-column: 2; border-radius: 0 6px 6px 0; padding-left: 36px; box-shadow: inset 14px 0 18px -10px rgba(60, 30, 10, 0.45); }
+.page[data-origin="left"] { transform-origin: left center; }
+.page[data-origin="right"] { transform-origin: right center; }
+.page[data-role="hidden"] { display: none; }
+.page[data-role="front"] { z-index: 5; } .page[data-role="back"] { z-index: 6; } .page[data-role="under"] { z-index: 1; }
+/* the lamp: a warm radial glow on the paper at night */
+.page::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(ellipse at 50% 26%, rgba(255, 196, 110, calc(var(--g) * 0.46)), transparent 72%); }
+/* the curl: one gradient overlay; its opacity is the only thing the turn changes (front: dark edge, back: lighter paper, under: cast shadow) */
+.page::after { content: ""; position: absolute; inset: 0; z-index: 9; pointer-events: none; opacity: var(--shade, 0); background: linear-gradient(to right, rgba(40, 20, 8, 0.6), rgba(40, 20, 8, 0.05) 62%, rgba(255, 255, 255, 0.22)); }
+.page[data-role="front"][data-origin="right"]::after { background: linear-gradient(to left, rgba(40, 20, 8, 0.6), rgba(40, 20, 8, 0.05) 62%, rgba(255, 255, 255, 0.22)); }
+.page[data-role="back"]::after { background: linear-gradient(to right, rgba(255, 250, 232, 0.5), rgba(255, 250, 232, 0.1) 55%, rgba(40, 20, 8, 0.4)); }
+.page[data-role="back"][data-origin="right"]::after { background: linear-gradient(to left, rgba(255, 250, 232, 0.5), rgba(255, 250, 232, 0.1) 55%, rgba(40, 20, 8, 0.4)); }
+.page[data-role="under"][data-col="1"]::after { background: linear-gradient(to left, rgba(40, 20, 8, 0.6), transparent 60%); }
+.page[data-role="under"][data-col="2"]::after { background: linear-gradient(to right, rgba(40, 20, 8, 0.6), transparent 60%); }
+
+/* a decorative blank leaf that riffles past on a jump */
+.leaf { position: absolute; top: 0; bottom: 0; z-index: 4; width: 50%; opacity: 0; pointer-events: none; background: var(--paper) url(/textures/ui/lokta-paper.png) repeat; box-shadow: inset 0 0 28px rgba(60, 30, 10, 0.25); }
+.leaf[data-dir="1"] { left: 50%; transform-origin: left center; }
+.leaf[data-dir="-1"] { left: 0; transform-origin: right center; }
+.leaf[data-wide="false"] { width: 100%; left: 0; transform-origin: left center; }
+
+/* the reduced-motion switch: no turn, a short fade */
+@media (prefers-reduced-motion: reduce) {
+  .page[data-fresh="a"] { animation: fadeA 160ms ease-out; }
+  .page[data-fresh="b"] { animation: fadeB 160ms ease-out; }
+}
+@keyframes fadeA { from { opacity: 0.2; } to { opacity: 1; } }
+@keyframes fadeB { from { opacity: 0.2; } to { opacity: 1; } }
+
+/* ---- type on a page */
+.page h1, .page h2 { margin: 0 0 6px; font-weight: 700; line-height: 1.15; color: var(--ink); text-shadow: 0 0 calc(var(--g) * 11px) rgba(255, 196, 90, calc(var(--g) * 0.8)), 0 1px 0 rgba(255, 255, 255, 0.35); }
+.page h1 { font-size: 1.9em; } .page h2 { font-size: 1.55em; }
+.page h3 { margin: 14px 0 4px; font-size: 1em; font-weight: 700; color: var(--red); letter-spacing: 0.03em; }
+.page p { margin: 0 0 8px; }
+.page ul, .page ol { margin: 0 0 8px; padding: 0; list-style: none; }
+.page :focus-visible { outline: 3px solid #a67c00; outline-offset: 2px; border-radius: 3px; }
+.page :is(h1, h2):focus { outline: none; }
+.eyebrow { margin: 0; font-size: 0.82em; color: var(--red); font-weight: 700; }
+.tag { margin: 0 0 8px; font-size: 1.05em; }
+.note { margin: 0 0 8px; padding: 6px 10px; border-left: 3px solid rgba(143, 51, 32, 0.55); background: rgba(143, 51, 32, 0.07); border-radius: 2px 8px 8px 2px; font-size: 0.92em; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 8px; }
+.chips li { padding: 0 11px; font-size: 0.88em; font-weight: 700; border: 1.5px solid rgba(143, 51, 32, 0.75); border-radius: 20px 26px 18px 24px / 22px 18px 24px 20px; }
+.points li { position: relative; padding-left: 20px; margin-bottom: 4px; }
+.points li::before { content: "✎"; position: absolute; left: 0; color: var(--red); }
+.muted { opacity: 0.9; }
+.ink { color: var(--red); text-decoration: underline wavy; text-decoration-thickness: 1.5px; text-underline-offset: 5px; font-weight: 700; padding: 6px 3px; }
+.ink:hover { color: #6b1f12; text-decoration-style: solid; }
+.srOnly { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.links { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-top: 10px; }
+.contents li { margin-bottom: 2px; }
+.contents li a { display: inline-block; padding: 4px 3px; }
+.sub { margin-left: 18px; font-size: 0.92em; }
+
+/* the taped photo (video or poster); the tape is two translucent strips */
+.taped { position: relative; margin: 6px 0 12px; padding: 8px 8px 24px; background: #fdf6e3; box-shadow: 0 3px 10px rgba(40, 20, 8, 0.35); transform: rotate(-1.2deg); }
+.taped::before, .taped::after { content: ""; position: absolute; top: -9px; width: 62px; height: 20px; background: rgba(230, 205, 140, 0.78); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.18); }
+.taped::before { left: -14px; transform: rotate(-38deg); } .taped::after { right: -14px; transform: rotate(38deg); }
+.taped img, .taped video { display: block; width: 100%; aspect-ratio: 16 / 10; object-fit: cover; background: #2a1c12; }
+.taped figcaption { position: absolute; left: 10px; right: 10px; bottom: 3px; font-size: 0.82em; }
+.portrait img { aspect-ratio: 4 / 5; }
+.mark { display: grid; place-items: center; aspect-ratio: 16 / 10; font-size: 3rem; font-weight: 700; color: #fbe9b7; background: linear-gradient(135deg, #5a3a22, #2a1c12); text-transform: uppercase; }
+.playBtn { position: absolute; left: 18px; bottom: 34px; display: grid; place-items: center; width: 46px; height: 46px; padding: 0 0 0 3px; font-size: 1.1rem; color: #fbe3c8; border: 0; border-radius: 50%; cursor: pointer; background: radial-gradient(circle at 32% 28%, #cf4a2d, #9a2314 62%, #741609); box-shadow: 0 3px 5px rgba(0, 0, 0, 0.4); }
+.playBtn:hover { filter: brightness(1.12); }
+
+/* ---- skills: little ink-sketch brass wheels */
+.wheels { display: grid; grid-template-columns: repeat(auto-fill, minmax(8.4rem, 1fr)); gap: 8px 10px; margin-bottom: 6px; }
+.wheel { display: flex; align-items: center; gap: 8px; }
+.gear { flex: none; width: 44px; height: 44px; color: #6b4a12; animation: spin var(--dur, 10s) linear infinite; animation-direction: var(--dir, normal); animation-play-state: paused; }
+.page[data-active="true"] .gear { animation-play-state: running; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.gear path, .gear circle { fill: rgba(201, 162, 39, 0.3); stroke: currentColor; stroke-width: 1.6; stroke-linejoin: round; stroke-linecap: round; }
+.gear line { stroke: currentColor; stroke-width: 1.3; stroke-linecap: round; }
+
+/* ---- journey: an ink line that draws itself */
+.tl { position: relative; padding-left: 30px; margin-bottom: 8px; }
+.tlLine { position: absolute; left: 0; top: 0; width: 14px; height: 100%; overflow: visible; }
+.tlLine path { fill: none; stroke: var(--red); stroke-width: 2.5; stroke-linecap: round; vector-effect: non-scaling-stroke; }
+.tlItem { position: relative; margin-bottom: 14px; }
+.tlItem::before { content: ""; position: absolute; left: -29px; top: 7px; width: 11px; height: 11px; border-radius: 50%; background: var(--gold); box-shadow: 0 0 0 2px var(--red), 0 0 calc(var(--g) * 9px) calc(var(--g) * 2px) rgba(255, 190, 80, calc(var(--g) * 0.8)); }
+.tlItem h3 { margin-top: 0; }
+.badge { display: inline-block; margin-right: 6px; padding: 0 9px; font-size: 0.8em; font-weight: 700; border: 1.5px solid rgba(143, 51, 32, 0.75); border-radius: 14px; }
+.frame[data-js="true"] .tlLine path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: draw 1.8s ease-out forwards paused; }
+.frame[data-js="true"] .tlItem { animation: itemIn 0.5s ease-out backwards paused; animation-delay: calc(var(--i, 0) * 0.32s); }
+.frame[data-js="true"] .page[data-active="true"] :is(.tlLine path, .tlItem) { animation-play-state: running; }
+@keyframes draw { to { stroke-dashoffset: 0; } }
+@keyframes itemIn { from { opacity: 0; transform: translateX(-8px); } to { opacity: 1; transform: none; } }
+
+/* ---- wax seals and ruled lines inside a page (the kit's contact form lives here) */
+.proof { margin-bottom: 6px; }
+
+/* ---- the back cover */
+.page[data-kind="back"] { color: #f3d98a; background: var(--wood) url(/textures/ui/lokta-wood.png) repeat; text-shadow: 0 1px 0 #1f120a; text-align: center; }
+.page[data-kind="back"]:not([data-role="hidden"]) { display: flex; flex-direction: column; align-items: center; justify-content: center; }
+.page[data-kind="back"] :is(h2, p) { color: #f3d98a; text-shadow: 0 0 calc(var(--g) * 10px) rgba(255, 196, 90, calc(var(--g) * 0.7)), 0 1px 0 #1f120a; }
+.page[data-kind="back"] .ink { color: #ffe9a8; }
+.page[data-kind="back"]::before { display: none; }
+.seal { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 48px; padding: 8px 24px; font: inherit; font-weight: 700; text-decoration: none; color: #fbe3c8; border-radius: 22px 26px 24px 20px / 24px 20px 26px 22px; background: radial-gradient(circle at 32% 28%, #cf4a2d, #9a2314 62%, #741609); box-shadow: inset 0 0 0 3px rgba(0, 0, 0, 0.16), inset 0 2px 3px rgba(255, 190, 160, 0.35), 0 3px 5px rgba(0, 0, 0, 0.4); text-shadow: 0 1px 1px rgba(0, 0, 0, 0.45); }
+.seal:hover { filter: brightness(1.12); }
+.page[data-kind="back"] .seal { color: #fbe3c8; }
+
+/* ---- turning the corner: a folded page corner, real buttons */
+.corner { position: absolute; bottom: 0; z-index: 8; width: 54px; height: 54px; padding: 0; border: 0; cursor: pointer; color: var(--red); font-size: 24px; line-height: 1; font-family: inherit; transition: transform 0.12s; }
+.cornerR { right: 0; transform-origin: 100% 100%; display: flex; align-items: flex-end; justify-content: flex-end; padding: 0 8px 4px 0; border-radius: 100% 0 6px 0 / 100% 0 6px 0; background: linear-gradient(135deg, transparent 50%, rgba(60, 30, 10, 0.3) 50%, #f1e2bd 54%, #d6c18e); }
+.cornerL { left: 0; transform-origin: 0 100%; display: flex; align-items: flex-end; justify-content: flex-start; padding: 0 0 4px 8px; border-radius: 0 100% 0 6px; background: linear-gradient(225deg, transparent 50%, rgba(60, 30, 10, 0.3) 50%, #f1e2bd 54%, #d6c18e); }
+.corner:hover:not(:disabled) { transform: scale(1.14); }
+.corner:disabled { visibility: hidden; }
+.corner:focus-visible { outline: 3px solid #a67c00; outline-offset: -3px; }
+.folio { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); z-index: 8; margin: 0; padding: 0 10px; font-size: 14px; color: var(--ink); pointer-events: none; border-radius: 8px; background: color-mix(in srgb, var(--paper) 78%, transparent); }
+
+/* ---- the cover (first time per session): wood, brass corners, swings open on its hinge */
+.cover { position: absolute; inset: 0; z-index: 20; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center; cursor: pointer; border-radius: 6px; transform-origin: left center; backface-visibility: hidden;
+  background: var(--wood) url(/textures/ui/lokta-wood.png) repeat; box-shadow: inset 0 0 0 3px rgba(229, 193, 88, 0.55), inset 0 0 50px rgba(0, 0, 0, 0.5); color: #f3d98a; }
+.cover[data-open="true"] { animation: coverOpen 900ms cubic-bezier(0.55, 0, 0.2, 1) forwards; }
+:global([data-cover="seen"]) .cover { display: none; }
+.coverName { padding: 0 28px; font-size: clamp(1.8rem, 5vw, 3rem); font-weight: 700; letter-spacing: 0.04em; text-shadow: 0 1px 0 #1f120a, 0 0 calc(var(--g) * 16px) rgba(255, 196, 90, calc(var(--g) * 0.8)); }
+.coverTitle { padding: 0 28px; font-size: clamp(1rem, 2.4vw, 1.4rem); opacity: 0.92; }
+.coverCorner { position: absolute; width: 34px; height: 34px; background: linear-gradient(135deg, #f3d98a, #b88a1c); }
+.coverCorner[data-c="tl"] { top: 0; left: 0; border-radius: 6px 0 100% 0; } .coverCorner[data-c="tr"] { top: 0; right: 0; border-radius: 0 6px 0 100%; }
+.coverCorner[data-c="bl"] { bottom: 0; left: 0; border-radius: 0 100% 0 6px; } .coverCorner[data-c="br"] { bottom: 0; right: 0; border-radius: 100% 0 6px 0; }
+@keyframes coverOpen { from { transform: rotateY(0); } to { transform: rotateY(-170deg); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .cover { display: none; } }
+
+/* ---- ribbon tabs on the edge (a bottom bar on phones) */
+.ribbons { position: absolute; left: calc(100% - 4px); top: 44px; z-index: 9; display: flex; flex-direction: column; gap: 10px; }
+.tab { --c: #8f2a1a; display: block; min-width: 5.6rem; padding: 7px 16px 7px 14px; font-size: 15px; font-weight: 700; line-height: 1.2; text-decoration: none; color: #fff7e6; background: linear-gradient(90deg, var(--c), color-mix(in srgb, var(--c) 78%, #000)); border-radius: 0 6px 6px 0; box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4); text-shadow: 0 1px 1px rgba(0, 0, 0, 0.5); transition: transform 0.15s; }
+.tab[data-k="1"] { --c: #7a5a10; } .tab[data-k="2"] { --c: #2f5d46; } .tab[data-k="3"] { --c: #2c4a7a; } .tab[data-k="4"] { --c: #5a2f6b; }
+.tab:hover { transform: translateX(6px); }
+.tab[aria-current="page"] { transform: translateX(10px); box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4), 0 0 calc(var(--g) * 14px) rgba(255, 196, 90, calc(var(--g) * 0.9)); }
+.tab:focus-visible { outline: 3px solid #ffe08a; outline-offset: 2px; }
+
+/* ---- diyo sparks at night (CSS only; transform + opacity) */
+.sparks { position: absolute; inset: 0; z-index: 12; pointer-events: none; opacity: var(--g); }
+.sparks i { position: absolute; bottom: 14px; width: 5px; height: 5px; border-radius: 50%; background: #ffd27a; box-shadow: 0 0 7px 2px rgba(255, 190, 80, 0.85); opacity: 0; animation: rise 6s ease-in infinite; }
+@keyframes rise { 0% { transform: translate(0, 0) scale(1); opacity: 0; } 15% { opacity: 0.95; } 100% { transform: translate(14px, -150px) scale(0.4); opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .sparks, .gear { animation: none; } .sparks { display: none; } .gear { animation: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .frame[data-js="true"] .tlLine path, .frame[data-js="true"] .tlItem { animation: none; stroke-dashoffset: 0; }
+}
+
+/* ---- phones: one page at a time, the tabs become a bottom bar */
+@media (max-width: 640px) {
+  .stage { padding: 54px 8px 62px; }
+  .frame { height: 100%; padding: 6px; }
+  .book { grid-template-columns: minmax(0, 1fr); }
+  .page[data-col="2"], .page[data-role="right"] { grid-column: 1; }
+  .page[data-role="right"] { display: none; }
+  .page[data-col="1"], .page[data-col="2"] { border-radius: 6px; padding: 18px 20px 58px 22px; box-shadow: inset 12px 0 16px -10px rgba(60, 30, 10, 0.4); }
+  .spine { display: none; }
+  .ribbons { position: fixed; left: 0; right: 0; top: auto; bottom: 0; flex-direction: row; gap: 0; padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); background: var(--wood) url(/textures/ui/lokta-wood.png) repeat; box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.4); z-index: 30; }
+  .tab { flex: 1 1 0; min-width: 0; padding: 10px 2px; font-size: 13px; text-align: center; border-radius: 6px; margin: 0 2px; }
+  .tab:hover, .tab[aria-current="page"] { transform: translateY(-4px); }
+}

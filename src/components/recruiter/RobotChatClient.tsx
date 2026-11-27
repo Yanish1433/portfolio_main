@@ -8,7 +8,11 @@ import type { RobotAction, RobotBrain, RobotContext, RobotReply } from "@/lib/ro
 import styles from "./recruiter.module.css";
 import { RobotChat } from "./RobotChat";
 import type { ChatTurn } from "./RobotChat";
-import { scrollToHash } from "./scroll";
+
+/** Book pages are named by the URL hash; the book listens for hashchange and turns to it. */
+const goHash = (hash: string) => {
+  window.location.hash = hash.startsWith("#") ? hash : `#${hash}`;
+};
 
 type History = NonNullable<RobotContext["history"]>;
 
@@ -37,11 +41,11 @@ export function RobotChatClient() {
     (action: RobotAction) => {
       switch (action.type) {
         case "openLink":
-          if (action.url.startsWith("#")) scrollToHash(action.url);
+          if (action.url.startsWith("#")) goHash(action.url);
           else window.open(action.url, "_blank", "noopener,noreferrer");
           break;
         case "openProject":
-          scrollToHash("#projects");
+          goHash("#projects");
           break;
         case "showResume": {
           const url = profile.links.resumeUrl;

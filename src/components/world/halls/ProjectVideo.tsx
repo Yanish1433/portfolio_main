@@ -8,7 +8,7 @@
 //   whatever opened it. Any other <video> on the page is paused while it is open.
 // Pure: no store, no content imports (so Recruiter Mode loads it lazily without the 3D bundle).
 import { useEffect, useId, useRef, useState } from "react";
-import { btnClass, cardClass, LINK_ARROW, pillClass, useInk, wellClass } from "../ui/book";
+import { btnClass, cardClass, LINK_ARROW, pillClass, useInk, wellClass } from "@/components/book";
 import { isRealLink } from "@/components/recruiter/links";
 
 export type VideoProject = {

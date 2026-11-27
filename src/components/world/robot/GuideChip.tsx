@@ -1,6 +1,6 @@
 "use client";
 
-import { chipClass } from "../ui/book";
+import { chipClass } from "@/components/book";
 import { useRobot } from "./robotStore";
 import { openGuideNow } from "./actions";
 

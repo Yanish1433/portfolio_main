@@ -6,8 +6,8 @@ import { runAction } from "../robot/actions";
 import { useWorld } from "@/store/world";
 import { ctaPlan, initials } from "./aboutView";
 import type { ReactNode } from "react";
-import { chipClass } from "../ui/book";
-import { paginate } from "../ui/book/paginate";
+import { chipClass } from "@/components/book";
+import { paginate } from "@/components/book/paginate";
 
 const ICONS: [RegExp, string][] = [
   [/3d|game|play|world/i, "🧊"],

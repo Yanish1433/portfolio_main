@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react";
 import styles from "./recruiter.module.css";
-import { btnClass, errClass, fieldClass, labelClass, WaxSeal } from "@/components/world/ui/book";
+import { btnClass, errClass, fieldClass, labelClass, WaxSeal } from "@/components/book";
 import { buildPayload, isSuccess, validateContact, WEB3FORMS_URL, type ContactErrors } from "./contactSubmit";
 
 type Status = "idle" | "sending" | "success" | "error";
@@ -63,12 +63,12 @@ export function ContactForm({ githubUrl, variant = "page", night = false }: { gi
     }
   }
 
-  const panel = variant === "panel"; // the world mailbox: handwritten book page (presentation only)
+  void variant; // one look: the handwritten book page (the world mailbox and Recruiter Mode share it)
   const locked = status === "sending" || status === "success";
   const err = (k: keyof ContactErrors) => (errors[k] ? { "aria-invalid": true, "aria-describedby": `${uid}-${k}` } : {});
   const fieldError = (k: keyof ContactErrors) =>
     errors[k] ? (
-      <span id={`${uid}-${k}`} className={panel ? errClass : undefined} style={panel ? undefined : { color: "var(--accent)", fontWeight: 500, fontSize: "0.8rem" }}>
+      <span id={`${uid}-${k}`} className={errClass}>
         {errors[k]}
       </span>
     ) : null;
@@ -83,29 +83,29 @@ export function ContactForm({ githubUrl, variant = "page", night = false }: { gi
           : "";
 
   return (
-    <form className={panel ? "flex flex-col gap-3" : styles.form} onSubmit={onSubmit} noValidate data-contact-form>
-      {panel && status === "success" && <WaxSeal />}
-      <label className={panel ? "block" : styles.field}>
-        <span className={panel ? labelClass : undefined}>Name</span>
-        <input className={panel ? fieldClass() : undefined} name="name" type="text" autoComplete="name" required disabled={locked} {...err("name")} />
+    <form className="flex flex-col gap-3" onSubmit={onSubmit} noValidate data-contact-form>
+      {status === "success" && <WaxSeal />}
+      <label className="block">
+        <span className={labelClass}>Name</span>
+        <input className={fieldClass()} name="name" type="text" autoComplete="name" required disabled={locked} {...err("name")} />
         {fieldError("name")}
       </label>
-      <label className={panel ? "block" : styles.field}>
-        <span className={panel ? labelClass : undefined}>Email</span>
-        <input className={panel ? fieldClass() : undefined} name="email" type="email" autoComplete="email" required disabled={locked} {...err("email")} />
+      <label className="block">
+        <span className={labelClass}>Email</span>
+        <input className={fieldClass()} name="email" type="email" autoComplete="email" required disabled={locked} {...err("email")} />
         {fieldError("email")}
       </label>
-      <label className={panel ? "block" : styles.field}>
-        <span className={panel ? labelClass : undefined}>Message</span>
-        <textarea className={panel ? fieldClass() : undefined} name="message" rows={variant === "panel" ? 3 : 5} required minLength={10} disabled={locked} {...err("message")} />
+      <label className="block">
+        <span className={labelClass}>Message</span>
+        <textarea className={fieldClass()} name="message" rows={3} required minLength={10} disabled={locked} {...err("message")} />
         {fieldError("message")}
       </label>
       {/* honeypot: bots tick it, people never see it */}
       <input type="checkbox" name="botcheck" tabIndex={-1} autoComplete="off" style={{ display: "none" }} aria-hidden="true" />
-      <button type="submit" className={panel ? btnClass(true) : `${styles.btn} ${styles.btnPrimary}`} disabled={locked}>
+      <button type="submit" className={btnClass(true)} disabled={locked}>
         {status === "sending" ? "Sending…" : status === "error" ? "Try again" : "Send message"}
       </button>
-      <p className={styles.formStatus} role="status" aria-live="polite" data-contact-status={status} style={panel ? { color: "#2b1d14", fontWeight: 600 } : undefined}>
+      <p className={styles.formStatus} role="status" aria-live="polite" data-contact-status={status} style={{ color: "#2b1d14", fontWeight: 600 }}>
         {statusText}
       </p>
     </form>

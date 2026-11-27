@@ -13,7 +13,7 @@ import { WHEEL_PROJECTS, WHEELS } from "./wheelData";
 import { FILTERS, plainGroupName, strengthWord, wheelSummary } from "./wheelLayout";
 import { NO_PROJECT_LINE, WHEEL_HINT } from "./wheelCopy";
 import { THREAD_SECONDS } from "./threads";
-import { btnClass, cardClass, chipClass, rowClass, useInk } from "../ui/book";
+import { btnClass, cardClass, chipClass, rowClass, useInk } from "@/components/book";
 
 /** The avatar is "in the skills zone" within this distance of the gallery's middle. */
 const ZONE_R = 9;
