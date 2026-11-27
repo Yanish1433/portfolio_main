@@ -134,7 +134,9 @@
 .corner:hover:not(:disabled) { transform: scale(1.14); }
 .corner:disabled { visibility: hidden; }
 .corner:focus-visible { outline: 3px solid #a67c00; outline-offset: -3px; }
-.folio { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%); z-index: 8; margin: 0; padding: 0 10px; font-size: 14px; color: var(--ink); pointer-events: none; border-radius: 8px; background: color-mix(in srgb, var(--paper) 78%, transparent); }
+/* the page count sits in the wood margin under the paper, so it never covers text */
+.folio { position: absolute; bottom: -26px; left: 50%; transform: translateX(-50%); z-index: 8; margin: 0; padding: 0 10px; font-size: 14px; line-height: 20px; white-space: nowrap; color: #f3d98a; pointer-events: none; }
+.frame { padding-bottom: 30px; }
 
 /* ---- the cover (first time per session): wood, brass corners, swings open on its hinge */
 .cover { position: absolute; inset: 0; z-index: 20; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center; cursor: pointer; border-radius: 6px; transform-origin: left center; backface-visibility: hidden;
@@ -169,7 +171,7 @@
 /* ---- phones: one page at a time, the tabs become a bottom bar */
 @media (max-width: 640px) {
   .stage { padding: 54px 8px 62px; }
-  .frame { height: 100%; padding: 6px; }
+  .frame { height: 100%; padding: 6px 6px 30px; }
   .book { grid-template-columns: minmax(0, 1fr); }
   .page[data-col="2"], .page[data-role="right"] { grid-column: 1; }
   .page[data-role="right"] { display: none; }
