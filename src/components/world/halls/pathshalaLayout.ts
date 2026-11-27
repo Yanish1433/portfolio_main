@@ -14,10 +14,11 @@ export type Scroll = { x: number; z: number; w: number; h: number; /** world hei
 export type Easel = { x: number; z: number; w: number; h: number; yaw: number; spot: Spot };
 
 const SCROLL_Z = COURTYARD.z0 + 0.55;
-const SCROLL_W = 2.0;
+// step13b: a taller, wider scroll with bigger rows (the courtyard is 3 m wide: posts at +/-1.3 m clear its walls)
+const SCROLL_W = 2.3;
 const SCROLL_BOTTOM = 0.62;
-const SCROLL_HEADER = 0.32;
-const SCROLL_ROW = 0.52;
+const SCROLL_HEADER = 0.5;
+const SCROLL_ROW = 0.78;
 /** More rows than this (only ever in ?debug&edu=N) are left off the scroll. */
 export const SCROLL_MAX_ROWS = 8;
 

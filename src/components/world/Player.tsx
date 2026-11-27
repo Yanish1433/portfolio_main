@@ -1,6 +1,6 @@
 "use client";
 
-import type { CharacterId } from "./characters";
+import { AVATAR_HEIGHT, AVATAR_SCALE, type CharacterId } from "./characters";
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import { useKeyboardControls } from "@react-three/drei";
@@ -9,6 +9,8 @@ import Avatar from "./Avatar";
 import { blockedAt, findPath, resolveMove } from "./nav";
 import { avatarMotion, camRig, joystick, navPath, playerPos, pointerClaim, RUN_SPEED, WALK_SPEED, worldControl } from "./input";
 import { SPAWN, zones } from "./zones";
+import { STANDS } from "./halls/layout";
+import { WORKSHOP_CAM_RING } from "./halls/workshopLayout";
 import {
   DEFAULT_VIEW,
   EAGLE_DEFAULT,
@@ -32,6 +34,10 @@ import {
   newFrameState,
   noteManual,
   orbitBy,
+  SHOULDER,
+  blendPose,
+  pickShoulder,
+  shoulderPose,
   shouldFlyIn,
   updateFrame,
   type Ring,
@@ -76,7 +82,9 @@ const _pathLeft = (x: number, z: number, path: Vec2[], idx: number) => {
 const SHOWCASE_DIST = 9;
 const SHOWCASE_SECS = 2;
 /** Preset zones' entrance rings, for the auto-framer (cameraRig.ts holds the per-zone views). */
-const RINGS: Ring[] = zones.map((z) => ({ id: z.id, x: z.ring[0], z: z.ring[1] }));
+const RINGS: Ring[] = [...zones.map((z) => ({ id: z.id, x: z.ring[0], z: z.ring[1] })), ...(WORKSHOP_CAM_RING ? [WORKSHOP_CAM_RING] : [])];
+/** Project stands' rings and screens, for the over-the-shoulder cinema view (cameraRig.shoulderPose). */
+const SHOULDER_STANDS = STANDS.filter((s) => s.spot.kind === "project").map((s) => ({ key: s.spot.key, ring: s.spot.ring, screen: { x: s.x, y: s.screen.y, z: s.z + 0.03, w: s.screen.w, h: s.screen.h } }));
 /** Keyboard camera: orbit speed (rad/s) and zoom speed (m/s). */
 const KEY_ORBIT = 1.6;
 const KEY_ZOOM = 14;
@@ -124,7 +132,9 @@ export default function Player({ characters, reducedMotion }: { characters: Char
     pitchTarget: DEFAULT_VIEW.pitch,
     frame: newFrameState(),
     viewCustom: false,
-    camTarget: new THREE.Vector3(SPAWN[0], 1, SPAWN[1]),
+    camTarget: new THREE.Vector3(SPAWN[0], AVATAR_SCALE, SPAWN[1]),
+    /** Over-the-shoulder view: the project ring being stood on, and how far the camera has eased into it (0..1). */
+    shoulder: { key: null as string | null, /** last ring, kept while easing out */ last: null as string | null, k: 0 },
     lastStore: 0,
     manual: false,
     /** Set by place(): the next frame's jump isn't walking. */
@@ -283,7 +293,7 @@ export default function Player({ characters, reducedMotion }: { characters: Char
     navPath.idx = 0;
     if (heading !== undefined) st.heading = heading;
     st.teleported = true;
-    st.camTarget.set(x, 1, z);
+    st.camTarget.set(x, AVATAR_SCALE, z);
     if (marker.current) marker.current.visible = false;
     useWorld.getState().setTarget(null);
   };
@@ -680,6 +690,33 @@ export default function Player({ characters, reducedMotion }: { characters: Char
     camRig.look.x = st.camTarget.x;
     camRig.look.y = st.camTarget.y;
     camRig.look.z = st.camTarget.z;
+    // Over-the-shoulder cinema view (step13b): standing on a project ring eases the camera behind Lakhey, looking
+    // straight at that stand's screen. A hand-set camera (the manual latch), a moving avatar, and eagle / cinema /
+    // fly-in all win or are untouched: this only blends camRig (the follow pose) while cameraMode is "follow".
+    {
+      const sh = st.shoulder;
+      const moving = avatarMotion.speed > 1.0;
+      const still = sh.key !== null || !moving; // starting needs a (nearly) stopped avatar; holding doesn't
+      sh.key = world.cameraMode === "follow" && !st.frame.manual && !locked && still ? pickShoulder(st.x, st.z, SHOULDER_STANDS, sh.key) : null;
+      const want = sh.key ? 1 : 0;
+      if (sh.k !== want) sh.k = reducedMotion ? want : Math.abs(want - sh.k) < 0.002 ? want : sh.k + (want - sh.k) * (1 - Math.exp(-dt / SHOULDER.tau));
+      if (sh.k > 0) {
+        if (sh.key) sh.last = sh.key;
+        const stand = SHOULDER_STANDS.find((s) => s.key === sh.last);
+        if (stand) {
+          const aspect = state.size.width / Math.max(1, state.size.height);
+          const to = shoulderPose(stand.screen, { x: st.x, z: st.z }, { fovDeg: (camera as THREE.PerspectiveCamera).fov, aspect, headY: AVATAR_HEIGHT });
+          const e = sh.k * sh.k * (3 - 2 * sh.k); // smoothstep
+          const mixed = blendPose({ pos: [camRig.pos.x, camRig.pos.y, camRig.pos.z], look: [camRig.look.x, camRig.look.y, camRig.look.z] }, to, e);
+          camRig.pos.x = mixed.pos[0];
+          camRig.pos.y = mixed.pos[1];
+          camRig.pos.z = mixed.pos[2];
+          camRig.look.x = mixed.look[0];
+          camRig.look.y = mixed.look[1];
+          camRig.look.z = mixed.look[2];
+        }
+      }
+    }
     // First visit: start the fly-in once the world has loaded.
     if (!st.fly.checked && world.loaded) {
       st.fly.checked = true;
@@ -716,7 +753,7 @@ export default function Player({ characters, reducedMotion }: { characters: Char
       return;
     }
     camera.position.set(camRig.pos.x, camRig.pos.y, camRig.pos.z);
-    camera.lookAt(st.camTarget);
+    camera.lookAt(camRig.look.x, camRig.look.y, camRig.look.z);
     if (st.fly.on) {
       // Only the camera write is blended: camRig keeps the normal pose (cinema flies back to it), and the
       // fly pose ends exactly on it, so landing has no jump.

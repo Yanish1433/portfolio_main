@@ -4,7 +4,7 @@
 // first-visit hint. The card shows what you point at (mouse hover), what you stand next to, or the wheel you
 // chose; a chosen wheel lists the group's skills with plain levels and the projects that used any of them,
 // each a button that walks to that stand.
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useWorld } from "@/store/world";
 import { GALLERY } from "../zones";
 import { projectInfo, visitByVisitor } from "../halls/visit";
@@ -13,7 +13,7 @@ import { WHEEL_PROJECTS, WHEELS } from "./wheelData";
 import { FILTERS, plainGroupName, strengthWord, wheelSummary } from "./wheelLayout";
 import { NO_PROJECT_LINE, WHEEL_HINT } from "./wheelCopy";
 import { THREAD_SECONDS } from "./threads";
-import { btnClass, cardClass, chipClass, rowClass } from "../ui/lokta";
+import { btnClass, cardClass, chipClass, rowClass, useInk } from "../ui/book";
 
 /** The avatar is "in the skills zone" within this distance of the gallery's middle. */
 const ZONE_R = 9;
@@ -47,7 +47,10 @@ export function WheelCard() {
 
   // pointing at a wheel wins over the chosen one; standing next to one comes last
   const shown = hover ?? selected ?? near;
-  if (hidden || shown === null || !WHEELS[shown]) return null;
+  const paper = useRef<HTMLDivElement>(null);
+  const showing = !hidden && shown !== null && !!WHEELS[shown];
+  useInk(paper, `wheel:${shown}:${shown === selected && hover === null}`, showing);
+  if (!showing || shown === null) return null;
   const wheel = WHEELS[shown];
   const projects = WHEEL_PROJECTS[shown];
   const chosen = shown === selected && hover === null;
@@ -57,7 +60,8 @@ export function WheelCard() {
   return (
     <div className="pointer-events-none flex w-full justify-center">
       <div
-        className={cardClass("pointer-events-auto box-border max-h-[58vh] w-full max-w-[min(26rem,calc(100vw-32px))] min-w-0 overflow-y-auto [overflow-wrap:anywhere] p-4")}
+        ref={paper}
+        className={cardClass("pointer-events-auto relative box-border max-h-[58vh] w-full max-w-[min(26rem,calc(100vw-32px))] min-w-0 overflow-y-auto [overflow-wrap:anywhere] p-4 pl-6")}
         data-night={night}
         role="region"
         aria-label={`Skills: ${name}`}

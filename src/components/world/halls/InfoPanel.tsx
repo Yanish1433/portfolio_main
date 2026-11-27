@@ -12,13 +12,13 @@ import { accentAt, HALL, realUrl } from "./content";
 import { taglineOf } from "@/content/showcase";
 import { STANDS } from "./layout";
 import { eduRow } from "@/lib/robot/journey";
-import AboutBody from "../about/AboutBody";
+import { aboutPages } from "../about/AboutBody";
 import { ContactForm } from "@/components/recruiter/ContactForm";
 import { profile } from "@/content/profile";
 import { ctaState } from "../about/aboutView";
 import { WORKSHOP } from "./workshopLayout";
 import { LABELS } from "../nepal/labels";
-import { btnClass, chipClass, LoktaPanel, wellClass } from "../ui/lokta";
+import { btnClass, chipClass, BookPanel, LINK_ARROW, wellClass } from "../ui/book";
 
 function useClose() {
   return () => useWorld.getState().closeInfo(true);
@@ -55,13 +55,13 @@ function ExtLink({ href, label, primary, theme }: { href: string | null | undefi
   return (
     <a href={href} target="_blank" rel="noopener noreferrer" className={linkBtn(theme, !!primary)}>
       {label}
-      <span aria-hidden="true">↗</span>
+      <span aria-hidden="true">{LINK_ARROW}</span>
       <span className="sr-only"> (opens in a new tab)</span>
     </a>
   );
 }
 
-function Body({ info, theme, headingId, aboutPhoto }: { info: InfoRef; theme: Theme; headingId: string; aboutPhoto: string | null }) {
+function Body({ info, theme, headingId }: { info: InfoRef; theme: Theme; headingId: string }) {
   const heading = (t: string) => (
     <h2 id={headingId} className="pr-9 text-xl font-semibold leading-tight">
       {t}
@@ -69,7 +69,7 @@ function Body({ info, theme, headingId, aboutPhoto }: { info: InfoRef; theme: Th
   );
   switch (info.kind) {
     case "about":
-      return <AboutBody photo={aboutPhoto} night={theme.night} headingId={headingId} linkBtn={(primary) => linkBtn(theme, primary)} />;
+      return null; // the About book has its own pages (see InfoPanel below)
     case "workshop": {
       const w = WORKSHOP.find((x) => x.id === info.id);
       const others = WORKSHOP.filter((x) => x.id !== info.id);
@@ -331,9 +331,11 @@ export default function InfoPanel({ aboutPhoto = null }: { aboutPhoto?: string |
   if (!info) return null;
   const theme = { night };
   return (
-    <LoktaPanel
+    <BookPanel
       ref={panel}
       key={key}
+      bookKey={key ?? undefined}
+      pages={info.kind === "about" ? aboutPages({ photo: aboutPhoto, headingId, linkBtn: (primary) => linkBtn(theme, primary) }) : undefined}
       night={night}
       ne={KIND_NE[info.kind]}
       kind={KIND_LABEL[info.kind]}
@@ -344,7 +346,7 @@ export default function InfoPanel({ aboutPhoto = null }: { aboutPhoto?: string |
       tabIndex={-1}
       className="info-panel pointer-events-auto min-w-0"
     >
-      <Body info={info} theme={theme} headingId={headingId} aboutPhoto={aboutPhoto} />
-    </LoktaPanel>
+      {info.kind === "about" ? null : <Body info={info} theme={theme} headingId={headingId} />}
+    </BookPanel>
   );
 }

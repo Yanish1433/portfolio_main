@@ -6,13 +6,13 @@ import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import type { GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
-import { characterById, GAIT_CLIPS, gaitCycleRate, type CharacterId } from "./characters";
+import { AVATAR_HEIGHT, characterById, GAIT_CLIPS, gaitCycleRate, type CharacterId } from "./characters";
 import { avatarMotion, RUN_SPEED, WALK_SPEED } from "./input";
 import { applyLookdev, releaseLookdev } from "./lookdev";
 import { useWorld } from "@/store/world";
 
 const DRACO_PATH = "/draco/";
-const TARGET_HEIGHT = 1.7;
+const TARGET_HEIGHT = AVATAR_HEIGHT;
 
 // --- Walk / run -------------------------------------------------------------
 // The model ships Idle, Walk, Run and Dance clips. Idle / Walk / Run all play, weighted by the avatar's

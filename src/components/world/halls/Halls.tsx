@@ -33,10 +33,12 @@ import Workshop from "./Workshop";
 
 // --- Project posters --------------------------------------------------------
 
-const POSTER_PX = 600;
-const PLATE_PX: [number, number] = [512, 96];
+// step13b: the screens are ~2x bigger, so the poster cell is ~1.7x wider (two still fit an atlas row)
+const POSTER_PX = 1000;
+const PLATE_PX: [number, number] = [768, 144];
 const RIBBON_PX: [number, number] = [420, 72];
-const plateW = (w: number) => Math.min(0.9, w - 0.32);
+export const plateW = (w: number) => Math.min(1.6, w - 0.32);
+export const PLATE_H = 0.27;
 
 /** "Flagship" ribbon: crimson cloth with gold edges and lettering. */
 function drawRibbon(g: CanvasRenderingContext2D, r: { x: number; y: number; w: number; h: number }) {
@@ -109,7 +111,7 @@ function ProjectScreens({ files }: { files: MediaFiles }) {
     STANDS.forEach((s, i) => {
       const sc = s.screen;
       geos.push(quad(sc.w, sc.h, at(s.x, sc.y, s.z + 0.03), uvRect(atlas.rects[i * 2], canvas.width, canvas.height)));
-      geos.push(quad(plateW(s.w), 0.15, at(s.x, sc.y - sc.h / 2 - 0.2, s.z + 0.066), uvRect(atlas.rects[i * 2 + 1], canvas.width, canvas.height)));
+      geos.push(quad(plateW(s.w), PLATE_H, at(s.x, sc.y - sc.h / 2 - 0.2, s.z + 0.066), uvRect(atlas.rects[i * 2 + 1], canvas.width, canvas.height)));
       if (s.flagship && ribbonRect) {
         const rw = Math.min(0.78, sc.w * 0.42);
         const rh = rw * (RIBBON_PX[1] / RIBBON_PX[0]);

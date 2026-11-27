@@ -2,7 +2,7 @@
 
 import { useId, useState } from "react";
 import styles from "./recruiter.module.css";
-import { btnClass, errClass, fieldClass, labelClass, WaxSeal } from "@/components/world/ui/lokta";
+import { btnClass, errClass, fieldClass, labelClass, WaxSeal } from "@/components/world/ui/book";
 import { buildPayload, isSuccess, validateContact, WEB3FORMS_URL, type ContactErrors } from "./contactSubmit";
 
 type Status = "idle" | "sending" | "success" | "error";
@@ -12,7 +12,7 @@ type Status = "idle" | "sending" | "success" | "error";
  * The access key is public by design (NEXT_PUBLIC_WEB3FORMS_KEY, needed at build time).
  */
 export function ContactForm({ githubUrl, variant = "page", night = false }: { githubUrl?: string; variant?: "page" | "panel"; night?: boolean }) {
-  void night; // the lokta paper is the same by day and night; the frame glows at night
+  void night; // the book page is the same by day and night; the frame glows at night
   const key = process.env.NEXT_PUBLIC_WEB3FORMS_KEY;
   const [status, setStatus] = useState<Status>("idle");
   const [errors, setErrors] = useState<ContactErrors>({});
@@ -63,7 +63,7 @@ export function ContactForm({ githubUrl, variant = "page", night = false }: { gi
     }
   }
 
-  const panel = variant === "panel"; // the world mailbox: lokta paper look (presentation only)
+  const panel = variant === "panel"; // the world mailbox: handwritten book page (presentation only)
   const locked = status === "sending" || status === "success";
   const err = (k: keyof ContactErrors) => (errors[k] ? { "aria-invalid": true, "aria-describedby": `${uid}-${k}` } : {});
   const fieldError = (k: keyof ContactErrors) =>

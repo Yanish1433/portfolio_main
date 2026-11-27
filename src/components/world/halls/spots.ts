@@ -38,11 +38,12 @@ export function wingCentres(n: number, [a, b]: [number, number], maxSpacing = 2.
 
 /** The flagship's screen is this much wider than its neighbours' (and FLAG_H taller). */
 export const FLAG_W = 1.4;
-export const FLAG_H = 1.25;
+export const FLAG_H = 1.4;
 /** Narrowest gap left between two stands (a dalan pillar stands in it). */
 export const MIN_GAP = 0.45;
-const MAX_W = 1.6;
-const MAX_FLAG_W = 2.2;
+// step13b: an outdoor cinema wall, so the screens are about twice as wide (16:9 for a flagship)
+export const MAX_W = 3.0;
+export const MAX_FLAG_W = 4.2;
 const SCREEN_INSET = 0.22;
 
 /**
@@ -61,7 +62,7 @@ export function packWing(count: number, wing: [number, number], flagAt: number |
   if (f === 0) return xs.map((x) => ({ x, w }));
   const flagOf = (other: number) => Math.min(MAX_FLAG_W, FLAG_W * (other - SCREEN_INSET) + SCREEN_INSET);
   const [a, b] = wing;
-  const room = b - a + w; // outer extent the wing may use
+  const room = b - a + Math.min(w, 1.6); // outer extent the wing may use (the bigger step13b screens don't push past the old edges)
   let other = w;
   let flag = flagOf(other);
   const sum = () => other * (count - f) + flag * f;

@@ -34,7 +34,7 @@ const RING_DZ = 1.25;
 /** Stand centres stay inside these x spans (west wing, east wing). A wing with one stand is short. */
 const WING_INNER = 3.1;
 const WING_FULL = 6.1;
-const WING_SHORT = 4.0;
+const WING_SHORT = 4.6;
 export const WINGS: [number, number][] = (() => {
   const perWing = Math.ceil(Math.min(HALL.projects.length, MAX_STANDS) / 2);
   const len = perWing === 1 ? WING_SHORT : WING_FULL;
@@ -43,7 +43,8 @@ export const WINGS: [number, number][] = (() => {
     [WING_INNER, WING_INNER + len],
   ];
 })();
-export const POSTER = { h: 1.05, y: 1.42 };
+/** Screens share their bottom edge (y - h/2 = 1.0 m); step13b: much bigger, 16:9 for a flagship (h x FLAG_H). */
+export const POSTER = { h: 1.6, y: 1.8 };
 
 export type Stand = {
   x: number;
@@ -63,7 +64,7 @@ export type Stand = {
 /** A carved plinth in front of a stand with one tiny building per layer, joined by a glowing road. */
 export type Diorama = { x: number; z: number; w: number; d: number; /** plinth top */ top: number; blocks: DioramaBlock[] };
 
-export const PLINTH = { w: 1.2, /** a flagship's plinth is wider */ flagW: 1.8, d: 0.45, top: 0.4, /** gap from the stand's front face */ gap: 0.0 };
+export const PLINTH = { w: 1.5, /** a flagship's plinth is wider */ flagW: 2.4, d: 0.45, top: 0.4, /** gap from the stand's front face */ gap: 0.0 };
 
 function dioramaFor(x: number, w: number, projectIndex: number | null, flagship: boolean): Diorama | null {
   if (projectIndex === null) return null;

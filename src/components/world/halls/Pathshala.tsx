@@ -15,7 +15,7 @@ import { at, makeAtlas, merge, quad, useAnisotropy, useFontsSettled, type Atlas 
 import { courseInfo, visitByVisitor } from "./visit";
 
 const SPINE_PX: [number, number] = [112, 336];
-const SCROLL_PX = 760;
+const SCROLL_PX = 1000;
 /** Unroll when the avatar comes this close to the scroll's ring. */
 const UNROLL_R = 5.5;
 const STAMP_R = 5;

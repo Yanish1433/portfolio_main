@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { FLAG_W, MIN_GAP, packWing, wingCentres } from "./spots";
+import { FLAG_W, MAX_FLAG_W, MAX_W, MIN_GAP, packWing, wingCentres } from "./spots";
 
 const WING: [number, number] = [-9.2, -3.1];
 const gaps = (r: { x: number; w: number }[]) => r.slice(1).map((s, i) => s.x - s.w / 2 - (r[i].x + r[i].w / 2));
@@ -10,7 +10,7 @@ test("packWing without a flagship is the old even spread", () => {
     const { xs, spacing } = wingCentres(n, WING);
     const r = packWing(n, WING);
     assert.deepEqual(r.map((s) => s.x), xs);
-    for (const s of r) assert.equal(s.w, Math.min(1.6, spacing - MIN_GAP));
+    for (const s of r) assert.equal(s.w, Math.min(MAX_W, spacing - MIN_GAP));
   }
 });
 
@@ -39,7 +39,7 @@ test("packWing with a flagship: wider screen, gaps >= MIN_GAP, centred, inside t
 
 test("a lone flagship gets the full bigger stand", () => {
   const [s] = packWing(1, WING, 0);
-  assert.ok(s.w > 2.0 && s.w <= 2.2, String(s.w));
+  assert.ok(s.w > 3.0 && s.w <= MAX_FLAG_W, String(s.w)); // step13b: the cinema-wall size
 });
 
 test("packWing with two flagships: same size, gaps >= MIN_GAP, inside the wing; a lone one per wing is bigger than a plain stand", () => {
@@ -57,5 +57,5 @@ test("packWing with two flagships: same size, gaps >= MIN_GAP, inside the wing; 
     }
   }
   const solo = packWing(1, [3.1, 7.1], [0]);
-  assert.ok(solo[0].w > 1.6, "a flagship stand is wider than a plain one");
+  assert.ok(solo[0].w > 2.4, "a flagship stand is wider than a plain one");
 });

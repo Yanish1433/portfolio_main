@@ -1,6 +1,6 @@
 "use client";
 
-import { cardClass, chipClass } from "../ui/lokta";
+import { cardClass, chipClass } from "../ui/book";
 import { useEffect, useRef, useState } from "react";
 import { useWorld } from "@/store/world";
 import { occlusion } from "../nepal/materials";

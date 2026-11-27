@@ -6,7 +6,7 @@ import { useWorld } from "@/store/world";
 import { playerPos, worldControl } from "../input";
 import { startQuickTour } from "../robot/actions";
 import { arrivedAt } from "./footprints";
-import { cardClass, pillClass } from "../ui/lokta";
+import { cardClass, pillClass } from "../ui/book";
 import { SECTIONS, sectionTarget, type Section } from "./sections";
 
 const pill = pillClass("h-11 min-w-11 justify-center sm:h-10");

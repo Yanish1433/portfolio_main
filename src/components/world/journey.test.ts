@@ -5,7 +5,7 @@ import { profile } from "@/content/profile";
 import { JOURNEY, stonePositions } from "./journey";
 import { GHAR, ISLAND_RADIUS, MILESTONES, SPAWN, STATIC_OBSTACLES, TIMELINE_PATH, zones, type Obstacle } from "./zones";
 import { HALL_OBSTACLES, SCROLL, SHELF, EASELS, SPOTS } from "./halls/layout";
-import { SCROLL_XS, WORKSHOP, WORKSHOP_SPOT } from "./halls/workshopLayout";
+import { PLAQUES, PLAQUE_W, SCROLL_XS, WORKSHOP, WORKSHOP_SPOT } from "./halls/workshopLayout";
 
 // A small stand-in for nav.ts (which pulls in the store): the same 0.5 m grid, avatar radius + 0.12.
 const obstacles: Obstacle[] = [...zones.flatMap((z) => z.obstacles), ...STATIC_OBSTACLES, ...HALL_OBSTACLES];
@@ -77,8 +77,15 @@ test("the Workshop: one scroll per GitHub project, on the palace wall, and its r
   assert.equal(WORKSHOP.length, 5);
   assert.equal(SCROLL_XS.length, WORKSHOP.length);
   assert.ok(WORKSHOP_SPOT && SPOTS.includes(WORKSHOP_SPOT));
-  for (let i = 1; i < SCROLL_XS.length; i++) assert.ok(SCROLL_XS[i] - SCROLL_XS[i - 1] >= 0.45, "scrolls do not overlap");
-  assert.ok(SCROLL_XS[0] > 8.3, "the board stands beyond the dalan roof (x > 8.25)");
+  for (let i = 0; i < PLAQUES.length; i++) {
+    for (let j = i + 1; j < PLAQUES.length; j++) {
+      const a = PLAQUES[i];
+      const b = PLAQUES[j];
+      assert.ok(Math.abs(a.x - b.x) >= a.w || Math.abs(a.y - b.y) >= a.h, `plaques ${i} and ${j} overlap`);
+    }
+  }
+  assert.ok(Math.min(...SCROLL_XS) - PLAQUE_W / 2 > 8.95, "the board stands beyond the dalan's east roof (x > 8.9)");
+  assert.ok(Math.max(...SCROLL_XS) + PLAQUE_W / 2 + 0.17 < 12.3, "and clear of the house to its east (x < 12.3)");
   const [rx, rz] = WORKSHOP_SPOT!.ring;
   assert.ok(!blockedAt(rx, rz), "the ring is clear");
   assert.ok(findPath({ x: SPAWN[0], z: SPAWN[1] }, { x: rx, z: rz }), "no path to the Workshop");

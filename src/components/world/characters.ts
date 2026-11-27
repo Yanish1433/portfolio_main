@@ -1,5 +1,5 @@
 // The playable character: Lakhey, the masked Newar festival dancer. One Mixamo-style rig, auto-scaled to
-// 1.7 m, clips Idle / Walk / Run / Dance (built in Blender: blender/scripts/clips.py).
+// AVATAR_HEIGHT (1.7 m x AVATAR_SCALE), clips Idle / Walk / Run / Dance (built in Blender: blender/scripts/clips.py).
 // Pure data and helpers: imported by the server page (existence check), the client and the tests.
 
 export type CharacterId = "lakhey";
@@ -31,6 +31,17 @@ export const CHARACTERS: Character[] = [
     idleArmDown: 55,
   },
 ];
+
+/**
+ * ONE number for how big Lakhey is on screen (step13b: +22 % so the avatar reads next to the bigger
+ * halls). The model is auto-scaled to AVATAR_HEIGHT; everything that depends on the avatar's size reads
+ * it from here: Avatar.tsx (the scale), Player.tsx (camera target height), cameraRig.shoulderPose
+ * (head height) and the occlusion dither radius in nepal/ThemeDriver.tsx. Collision (nav.ts
+ * AVATAR_RADIUS 0.45) stays: it was already wider than the body, and the doors / gates have room.
+ */
+export const AVATAR_SCALE = 1.22;
+export const AVATAR_BASE_HEIGHT = 1.7;
+export const AVATAR_HEIGHT = AVATAR_BASE_HEIGHT * AVATAR_SCALE;
 
 export const characterById = (id: string | null | undefined) => CHARACTERS.find((c) => c.id === id);
 

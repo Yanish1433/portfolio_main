@@ -8,7 +8,7 @@
 //   whatever opened it. Any other <video> on the page is paused while it is open.
 // Pure: no store, no content imports (so Recruiter Mode loads it lazily without the 3D bundle).
 import { useEffect, useId, useRef, useState } from "react";
-import { btnClass, cardClass, pillClass, wellClass } from "../ui/lokta";
+import { btnClass, cardClass, LINK_ARROW, pillClass, useInk, wellClass } from "../ui/book";
 import { isRealLink } from "@/components/recruiter/links";
 
 export type VideoProject = {
@@ -26,14 +26,15 @@ export type VideoProject = {
 
 const FOCUSABLE = 'a[href], button:not([disabled]), video[controls], [tabindex]:not([tabindex="-1"])';
 
-const btn = (primary: boolean) => (primary ? btnClass(true) : pillClass("!min-h-10 !px-5 !py-2.5 !text-[15px]"));
+// "Live site" / "Code" are ink links on the caption page
+const btn = () => btnClass(false);
 
-function ExtLink({ href, label, primary }: { href: string | null; label: string; primary?: boolean }) {
+function ExtLink({ href, label }: { href: string | null; label: string; primary?: boolean }) {
   if (!href || !isRealLink(href)) return null;
   return (
-    <a href={href} target="_blank" rel="noopener noreferrer" className={btn(!!primary)}>
+    <a href={href} target="_blank" rel="noopener noreferrer" className={btn()}>
       {label}
-      <span aria-hidden="true">↗</span>
+      <span aria-hidden="true">{LINK_ARROW}</span>
       <span className="sr-only"> (opens in a new tab)</span>
     </a>
   );
@@ -75,6 +76,8 @@ export default function ProjectVideo({ project: p, onClose }: { project: VideoPr
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
   const headingId = useId();
+  const caption = useRef<HTMLDivElement>(null);
+  useInk(caption, `video:${p.id}`);
   const [failed, setFailed] = useState(false);
   const [reducedMotion] = useState(() => typeof window !== "undefined" && window.matchMedia("(prefers-reduced-motion: reduce)").matches);
   const showVideo = !!p.video && !failed;
@@ -145,7 +148,10 @@ export default function ProjectVideo({ project: p, onClose }: { project: VideoPr
       </div>
 
       <div className="flex min-h-0 flex-1 items-center justify-center px-2 py-3 sm:px-8">
-        <div className="aspect-video max-h-[calc(100dvh-13rem)] w-full max-w-[min(100%,calc((100dvh-13rem)*16/9))] overflow-hidden rounded-xl bg-black shadow-2xl ring-1 ring-white/10">
+        <div className="relative w-full max-w-[min(100%,calc((100dvh-13rem)*16/9+28px))] rotate-[-0.6deg] rounded-sm bg-[#f6ead0] p-3.5 pb-4 shadow-2xl">
+          <span aria-hidden="true" className="absolute -top-3 left-6 h-6 w-16 rotate-[-6deg] bg-[#e8d49a]/80 shadow-sm" />
+          <span aria-hidden="true" className="absolute -top-3 right-6 h-6 w-16 rotate-[5deg] bg-[#e8d49a]/80 shadow-sm" />
+          <div className="aspect-video max-h-[calc(100dvh-13rem-28px)] w-full overflow-hidden bg-black">
           {showVideo ? (
             <video
               key={p.video}
@@ -163,11 +169,12 @@ export default function ProjectVideo({ project: p, onClose }: { project: VideoPr
           ) : (
             <Stills p={p} />
           )}
+          </div>
         </div>
       </div>
 
       <div className="mx-auto mb-6 w-full max-w-4xl shrink-0 [overflow-wrap:anywhere] sm:px-0">
-        <div className={cardClass("flex flex-wrap items-end justify-between gap-x-6 gap-y-3 px-4 py-3")}>
+        <div ref={caption} className={cardClass("relative flex flex-wrap items-end justify-between gap-x-6 gap-y-3 px-5 py-3")}>
           <div className="min-w-0">
             <h2 id={headingId} className="flex items-center gap-2.5 text-2xl font-semibold leading-tight text-[#8f3320] sm:text-3xl">
               <span className="h-2.5 w-2.5 shrink-0 rotate-45" style={{ background: p.accent }} aria-hidden="true" />

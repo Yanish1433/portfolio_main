@@ -17,10 +17,11 @@ import { slope } from "./shapes";
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
 
 /** Pent roof height at the palace wall and at its front edge. */
-const ROOF_WALL_Y = 3.75;
-const ROOF_EDGE_Y = 3.22;
+// step13b: raised ~0.9 m so the much taller cinema screens (top at 3.1 m) and their toran fit under it
+const ROOF_WALL_Y = 4.65;
+const ROOF_EDGE_Y = 4.12;
 const ROOF_EDGE_Z = STANDS.length ? STANDS[0].z + 0.6 : PALACE_FRONT + 1.55;
-const LINTEL_Y = 3.02;
+const LINTEL_Y = 3.92;
 
 /** Arch outline (toran): flat bottom, rounded shoulders, small peak, with a round opening. */
 function toranGeometry(w: number, h: number) {
@@ -88,11 +89,11 @@ function standMeshes(P: Parts, A: Anchors) {
     // lattice panel under the screen, brass plate on its rail
     P.box("wood", w - 0.12, 0.4, 0.05, x, 0.5, z - 0.02, COL.woodDark);
     P.add("lattice", plane(w - 0.22, 0.34, 1, true), "#fff", T(x, 0.5, z + 0.02));
-    const pw = Math.min(0.9, w - 0.32);
-    P.box("gold", pw + 0.04, 0.18, 0.025, x, bottom - 0.2, z + 0.05, COL.bronze);
+    const pw = Math.min(1.6, w - 0.32);
+    P.box("gold", pw + 0.04, 0.31, 0.025, x, bottom - 0.2, z + 0.05, COL.bronze);
     // toran arch on top, gilded, with a plain round medallion and a small finial
-    P.add("gold", toranGeometry(w + 0.04, 0.42), COL.gold, T(x, top + 0.12, z - 0.01));
-    P.add("gold", new THREE.CircleGeometry(0.07, 8), "#d9b25a", T(x, top + 0.12 + 0.42 * 0.36, z + 0.02));
+    P.add("gold", toranGeometry(w + 0.04, 0.36), COL.gold, T(x, top + 0.12, z - 0.01));
+    P.add("gold", new THREE.CircleGeometry(0.07, 8), "#d9b25a", T(x, top + 0.12 + 0.36 * 0.36, z + 0.02));
     P.add("gold", lathe([[0, 0], [0.05, 0], [0.03, 0.08], [0, 0.16]], 6), COL.gold, T(x, top + 0.54, z + 0.01));
     A.diyos.push(V(x + w / 2 - 0.12, 0.28, z + STAND_DEPTH / 2 - 0.06));
     if (s.flagship) {

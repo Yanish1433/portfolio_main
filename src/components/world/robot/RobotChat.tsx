@@ -1,6 +1,6 @@
 "use client";
 
-import { btnClass, cardClass, pillClass } from "../ui/lokta";
+import { btnClass, cardClass, pillClass } from "../ui/book";
 import { useEffect, useRef, useState } from "react";
 import { useWorld } from "@/store/world";
 import { characterById } from "../characters";

@@ -33,10 +33,33 @@ export const ACCENT: Record<SkillCategory, string> = {
 };
 export const accentOf = (c: string) => ACCENT[c as SkillCategory] ?? "#b5663f";
 
-/** Drum proportions at scale 1 (the lathe in WheelGallery.tsx). */
+/** Drum proportions of the authored lathe (WheelGallery.tsx makeDrumGeo). */
 export const DRUM_R = 0.3;
 export const DRUM_H = 1.0;
 export const DRUM_Y = 0.62;
+/** step13b: the drums are drawn this much wider / taller than authored (instance scale), so they read from the walk-up view. */
+export const DRUM_GROW_XZ = 1.4;
+export const DRUM_GROW_Y = 1.4;
+/** Widest a drum gets (m), and where its top sits above the ground (before the finial). */
+export const DRUM_MAX_R = DRUM_R * DRUM_GROW_XZ;
+export const DRUM_TOP = DRUM_Y + DRUM_H * DRUM_GROW_Y;
+
+// ---------------------------------------------------------------- the skill-name ring
+
+/** Cell (px) and world size (m) of one name on the glowing ring (step13b: ~40 % bigger, 480 px cells for crisp letters). */
+export const RING_CELL: [number, number] = [480, 152];
+export const RING_W = 2.1;
+export const RING_H = RING_W * (RING_CELL[1] / RING_CELL[0]);
+/** Every other name is lifted by this much, so neighbours never overlap. */
+export const RING_LIFT = 1.1;
+
+/** Where the k-th of m ring names sits (offsets from the wheel's x and the ring's base y): a shallow arc, zig-zagged. */
+export function ringSlot(k: number, m: number): { dx: number; dy: number } {
+  const t = m === 1 ? 0.5 : k / (m - 1);
+  const zig = m > 3;
+  const span = (m - 1) * (zig ? 1.1 : RING_W + 0.1); // zig-zag: neighbours share a row two apart; else one row, side by side
+  return { dx: (t - 0.5) * span, dy: (1 - (2 * t - 1) ** 2) * 0.3 + (zig && k % 2 ? RING_LIFT : 0) };
+}
 
 // ---------------------------------------------------------------- plain words
 
@@ -120,7 +143,7 @@ export function layoutWheels(groups: WheelGroup[]): WheelSpec[] {
   const rows = groups.filter((g) => g.skills.length > 0).slice(0, GALLERY.maxWheels);
   const n = rows.length;
   const pitch = pitchFor(n);
-  const radius = Math.min(DRUM_R, pitch * 0.34);
+  const radius = Math.min(DRUM_MAX_R, pitch * 0.34);
   return rows.map((g, i) => ({
     index: i,
     category: g.category,

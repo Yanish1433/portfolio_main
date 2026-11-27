@@ -37,7 +37,7 @@ export function buildWheelGallery(P: Parts, A: Anchors, wheels: WheelSpec[]) {
     P.box("wood", pw, 0.46, 0.62, w.x, 0.33, zc, COL.woodDark);
     P.box("plain", pw + 0.05, 0.05, 0.67, w.x, 0.585, zc, w.colour);
     P.add("gold", lathe([[0, 0], [w.radius * 1.15, 0], [w.radius * 1.15, 0.02], [0, 0.02]], 10), COL.gold, T(w.x, DRUM_Y - 0.03, zc));
-    P.small(() => P.add("wood", box(plaqueWidth(n) + 0.07, 0.46, 0.06), COL.woodDark, rotX(w.x, PLAQUE.y, zc + PLAQUE.dz, PLAQUE.tilt)));
+    P.small(() => P.add("wood", box(plaqueWidth(n) + 0.07, 0.76, 0.06), COL.woodDark, rotX(w.x, PLAQUE.y, zc + PLAQUE.dz, PLAQUE.tilt)));
   }
 
   // carved posts: plinth block, square shaft, flared capital and a diagonal strut to the beam

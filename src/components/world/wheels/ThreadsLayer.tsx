@@ -13,7 +13,7 @@ import { useWorld } from "@/store/world";
 import { STANDS } from "../halls/layout";
 import { WHEELS, standsForWheel } from "./wheelData";
 import { CULL_R, galleryDist, galleryHidden } from "./WheelGallery";
-import { DRUM_H, DRUM_Y } from "./wheelLayout";
+import { DRUM_TOP } from "./wheelLayout";
 import { threadAlpha, threadBuffers, type V3 } from "./threads";
 
 const VERT = /* glsl */ `
@@ -80,7 +80,7 @@ export default function Threads({ reducedMotion }: { reducedMotion: boolean }) {
     const stands = selected === null ? [] : standsForWheel(selected);
     const wheel = selected === null ? null : WHEELS[selected];
     if (wheel && stands.length) {
-      const from: V3 = [wheel.x, DRUM_Y + DRUM_H + 0.3, wheel.z];
+      const from: V3 = [wheel.x, DRUM_TOP + 0.3, wheel.z];
       // to the lower middle of each stand's screen
       const to: V3[] = stands.map((s) => [s.x, s.screen.y - s.screen.h * 0.3, s.z + 0.3]);
       const b = threadBuffers(from, to);

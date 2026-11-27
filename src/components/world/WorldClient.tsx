@@ -12,6 +12,15 @@ const FONT_FACES = `
 @font-face { font-family: "Mukta"; font-weight: 400 600; font-display: swap;
   src: url(/fonts/Mukta-SemiBold-latin.woff2) format("woff2");
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: "Kalam"; font-weight: 400; font-display: swap;
+  src: url(/fonts/Kalam-Regular-devanagari.woff2) format("woff2");
+  unicode-range: U+0900-097F, U+200C-200D, U+25CC; }
+@font-face { font-family: "Kalam"; font-weight: 400; font-display: swap;
+  src: url(/fonts/Kalam-Regular-latin.woff2) format("woff2");
+  unicode-range: U+0000-00FF, U+2013-2014, U+2018-201D, U+2022, U+2026, U+20AC, U+2190-2193, U+2197, U+279A; }
+@font-face { font-family: "Kalam"; font-weight: 600 700; font-display: swap;
+  src: url(/fonts/Kalam-Bold-latin.woff2) format("woff2");
+  unicode-range: U+0000-00FF, U+2013-2014, U+2018-201D, U+2022, U+2026, U+20AC, U+2190-2193, U+2197, U+279A; }
 @keyframes picker-in { from { opacity: 0; transform: translateY(14px) scale(0.98); } to { opacity: 1; transform: none; } }
 .picker-in { animation: picker-in 320ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 /* Info panel: bottom sheet in the dock on phones / touch; a side panel on desktop. */
@@ -40,6 +49,9 @@ export default function WorldClient({ characters, thumbs = [], posters = [], abo
     <div className="fixed inset-0 overflow-hidden bg-[#f3d9b8]">
       {/* Mukta (OFL, public/fonts/Mukta-OFL.txt): Latin + Devanagari for labels and overlays. */}
       <style>{FONT_FACES}</style>
+      {/* Kalam (OFL, public/fonts/Kalam-OFL.txt): the handwriting of the book panels; Latin preloaded on /town only. */}
+      <link rel="preload" href="/fonts/Kalam-Regular-latin.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
+      <link rel="preload" href="/fonts/Kalam-Bold-latin.woff2" as="font" type="font/woff2" crossOrigin="anonymous" />
       <World characters={characters} thumbs={thumbs} posters={posters} aboutPhoto={aboutPhoto} />
       <Overlay characters={characters} thumbs={thumbs} posters={posters} aboutPhoto={aboutPhoto} />
       <LoadingOverlay />

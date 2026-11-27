@@ -16,16 +16,31 @@ import { makeAtlas, merge, quad, useAnisotropy, useFontsSettled } from "../halls
 import { PLAQUE, plaqueWidth } from "./frame";
 import { CULL_R, galleryDist, galleryHidden } from "./WheelGallery";
 import { WHEELS } from "./wheelData";
-import { accentOf, plainGroup, RING_MAX, ringSkills } from "./wheelLayout";
+import { accentOf, plainGroup, RING_CELL, RING_H, RING_MAX, RING_W, ringSkills, ringSlot } from "./wheelLayout";
 
 export const PLAQUE_R = 14;
-const CELL: [number, number] = [440, 150];
-const RING_CELL: [number, number] = [300, 96];
-const RING_SIZE: [number, number] = [1.5, 1.5 * (RING_CELL[1] / RING_CELL[0])];
-const RING_Y = 2.9;
+/** Plaque cell (px): big letters, two lines for the group name (step13b). */
+const CELL: [number, number] = [440, 260];
+const RING_SIZE: [number, number] = [RING_W, RING_H];
+const RING_Y = 3.0;
 const RING_Z = 1.15;
 
 const font = (weight: number, px: number) => `${weight} ${px}px "${FONT_FAMILY}", system-ui, sans-serif`;
+
+/** Words wrapped to lines no wider than `max` at the current font. */
+function wrapName(g: CanvasRenderingContext2D, text: string, max: number): string[] {
+  const out: string[] = [];
+  let line = "";
+  for (const word of text.split(/\s+/)) {
+    const next = line ? `${line} ${word}` : word;
+    if (line && g.measureText(next).width > max) {
+      out.push(line);
+      line = word;
+    } else line = next;
+  }
+  if (line) out.push(line);
+  return out;
+}
 
 function drawPlaque(g: CanvasRenderingContext2D, x: number, y: number, category: string, label: string) {
   const [w, h] = CELL;
@@ -47,14 +62,22 @@ function drawPlaque(g: CanvasRenderingContext2D, x: number, y: number, category:
   g.textAlign = "center";
   g.textBaseline = "alphabetic";
   g.fillStyle = "#ffe9b8";
-  let size = 56;
-  g.font = font(700, size);
-  while (size > 28 && g.measureText(plain).width > w - 56) g.font = font(700, (size -= 2));
-  g.fillText(plain, x + w / 2, y + (tech ? 68 : 88));
+  // the group name as big as fits in at most two lines
+  const max = w - 56;
+  let size = 88;
+  let lines: string[] = [plain];
+  for (; size >= 44; size -= 4) {
+    g.font = font(700, size);
+    lines = wrapName(g, plain, max);
+    if (lines.length <= 2 && lines.every((l) => g.measureText(l).width <= max)) break;
+  }
+  const lh = size * 1.02;
+  const top = y + (tech ? 30 : 46);
+  lines.slice(0, 2).forEach((l, i) => g.fillText(l, x + w / 2, top + size * 0.85 + i * lh));
   if (tech) {
-    g.font = font(500, 36);
+    g.font = font(500, 40);
     g.fillStyle = "#e8c98c";
-    g.fillText(`(${tech})`, x + w / 2, y + 114);
+    g.fillText(`(${tech})`, x + w / 2, y + h - 30);
   }
   g.textAlign = "start";
 }
@@ -82,14 +105,6 @@ function drawRing(g: CanvasRenderingContext2D, x: number, y: number, text: strin
   g.shadowBlur = 0;
   g.textAlign = "start";
   g.textBaseline = "alphabetic";
-}
-
-/** Where the k-th of m ring names sits (offsets from the wheel's x and the ring's base y / z). */
-export function ringSlot(k: number, m: number): { dx: number; dy: number } {
-  const t = m === 1 ? 0.5 : k / (m - 1);
-  const theta = Math.PI * (0.12 + 0.76 * t);
-  const a = Math.min(2.6, 0.9 + 0.4 * m);
-  return { dx: -Math.cos(theta) * a, dy: Math.sin(theta) * 0.8 + (m > 3 && k % 2 ? 0.55 : 0) };
 }
 
 export default function WheelLabels() {

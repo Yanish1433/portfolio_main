@@ -20,7 +20,7 @@ import { GALLERY } from "../zones";
 import { useRobot } from "../robot/robotStore";
 import { chooseWheel } from "./choose";
 import { WHEEL_PROJECTS, WHEELS } from "./wheelData";
-import { DRUM_H, DRUM_R, DRUM_Y, nearestWheel } from "./wheelLayout";
+import { DRUM_GROW_Y, DRUM_H, DRUM_R, DRUM_Y, nearestWheel } from "./wheelLayout";
 
 /** Spin when the avatar is within this distance of a wheel (m). */
 export const NEAR_R = 2;
@@ -123,7 +123,7 @@ export default function WheelGallery({ reducedMotion }: { reducedMotion: boolean
     const w = WHEELS[i];
     const sc = w.radius / DRUM_R;
     _q.setFromEuler(_e.set(0, anim.current[i].yaw, 0));
-    m.setMatrixAt(i, _m.compose(_p.set(w.x, DRUM_Y, w.z), _q, _s.set(sc, 1, sc)));
+    m.setMatrixAt(i, _m.compose(_p.set(w.x, DRUM_Y, w.z), _q, _s.set(sc, DRUM_GROW_Y, sc)));
   };
 
   useLayoutEffect(() => {
@@ -132,9 +132,9 @@ export default function WheelGallery({ reducedMotion }: { reducedMotion: boolean
     if (!m || !pick) return;
     WHEELS.forEach((w, i) => {
       place(i);
-      const r = Math.min(0.55, w.radius * 1.5) / 0.5;
+      const r = Math.min(0.75, w.radius * 1.5) / 0.5;
       _q.identity();
-      pick.setMatrixAt(i, _m.compose(_p.set(w.x, 0, w.z), _q, _s.set(r, 1, r)));
+      pick.setMatrixAt(i, _m.compose(_p.set(w.x, 0, w.z), _q, _s.set(r, DRUM_GROW_Y, r)));
     });
     m.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     m.instanceMatrix.needsUpdate = true;

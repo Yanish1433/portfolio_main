@@ -4,7 +4,7 @@
 // Everything a visitor typed is rendered as React text nodes (never innerHTML).
 import { useEffect, useRef, useState } from "react";
 import { cooldownLeft, MESSAGE_MAX, minutes, NAME_MAX, postNote, readLast, validate, writeLast } from "@/lib/guestbook";
-import { WaxSeal, btnClass, cardClass, fieldClass, floatClass, pillClass } from "../ui/lokta";
+import { WaxSeal, btnClass, cardClass, fieldClass, floatClass, pillClass, useInk } from "../ui/book";
 import { guestbookEnabled, loadNotes, useGuestbook } from "./store";
 
 const pill = pillClass("h-11 sm:h-10");
@@ -19,6 +19,8 @@ function Form() {
   const [busy, setBusy] = useState(false);
   const [done, setDone] = useState(false);
   const first = useRef<HTMLInputElement>(null);
+  const paper = useRef<HTMLDivElement>(null);
+  useInk(paper, "guestbook:form");
 
   useEffect(() => {
     first.current?.focus();
@@ -44,7 +46,7 @@ function Form() {
 
   return (
     <div className="pointer-events-auto fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4" onKeyDown={(e) => e.nativeEvent.stopPropagation()} onKeyUp={(e) => e.nativeEvent.stopPropagation()}>
-      <div className={cardClass(`box-border w-full max-w-[min(26rem,calc(100vw-32px))] p-4 ${floatClass}`)} role="dialog" aria-modal="true" aria-label="Leave a note">
+      <div ref={paper} className={cardClass(`relative box-border w-full max-w-[min(26rem,calc(100vw-32px))] p-4 pl-6 ${floatClass}`)} role="dialog" aria-modal="true" aria-label="Leave a note">
         <div className="flex items-start justify-between gap-3">
           <h2 className="text-lg font-semibold text-[#8f3320]">
             Leave a note <span lang="ne" className="font-medium opacity-70" style={{ fontFamily: "Mukta, sans-serif" }}>सन्देश</span>
@@ -55,7 +57,7 @@ function Form() {
         </div>
         {done ? (
           <div className="mt-3 text-sm" role="status">
-            <WaxSeal />
+            <WaxSeal fly />
             <p className="mt-2 text-center">Thank you! Your flag will fly once Yanish approves it.</p>
             <button type="button" onClick={close} className={btnClass(true, "mt-3")}>
               Close
@@ -102,10 +104,12 @@ function Form() {
 function Card() {
   const card = useGuestbook((s) => s.card);
   const setCard = useGuestbook((s) => s.setCard);
+  const paper = useRef<HTMLDivElement>(null);
+  useInk(paper, `guestbook:card:${card?.name ?? ""}:${card?.message.length ?? 0}`, !!card);
   if (!card) return null;
   return (
     <div className="pointer-events-none fixed inset-x-0 top-20 z-30 flex justify-center px-4">
-      <div className={cardClass(`pointer-events-auto box-border w-full max-w-[min(24rem,calc(100vw-32px))] [overflow-wrap:anywhere] p-4 ${floatClass}`)} role="dialog" aria-label={`Note from ${card.name}`}>
+      <div ref={paper} className={cardClass(`pointer-events-auto relative box-border w-full max-w-[min(24rem,calc(100vw-32px))] [overflow-wrap:anywhere] p-4 pl-6 ${floatClass}`)} role="dialog" aria-label={`Note from ${card.name}`}>
         <div className="flex items-start justify-between gap-3">
           <p className="text-base font-semibold text-[#8f3320]">{card.name}</p>
           <button type="button" onClick={() => setCard(null)} aria-label="Close note" className="rounded-full px-2 text-xl leading-none text-[#8f3320] hover:opacity-70">

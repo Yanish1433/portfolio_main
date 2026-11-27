@@ -1,6 +1,7 @@
 // Pure camera maths for the follow camera (Player.tsx): view limits, per-zone presets, zone
 // hysteresis, the pointer-gesture state machine and the camera-relative move vector.
 // No three.js / React in here, so every rule is unit-tested (cameraRig.test.ts).
+import { AVATAR_HEIGHT } from "./characters";
 //
 // Yaw convention: 0 = the camera sits SOUTH (+z) of the avatar, today's view. Positive yaw moves
 // the camera towards +x (east). Everything in the town (stand screens, captions, plaques) faces +z,
@@ -35,14 +36,16 @@ export const clampDist = (d: number) => clamp(d, ZOOM_MIN, ZOOM_MAX);
 export type ZonePreset = View & { enter: number; exit: number };
 
 export const ZONE_PRESETS: Record<string, ZonePreset> = {
-  // wheels face south: a gentle 3/4 view from the south-east, close enough to read them
-  "skills-lab": { dist: 12, yaw: 0.2, pitch: 38 * DEG, enter: 5, exit: 8 },
-  // the courtyard house faces east: look in from the south-east
-  education: { dist: 11, yaw: 0.7, pitch: 40 * DEG, enter: 3.8, exit: 6 },
+  // wheels face south: nearly straight on and lower, so the bigger drums, plaques and name ring read (step13b)
+  "skills-lab": { dist: 10.5, yaw: 0.1, pitch: 30 * DEG, enter: 5, exit: 8 },
+  // the education scroll hangs on the courtyard's north wall facing south: look at it straight on (step13b)
+  education: { dist: 9.5, yaw: 0.12, pitch: 32 * DEG, enter: 3.8, exit: 6 },
+  // the Workshop board of GitHub plaques (halls/workshopLayout.ts; its ring is added by Player): straight on (step13b)
+  workshop: { dist: 10, yaw: 0, pitch: 28 * DEG, enter: 3.2, exit: 5.2 },
   // the brick lane runs south-west from the entrance ring
   timeline: { dist: 14, yaw: 0.35, pitch: 42 * DEG, enter: 4, exit: 6.5 },
   // the dalan: stands, dioramas and screens all face south
-  "project-hall": { dist: 15, yaw: 0, pitch: 40 * DEG, enter: 5.5, exit: 8.5 },
+  "project-hall": { dist: 14, yaw: 0, pitch: 36 * DEG, enter: 5.5, exit: 8.5 },
   // Yanish's Ghar: front (+z) towards the camera
   about: { dist: 10, yaw: -0.15, pitch: 36 * DEG, enter: 3.6, exit: 5.6 },
   // the Hulak postbox
@@ -326,4 +329,148 @@ export function frozenFlyT(search: string): number | null {
   if (v === null) return null;
   const n = Number(v);
   return Number.isFinite(n) ? clamp(n, 0, 1) : null;
+}
+
+// --- Pose of a view, and a tiny projection (pure, for the readability / framing tests) ---------------------
+
+/** The scene camera's vertical field of view (degrees), see World.tsx. */
+export const CAM_FOV = 45;
+
+/** Where the follow camera sits for `view` around `target` (what Player.tsx writes every frame). */
+export function viewPose(target: readonly [number, number, number], view: View): Pose {
+  const flat = Math.cos(view.pitch) * view.dist;
+  return {
+    pos: [target[0] + Math.sin(view.yaw) * flat, target[1] + Math.sin(view.pitch) * view.dist, target[2] + Math.cos(view.yaw) * flat],
+    look: [target[0], target[1], target[2]],
+  };
+}
+
+/** Pixels per metre, at `depth` metres in front of the camera, for a viewport `heightPx` tall. */
+export const pxPerMetre = (depth: number, heightPx: number, fovDeg = CAM_FOV) => heightPx / (2 * depth * Math.tan((fovDeg * DEG) / 2));
+
+type V3 = readonly [number, number, number];
+const sub = (a: V3, b: V3): [number, number, number] => [a[0] - b[0], a[1] - b[1], a[2] - b[2]];
+const dot = (a: V3, b: V3) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+const cross = (a: V3, b: V3): [number, number, number] => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+const norm = (a: V3): [number, number, number] => {
+  const l = Math.hypot(a[0], a[1], a[2]) || 1;
+  return [a[0] / l, a[1] / l, a[2] / l];
+};
+
+/** Perspective projection of a world point: x / y in NDC (-1..1 is on screen), depth in metres ahead of the camera. */
+export function projectNdc(pose: Pose, p: V3, fovDeg: number, aspect: number): { x: number; y: number; depth: number } {
+  const f = norm(sub(pose.look, pose.pos));
+  const r = norm(cross(f, [0, 1, 0]));
+  const u = cross(r, f);
+  const d = sub(p, pose.pos);
+  const depth = dot(d, f);
+  const t = Math.tan((fovDeg * DEG) / 2);
+  return { x: dot(d, r) / (depth * t * aspect), y: dot(d, u) / (depth * t), depth };
+}
+
+// --- Over-the-shoulder cinema view (step13b) -----------------------------------------------------------------
+// Standing on a project's ring, the camera eases in BEHIND Lakhey and looks straight at that stand's
+// screen: the screen fills most of the frame and the back of Lakhey's head and shoulders sit at the bottom
+// centre. It is a follow preset (Player.tsx blends it over the normal follow pose), not CinemaCamera: the
+// click -> openCinema flight, eagle view, fly-in and the manual orbit latch are untouched. It is the one
+// view allowed outside the ZOOM / PITCH clamps (it is a pose, not an orbit), but it keeps the camera at
+// least SHOULDER.minHead metres from Lakhey's head so the 0.5 m near plane never clips it.
+
+export const SHOULDER = {
+  /** Share of the frame's limiting dimension the screen fills. */
+  fill: 0.9,
+  /** Where the top of Lakhey's head lands vertically in the frame (NDC; below -1/3 = in the bottom third). */
+  headNdc: -0.45,
+  /** The camera stays at least this far behind Lakhey (m), and never further than maxDist from the screen. */
+  minBack: 1.7,
+  maxDist: 9,
+  /** Closest the camera may get to Lakhey's head (m): well outside the 0.5 m near plane. */
+  minHead: 1.2,
+  /** Walk onto a project ring (within `enter` m) to start, walk further than `exit` to stop. */
+  enter: 0.8,
+  exit: 1.5,
+  /** Ease time constant (s) of the blend in / out. */
+  tau: 0.25,
+};
+
+export type ScreenRect = { x: number; y: number; z: number; w: number; h: number };
+
+/**
+ * Camera pose behind the avatar at (avatar.x, avatar.z), looking straight (along -z) at a screen that faces +z.
+ * Far enough that the screen fills `SHOULDER.fill` of the frame, and high enough that the top of Lakhey's
+ * head lands at SHOULDER.headNdc (in the bottom third of the frame).
+ */
+export function shoulderPose(
+  screen: ScreenRect,
+  avatar: { x: number; z: number },
+  opts: { fovDeg?: number; aspect?: number; headY?: number } = {},
+): Pose & { headNdc: number; headDist: number } {
+  const fov = opts.fovDeg ?? CAM_FOV;
+  const aspect = Math.max(0.1, opts.aspect ?? 16 / 9);
+  const headY = opts.headY ?? AVATAR_HEIGHT;
+  const halfV = Math.tan((fov * DEG) / 2);
+  const halfH = halfV * aspect;
+  const avatarGap = Math.max(0, avatar.z - screen.z);
+  const fit = Math.max(screen.h / 2 / halfV, screen.w / 2 / halfH) / SHOULDER.fill;
+  const D = clamp(Math.max(fit, avatarGap + SHOULDER.minBack), 0.5, Math.max(SHOULDER.maxDist, avatarGap + SHOULDER.minBack));
+  const back = D - avatarGap; // camera -> avatar, along z
+  // Solve the camera height H so the head's top lands at SHOULDER.headNdc. The head's elevation below the
+  // look direction first grows with H, then shrinks again for a very high camera: search up to its peak.
+  const want = Math.atan(SHOULDER.headNdc * halfV);
+  const diff = (H: number) => Math.atan2(headY - H, back) - Math.atan2(screen.y - H, D);
+  let lo = Math.min(headY, screen.y);
+  let peak = lo;
+  let peakV = diff(lo);
+  for (let i = 1; i <= 80; i++) {
+    const H = lo + (12 * i) / 80;
+    const v = diff(H);
+    if (v < peakV) {
+      peakV = v;
+      peak = H;
+    }
+  }
+  let hi = peak;
+  if (peakV > want) lo = hi = peak; // the head can't get that low in the frame: take the lowest it gets
+  else {
+    for (let i = 0; i < 40; i++) {
+      const mid = (lo + hi) / 2;
+      if (diff(mid) > want) lo = mid;
+      else hi = mid;
+    }
+  }
+  let H = (lo + hi) / 2;
+  // keep the camera out of Lakhey's head
+  const dHead = (h: number) => Math.hypot(back, h - headY);
+  if (dHead(H) < SHOULDER.minHead) H = headY + Math.sqrt(Math.max(0, SHOULDER.minHead ** 2 - back ** 2));
+  const pos: [number, number, number] = [avatar.x, H, screen.z + D];
+  const look: [number, number, number] = [avatar.x, screen.y, screen.z];
+  const pose: Pose = { pos, look };
+  return { ...pose, headNdc: projectNdc(pose, [avatar.x, headY, avatar.z], fov, aspect).y, headDist: dHead(H) };
+}
+
+/**
+ * Which project ring (if any) the avatar stands on, with hysteresis: it starts within SHOULDER.enter m of a
+ * ring and holds until beyond SHOULDER.exit m. The nearest ring wins.
+ */
+export function pickShoulder(x: number, z: number, rings: { key: string; ring: [number, number] }[], current: string | null): string | null {
+  const d = (r: { ring: [number, number] }) => Math.hypot(x - r.ring[0], z - r.ring[1]);
+  const cur = current ? rings.find((r) => r.key === current) : undefined;
+  if (cur && d(cur) < SHOULDER.exit) return cur.key;
+  let best: string | null = null;
+  let bestD = SHOULDER.enter;
+  for (const r of rings) {
+    const dd = d(r);
+    if (dd < bestD) {
+      best = r.key;
+      bestD = dd;
+    }
+  }
+  return best;
+}
+
+/** Blend two poses (t 0..1). */
+export function blendPose(a: Pose, b: Pose, t: number): Pose {
+  const k = clamp(t, 0, 1);
+  const m = (p: V3, q: V3): [number, number, number] => [p[0] + (q[0] - p[0]) * k, p[1] + (q[1] - p[1]) * k, p[2] + (q[2] - p[2]) * k];
+  return { pos: m(a.pos, b.pos), look: m(a.look, b.look) };
 }

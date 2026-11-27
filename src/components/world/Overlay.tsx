@@ -29,7 +29,7 @@ import { EASELS, SCROLL } from "./halls/layout";
 import type { InfoRef } from "@/store/world";
 import GuideMenu from "./guide/GuideMenu";
 import GuestbookButton from "./guestbook/GuestbookUi";
-import { btnClass, cardClass, pillClass, rowClass } from "./ui/lokta";
+import { btnClass, cardClass, pillClass, rowClass } from "./ui/book";
 import { WheelCard, SkillFilterBar, WheelHint } from "./wheels/WheelUi";
 
 const RECRUITER_HREF = "/recruiter";

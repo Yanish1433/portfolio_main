@@ -13,6 +13,7 @@ import { skyUniforms } from "./Sky";
 import { themeState, themeTargets } from "./themeState";
 import { charMaterials, charRim } from "../lookdev";
 import { weather } from "../weather/weatherState";
+import { AVATAR_SCALE } from "../characters";
 
 const POOL = 4;
 const DUR = 2; // seconds for a full blend
@@ -183,7 +184,7 @@ export default function ThemeDriver({
     gl.getDrawingBufferSize(_buf);
     const viewDepth = _v.set(playerPos.x, 0.95, playerPos.z).applyMatrix4(state.camera.matrixWorldInverse).z;
     _v.set(playerPos.x, 0.95, playerPos.z).project(state.camera);
-    occlusion.value.set((_v.x * 0.5 + 0.5) * _buf.x, (_v.y * 0.5 + 0.5) * _buf.y, _buf.y * 0.13, -viewDepth);
+    occlusion.value.set((_v.x * 0.5 + 0.5) * _buf.x, (_v.y * 0.5 + 0.5) * _buf.y, _buf.y * 0.13 * AVATAR_SCALE, -viewDepth);
   });
 
   return (

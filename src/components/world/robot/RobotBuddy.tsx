@@ -13,11 +13,12 @@ import { useWorld } from "@/store/world";
 import { createRobotGeometry, createRobotMaterials, glowTexture, type EyeState } from "./robotMesh";
 import { robotMotion, useRobot } from "./robotStore";
 import RobotBubble from "./RobotBubble";
+import { AVATAR_SCALE } from "../characters";
 
-const HEIGHT = 1.6;
+const HEIGHT = 1.6 * AVATAR_SCALE;
 const PAD = 0.3; // keep this far from walls
-const SIDE = 0.85; // to the avatar's right
-const BACK = 0.9; // behind the avatar
+const SIDE = 0.85 * AVATAR_SCALE; // to the avatar's right
+const BACK = 0.9 * AVATAR_SCALE; // behind the avatar
 const LEAD_AHEAD = 2.0;
 /** Follow speed cap (m/s), faster than the avatar's run, with a catch-up boost when far behind. */
 const MAX_SPEED = 5.5;
