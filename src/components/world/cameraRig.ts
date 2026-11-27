@@ -242,8 +242,8 @@ export class GestureTracker {
   }
 }
 
-// --- First-visit fly-in ---------------------------------------------------------------------------
-// The very first visit opens high above the island, above the cloud sea, and glides down to the normal
+// --- Fly-in (every visit) ---------------------------------------------------------------------------
+// Every visit opens high above the island, above the cloud sea, and glides down to the normal
 // follow view behind the avatar. `flyInPose` is pure: it always ends exactly on the pose it is given
 // (the live follow pose), so handing the camera back to the rig has no jump.
 
@@ -308,19 +308,16 @@ export function eaglePose(yaw: number, pitch: number, dist: number): Pose {
   return { pos: [cx + Math.sin(yaw) * flat, cy + Math.sin(p) * d, cz + Math.cos(yaw) * flat], look: [cx, cy, cz] };
 }
 
-/** The flag key: the fly-in plays once per browser. */
-export const FLY_IN_KEY = "portfolio-flyin-seen";
-
 /**
- * Should the fly-in play? Not under reduced motion, in debug / robot / journey test runs, or when the
- * visitor has seen it. `?flyin=1` forces it (screenshots, demos), ignoring all of those but reduced motion.
+ * Should the fly-in play? On every visit; not under reduced motion, nor in debug / robot / journey test runs.
+ * `?flyin=0` skips it (tests); `?flyin=1` forces it past the test params (never past reduced motion).
  */
-export function shouldFlyIn(opts: { reducedMotion: boolean; search: string; seen: boolean }): boolean {
+export function shouldFlyIn(opts: { reducedMotion: boolean; search: string }): boolean {
   if (opts.reducedMotion) return false;
   const q = new URLSearchParams(opts.search);
+  if (q.get("flyin") === "0") return false;
   if (q.get("flyin") === "1") return true;
-  if (q.has("debug") || q.has("robot") || q.has("journey")) return false;
-  return !opts.seen;
+  return !(q.has("debug") || q.has("robot") || q.has("journey"));
 }
 
 /** `?flyT=0|0.5`: freeze the fly-in at that point (screenshots). null = play normally. */

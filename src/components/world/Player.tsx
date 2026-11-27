@@ -15,7 +15,6 @@ import {
   DEFAULT_VIEW,
   EAGLE_DEFAULT,
   EAGLE_SECS,
-  FLY_IN_KEY,
   FLY_IN_SECS,
   GestureTracker,
   WHEEL_ZOOM,
@@ -199,22 +198,10 @@ export default function Player({ characters, reducedMotion }: { characters: Char
     f.off = null;
     if (land && !reducedMotion) s.current.showcaseUntil = performance.now() / 1000 + SHOWCASE_SECS;
   };
-  /** First visit only: the camera starts high above the island and glides down. Any click / key / touch skips it. */
+  /** Every visit: the camera starts high above the island and glides down. Any click / key / touch skips it. */
   const startFly = () => {
     const search = window.location.search;
-    let seen = false;
-    try {
-      seen = window.localStorage.getItem(FLY_IN_KEY) === "1";
-    } catch {
-      /* storage blocked: treat as seen, so a visitor without storage doesn't get it on every load */
-      seen = true;
-    }
-    if (!shouldFlyIn({ reducedMotion, search, seen })) return;
-    try {
-      window.localStorage.setItem(FLY_IN_KEY, "1");
-    } catch {
-      /* ignore */
-    }
+    if (!shouldFlyIn({ reducedMotion, search })) return;
     const f = s.current.fly;
     f.on = true;
     f.t0 = performance.now();

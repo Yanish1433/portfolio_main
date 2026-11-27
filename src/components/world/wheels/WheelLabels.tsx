@@ -16,7 +16,7 @@ import { makeAtlas, merge, quad, useAnisotropy, useFontsSettled } from "../halls
 import { PLAQUE, plaqueHeight, plaqueWidth } from "./frame";
 import { CULL_R, galleryDist, galleryHidden } from "./WheelGallery";
 import { WHEELS } from "./wheelData";
-import { accentOf, plainGroup, RING_CELL, RING_H, RING_MAX, RING_W, ringSkills, ringSlot, SIGN_CELL, SIGN_NAME_FLOOR, SIGN_NAME_MAX } from "./wheelLayout";
+import { accentOf, plainGroup, RING_CELL, RING_H, RING_MAX, RING_W, ringSkills, ringSlot, SIGN_CELL, SIGN_INNER_W, fitLabel } from "./wheelLayout";
 
 export const PLAQUE_R = 14;
 /** Signboard cell (px): a wide carved dark-wood board; the group name in big Kalam Bold, the technical word beneath (step14b). */
@@ -44,37 +44,12 @@ function loadKalam(): Promise<void> {
   return kalamPromise;
 }
 
-/** The biggest name size (SIGN_NAME_FLOOR..MAX) whose text fits `max` px wide in at most two lines, split to balance the lines. */
-function fitName(g: CanvasRenderingContext2D, text: string, max: number): { size: number; lines: string[] } {
-  const words = text.split(/\s+/).filter(Boolean);
-  const splits: string[][] = [[words.join(" ")]];
-  for (let i = 1; i < words.length; i++) splits.push([words.slice(0, i).join(" "), words.slice(i).join(" ")]);
-  let best = { size: SIGN_NAME_FLOOR, lines: splits[splits.length > 1 ? 1 : 0] };
-  for (let size = SIGN_NAME_MAX; size >= SIGN_NAME_FLOOR; size -= 4) {
+/** Measure with the canvas in Kalam Bold (the font must be loaded first, see loadKalam). */
+function fitName(g: CanvasRenderingContext2D, text: string, max: number) {
+  return fitLabel(text, max, (t, size) => {
     g.font = kalam(700, size);
-    let pick: string[] | null = null;
-    let pickW = Infinity;
-    for (const lines of splits) {
-      const w = Math.max(...lines.map((l) => g.measureText(l).width));
-      if (w <= max && (w < pickW || (lines.length === 1 && w <= max))) {
-        pick = lines;
-        pickW = w;
-        if (lines.length === 1) break;
-      }
-    }
-    if (pick) return { size, lines: pick };
-  }
-  // nothing fits even at the floor: take the most balanced split
-  g.font = kalam(700, SIGN_NAME_FLOOR);
-  let w = Infinity;
-  for (const lines of splits) {
-    const lw = Math.max(...lines.map((l) => g.measureText(l).width));
-    if (lw < w) {
-      w = lw;
-      best = { size: SIGN_NAME_FLOOR, lines };
-    }
-  }
-  return best;
+    return g.measureText(t).width;
+  });
 }
 
 function drawPlaque(g: CanvasRenderingContext2D, x: number, y: number, category: string, label: string) {
@@ -108,7 +83,7 @@ function drawPlaque(g: CanvasRenderingContext2D, x: number, y: number, category:
   g.stroke();
   g.textAlign = "center";
   g.textBaseline = "alphabetic";
-  const { size, lines } = fitName(g, plain, w - 18);
+  const { size, lines } = fitName(g, plain, SIGN_INNER_W);
   g.font = kalam(700, size);
   const lh = size * 0.98;
   const top = y + (h - lines.length * lh) / 2;

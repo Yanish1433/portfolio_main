@@ -1,6 +1,8 @@
 import { create } from "zustand";
 import type { CharacterId } from "@/components/world/characters";
 import type { SkillCategory } from "@/content/profile";
+import { deriveTheme, parseTime, themeAt, wrapMinutes } from "@/components/world/nepal/timeLook";
+import { themeState } from "@/components/world/nepal/themeState";
 
 export type Vec2 = [number, number];
 export type Theme = "day" | "night";
@@ -42,19 +44,56 @@ export function clearSavedCharacter() {
   }
 }
 
-/** ?theme= wins (for screenshots), then a saved choice, then local time (night 18:00–06:00). */
-export function initialTheme(): Theme {
-  if (typeof window === "undefined") return "day";
-  const q = new URLSearchParams(window.location.search).get("theme");
-  if (q === "day" || q === "night") return q;
+const TIME_KEY = "world-time";
+const DAY_AT = 12 * 60;
+const NIGHT_AT = 22 * 60;
+
+const localMinutes = () => {
+  const d = new Date();
+  return d.getHours() * 60 + d.getMinutes();
+};
+
+/**
+ * ?time=HH:MM, then ?theme=day|night (12:00 / 22:00), then the saved choice ("world-time": minutes or "now";
+ * the old "world-theme" is migrated), then the visitor's local time.
+ * KEEP IN SYNC with THEME_SCRIPT (app/page.tsx, recruiter/themeScript.ts).
+ */
+export function initialMinutes(): number {
+  if (typeof window === "undefined") return DAY_AT;
+  const params = new URLSearchParams(window.location.search);
+  const qt = parseTime(params.get("time"));
+  if (qt !== null) return qt;
+  const q = params.get("theme");
+  if (q === "day") return DAY_AT;
+  if (q === "night") return NIGHT_AT;
   try {
-    const saved = window.localStorage.getItem(THEME_KEY);
-    if (saved === "day" || saved === "night") return saved;
+    const saved = window.localStorage.getItem(TIME_KEY);
+    if (saved && saved !== "now") {
+      const n = Number(saved);
+      if (Number.isFinite(n)) return wrapMinutes(Math.round(n));
+    }
+    if (!saved) {
+      const old = window.localStorage.getItem(THEME_KEY);
+      if (old === "day") return DAY_AT;
+      if (old === "night") return NIGHT_AT;
+    }
   } catch {
     // storage blocked: fall through
   }
-  const h = new Date().getHours();
-  return h >= 18 || h < 6 ? "night" : "day";
+  return localMinutes();
+}
+
+export function initialTheme(): Theme {
+  return themeAt(initialMinutes());
+}
+
+/** Remember the visitor's choice; `null` = follow the local clock ("Now"). */
+function saveMinutes(m: number | null) {
+  try {
+    window.localStorage.setItem(TIME_KEY, m === null ? "now" : String(Math.round(m)));
+  } catch {
+    // ignore
+  }
 }
 
 function applyTheme(theme: Theme) {
@@ -85,6 +124,10 @@ type WorldState = {
   setPanelOpen: (v: boolean) => void;
   /** Target theme; the 3D scene blends toward it over ~2 s. Shared with overlays / Recruiter Mode. */
   theme: Theme;
+  /** Time of day, minutes since midnight (the source of `theme`; the 3D look reads themeState.minutes). */
+  minutes: number;
+  /** `persist`: true = remember a fixed time, "now" = remember "follow the local clock". */
+  setMinutes: (m: number, persist?: boolean | "now") => void;
   setTheme: (t: Theme, persist?: boolean) => void;
   toggleTheme: () => void;
 
@@ -181,17 +224,17 @@ export const useWorld = create<WorldState>((set, get) => ({
   setMoved: () => set((s) => (s.moved ? s : { moved: true })),
   setPanelOpen: (panelOpen) => set({ panelOpen }),
   theme: "day",
-  setTheme: (theme, persist = true) => {
-    applyTheme(theme);
-    if (persist) {
-      try {
-        window.localStorage.setItem(THEME_KEY, theme);
-      } catch {
-        // ignore
-      }
-    }
-    set({ theme });
+  minutes: DAY_AT,
+  setMinutes: (m, persist = false) => {
+    const minutes = wrapMinutes(Math.round(m));
+    themeState.minutes = minutes;
+    const cur = get().theme;
+    const theme = deriveTheme(minutes, cur);
+    if (persist) saveMinutes(persist === "now" ? null : minutes);
+    if (theme !== cur) applyTheme(theme);
+    set(theme !== cur ? { minutes, theme } : { minutes });
   },
+  setTheme: (theme, persist = true) => get().setMinutes(theme === "night" ? NIGHT_AT : DAY_AT, persist),
   toggleTheme: () => get().setTheme(get().theme === "night" ? "day" : "night"),
 
   character: null,
@@ -260,4 +303,13 @@ export function isTypingTarget(e: Event): boolean {
   const el = (e.target as HTMLElement | null) ?? null;
   if (!el || typeof el.tagName !== "string") return false;
   return el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable;
+}
+
+/** Apply the starting time of day (no hysteresis, nothing saved). */
+export function initTime() {
+  const minutes = initialMinutes();
+  const theme = themeAt(minutes);
+  themeState.minutes = minutes;
+  applyTheme(theme);
+  useWorld.setState({ minutes, theme });
 }

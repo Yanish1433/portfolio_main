@@ -54,9 +54,44 @@ export const RING_H = RING_W * (RING_CELL[1] / RING_CELL[0]);
 /** step14b/15 signboard: atlas cell (px) of a carved dark-wood board, and the font size range of the group name (Kalam Bold, px of the cell). */
 export const SIGN_CELL: [number, number] = [640, 320];
 export const SIGN_NAME_MAX = 150;
-export const SIGN_NAME_FLOOR = 140;
+export const SIGN_NAME_FLOOR = 96;
 /** On-screen height (px) of the name's font size, from the board width (m), the size in cell px and the px per metre of the camera. */
 export const signNamePx = (boardW: number, namePx: number, pxPerM: number) => (namePx / SIGN_CELL[0]) * boardW * pxPerM;
+/** Text-free margin (px, each side) inside a signboard cell: wood border plus breathing room. */
+export const SIGN_PAD = 30;
+/** Usable text width (px) inside a signboard cell. */
+export const SIGN_INNER_W = SIGN_CELL[0] - 2 * SIGN_PAD;
+
+/**
+ * Fit a label into `maxW` px: the biggest size in [floor, max] (step 4) that fits in one line, else two
+ * balanced lines. `measure(text, size)` is the canvas measureText width (injected, so this stays pure).
+ * If even the floor is too wide, it returns the floor with the narrowest split and `fits: false`.
+ */
+export function fitLabel(text: string, maxW: number, measure: (t: string, size: number) => number, max = SIGN_NAME_MAX, floor = SIGN_NAME_FLOOR): { size: number; lines: string[]; width: number; fits: boolean } {
+  const words = text.split(/\s+/).filter(Boolean);
+  const splits: string[][] = [[words.join(" ")]];
+  for (let i = 1; i < words.length; i++) splits.push([words.slice(0, i).join(" "), words.slice(i).join(" ")]);
+  const widthOf = (lines: string[], size: number) => Math.max(...lines.map((l) => measure(l, size)));
+  for (let size = max; size >= floor; size -= 4) {
+    let pick: string[] | null = null;
+    let pickW = Infinity;
+    for (const lines of splits) {
+      const w = widthOf(lines, size);
+      if (w <= maxW && (lines.length === 1 || w < pickW)) {
+        if (!pick || pick.length > 1 || lines.length === 1) {
+          pick = lines;
+          pickW = w;
+        }
+        if (lines.length === 1) break;
+      }
+    }
+    if (pick) return { size, lines: pick, width: pickW, fits: true };
+  }
+  let best = splits[0];
+  for (const lines of splits) if (widthOf(lines, floor) < widthOf(best, floor)) best = lines;
+  return { size: floor, lines: best, width: widthOf(best, floor), fits: false };
+}
+
 /** Every other name is lifted by this much, so neighbours never overlap. */
 export const RING_LIFT = 1.1;
 

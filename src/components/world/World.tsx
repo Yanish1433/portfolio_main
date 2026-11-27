@@ -28,7 +28,7 @@ import WheelLabels from "./wheels/WheelLabels";
 import Threads from "./wheels/ThreadsLayer";
 import Guestbook from "./guestbook/Guestbook";
 import { themeTargets } from "./nepal/themeState";
-import { initialTheme, useWorld } from "@/store/world";
+import { initTime, useWorld } from "@/store/world";
 
 const KEY_MAP: KeyboardControlsEntry<Controls>[] = [
   { name: "forward", keys: ["ArrowUp", "KeyW"] },
@@ -163,7 +163,7 @@ export default function World({ characters, thumbs, posters = [], aboutPhoto = n
     if (tm === "aces" || tm === "agx" || tm === "neutral") setTone(tm);
     const exp = Number(q.get("exp"));
     if (exp > 0 && exp < 4) setExposure(exp);
-    useWorld.getState().setTheme(initialTheme(), false);
+    initTime();
   }, []);
 
   return (

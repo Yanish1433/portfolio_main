@@ -205,14 +205,14 @@ test("fly-in height only ever goes down, and the path actually curves", () => {
 });
 
 test("fly-in plays on a first visit only, never under reduced motion or in test runs", () => {
-  const base = { reducedMotion: false, search: "", seen: false };
+  const base = { reducedMotion: false, search: "" };
   assert.equal(shouldFlyIn(base), true);
-  assert.equal(shouldFlyIn({ ...base, seen: true }), false);
+  assert.equal(shouldFlyIn({ ...base, search: "?flyin=0" }), false);
   assert.equal(shouldFlyIn({ ...base, reducedMotion: true }), false);
   assert.equal(shouldFlyIn({ ...base, search: "?debug" }), false);
   assert.equal(shouldFlyIn({ ...base, search: "?robot=1" }), false);
   assert.equal(shouldFlyIn({ ...base, search: "?journey=1" }), false);
-  assert.equal(shouldFlyIn({ ...base, seen: true, search: "?flyin=1" }), true, "?flyin=1 forces it");
+  assert.equal(shouldFlyIn({ ...base, search: "?flyin=1" }), true, "?flyin=1 forces it");
   assert.equal(shouldFlyIn({ ...base, reducedMotion: true, search: "?flyin=1" }), false, "but never under reduced motion");
   assert.equal(frozenFlyT("?flyin=1&flyT=0.5"), 0.5);
   assert.equal(frozenFlyT("?flyin=1"), null);

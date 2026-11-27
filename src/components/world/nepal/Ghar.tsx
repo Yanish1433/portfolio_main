@@ -11,6 +11,7 @@ import { initials } from "../about/aboutView";
 import { loadLabelFonts, FONT_FAMILY } from "./LabelSprites";
 import { pointerClaim } from "../input";
 import { useWorld } from "@/store/world";
+import { containFit } from "./gharFit";
 import { visitGhar } from "../about/visitGhar";
 
 function portraitCanvas(text: string): HTMLCanvasElement {
@@ -71,18 +72,25 @@ export default function Ghar({ photo }: { photo: string | null }) {
       (t) => {
         if (dead) return t.dispose();
         t.colorSpace = THREE.SRGBColorSpace;
-        // cover-fit into the frame
-        const img = t.image as { width: number; height: number };
-        const want = win.photoW / win.photoH;
-        const have = img.width / img.height;
-        if (have > want) {
-          t.repeat.set(want / have, 1);
-          t.offset.set((1 - want / have) / 2, 0);
-        } else {
-          t.repeat.set(1, have / want);
-          t.offset.set(0, (1 - have / want) / 2);
-        }
-        setTex(t);
+        // contain-fit onto a dark-wood mat, in one canvas texture (still one draw call): the whole photo shows
+        const img = t.image as CanvasImageSource & { width: number; height: number };
+        const W = 512;
+        const H = Math.round((W * win.photoH) / win.photoW);
+        const c = document.createElement("canvas");
+        c.width = W;
+        c.height = H;
+        const g = c.getContext("2d")!;
+        g.fillStyle = "#2b1a10";
+        g.fillRect(0, 0, W, H);
+        const f = containFit(img.width / img.height, W / H);
+        const dw = W * f.w;
+        const dh = H * f.h;
+        g.drawImage(img, (W - dw) / 2, (H - dh) / 2, dw, dh);
+        t.dispose();
+        const ct = new THREE.CanvasTexture(c);
+        ct.colorSpace = THREE.SRGBColorSpace;
+        ct.anisotropy = 4;
+        setTex(ct);
       },
       undefined,
       () => undefined, // keep the portrait card

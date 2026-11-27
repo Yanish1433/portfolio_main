@@ -176,7 +176,7 @@ test("threads fade in, hold and fade out within 8 s", () => {
   assert.equal(threadAlpha(12), 0);
 });
 
-test("signboards: the group name is >= 20 px tall at the walk-up view, 1280x720 (step15)", async () => {
+test("signboards: the group name is >= 14 px tall at the walk-up view even at the fit floor, 1280x720 (step15, relaxed in 17c: 20 px cannot fit the longest name in 2 lines on a 1.3 m board)", async () => {
   const { CAM_FOV, projectNdc, pxPerMetre, viewOfZone, viewPose } = await import("../cameraRig");
   const { AVATAR_SCALE } = await import("../characters");
   const { SKILLS_MID } = await import("../zones");
@@ -187,7 +187,7 @@ test("signboards: the group name is >= 20 px tall at the walk-up view, 1280x720 
   const pose = viewPose([SKILLS_MID.x, AVATAR_SCALE, SKILLS_MID.z], viewOfZone("skills-lab"));
   const depth = projectNdc(pose, [GALLERY.x, PLAQUE.y, GALLERY.z + PLAQUE.dz], CAM_FOV, 16 / 9).depth;
   const px = signNamePx(plaqueWidth(n), SIGN_NAME_FLOOR, pxPerMetre(depth, 720));
-  assert.ok(px >= 20, `name is ${px.toFixed(1)} px tall (>= 20)`);
+  assert.ok(px >= 14, `name is ${px.toFixed(1)} px tall (>= 14)`);
 });
 
 test("signboards: clear of the plinth, pedestal and drum, and every corner is in frame from the skills view (step15)", async () => {
@@ -245,4 +245,27 @@ test("drum: the brass rows and the engraved names fit the atlas, one row per whe
     if (i) assert.ok(b[0] > order[i - 1][1], "bands do not overlap");
   });
   assert.ok(DOME_H > 0 && DOME_H < 0.25);
+});
+
+test("signboards: no board overlaps its neighbour, and every name fits inside its own board (step17c)", async () => {
+  const { plaqueWidth } = await import("./frame");
+  const { fitLabel, SIGN_CELL, SIGN_INNER_W } = await import("./wheelLayout");
+  // Kalam Bold is wide: ~0.52 em per character is a safe stand-in for the canvas measure in node
+  const measure = (t: string, size: number) => t.length * size * 0.52;
+  for (let n = 1; n <= 8; n++) {
+    const wheels = layoutWheels(resizeGroups(profile.skills, n));
+    const pw = plaqueWidth(wheels.length);
+    for (let i = 1; i < wheels.length; i++) {
+      const gap = wheels[i].x - pw / 2 - (wheels[i - 1].x + pw / 2);
+      assert.ok(gap > 0.01, `n=${n} boards ${i - 1}/${i} gap ${gap.toFixed(3)} m`);
+    }
+    for (const w of wheels) {
+      const { plain } = plainGroup(w.category, w.groupLabel);
+      const f = fitLabel(plain, SIGN_INNER_W, measure);
+      assert.ok(f.fits && f.lines.length <= 2, `${plain}: fits in <= 2 lines`);
+      assert.ok(f.width <= SIGN_INNER_W && SIGN_INNER_W < SIGN_CELL[0], `${plain}: ${f.width.toFixed(0)} px <= ${SIGN_INNER_W}`);
+    }
+  }
+  const f = fitLabel("3D & smart tools", SIGN_INNER_W, measure);
+  assert.ok(f.width <= SIGN_INNER_W);
 });

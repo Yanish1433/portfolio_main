@@ -7,16 +7,15 @@ import { useEffect, useRef } from "react";
 import { useFrame, useThree } from "@react-three/fiber";
 import * as THREE from "three";
 import { playerPos } from "../input";
-import { useWorld } from "@/store/world";
 import { getEnvironment, getMaterials, occlusion, timeUniform } from "./materials";
 import { skyUniforms } from "./Sky";
 import { themeState, themeTargets } from "./themeState";
 import { charMaterials, charRim } from "../lookdev";
+import { timeToLook, DAY_MINUTES } from "./timeLook";
 import { weather } from "../weather/weatherState";
 import { AVATAR_SCALE } from "../characters";
 
 const POOL = 4;
-const DUR = 2; // seconds for a full blend
 
 const C = (c: string) => new THREE.Color(c);
 const DAY = {
@@ -102,16 +101,18 @@ export default function ThemeDriver({
 
   useFrame((state, dtRaw) => {
     const dt = Math.min(dtRaw, 0.1);
-    const goal = useWorld.getState().theme === "night" ? 1 : 0;
+    // time of day: ease the shown minutes toward the goal along the shortest way round the clock
+    const goal = themeState.minutes;
     if (!themeState.initialised || reducedMotion) {
-      themeState.p = goal;
+      themeState.shown = goal;
       themeState.initialised = true;
     } else {
-      const step = dt / DUR;
-      themeState.p += THREE.MathUtils.clamp(goal - themeState.p, -step, step);
+      const diff = ((goal - themeState.shown + DAY_MINUTES * 1.5) % DAY_MINUTES) - DAY_MINUTES / 2;
+      themeState.shown = Math.abs(diff) < 0.05 ? goal : (themeState.shown + diff * (1 - Math.exp(-dt * 7)) + DAY_MINUTES) % DAY_MINUTES;
     }
-    const p = themeState.p;
-    const t = p * p * (3 - 2 * p);
+    const look = timeToLook(themeState.shown);
+    const t = look.t;
+    themeState.p = t;
     themeState.t = t;
     const L = (a: number, b: number) => a + (b - a) * t;
     timeUniform.value = reducedMotion ? 0 : state.clock.elapsedTime;
@@ -119,17 +120,16 @@ export default function ThemeDriver({
     // sun <-> moon
     if (sun.current && target.current) {
       target.current.position.set(playerPos.x, 0, playerPos.z);
-      _v.lerpVectors(DAY.sunOff, NIGHT.sunOff, t);
-      sun.current.position.set(playerPos.x + _v.x, _v.y, playerPos.z + _v.z);
-      sun.current.color.lerpColors(DAY.sun, NIGHT.sun, t);
-      sun.current.intensity = L(DAY.sunI, NIGHT.sunI) * (1 - 0.45 * weather.rain - 0.15 * weather.mist);
+      sun.current.position.set(playerPos.x + look.lightOff[0], look.lightOff[1], playerPos.z + look.lightOff[2]);
+      sun.current.color.setRGB(look.sun[0], look.sun[1], look.sun[2]);
+      sun.current.intensity = look.sunI * (1 - 0.45 * weather.rain - 0.15 * weather.mist);
     }
     if (hemi.current) {
-      hemi.current.color.lerpColors(DAY.hemiSky, NIGHT.hemiSky, t);
-      hemi.current.groundColor.lerpColors(DAY.hemiGround, NIGHT.hemiGround, t);
-      hemi.current.intensity = L(DAY.hemiI, NIGHT.hemiI) * (1 - 0.12 * weather.rain);
+      hemi.current.color.setRGB(look.hemiSky[0], look.hemiSky[1], look.hemiSky[2]);
+      hemi.current.groundColor.setRGB(look.hemiGround[0], look.hemiGround[1], look.hemiGround[2]);
+      hemi.current.intensity = look.hemiI * (1 - 0.12 * weather.rain);
     }
-    _col.lerpColors(DAY.fog, NIGHT.fog, t);
+    _col.setRGB(look.fog[0], look.fog[1], look.fog[2]);
     if (weather.mist > 0.001) _col.lerp(_wc.lerpColors(MIST_DAY, MIST_NIGHT, t), weather.mist * 0.85);
     if (weather.rain > 0.001) _col.lerp(_wc.lerpColors(RAIN_DAY, RAIN_NIGHT, t), weather.rain * 0.7);
     if (scene.fog) {
@@ -140,6 +140,11 @@ export default function ThemeDriver({
     }
     if (scene.background instanceof THREE.Color) scene.background.copy(_col);
     skyUniforms.uT.value = t;
+    skyUniforms.uDayTop.value.setRGB(look.skyTop[0], look.skyTop[1], look.skyTop[2]);
+    skyUniforms.uDayMid.value.setRGB(look.skyMid[0], look.skyMid[1], look.skyMid[2]);
+    skyUniforms.uDayHorizon.value.setRGB(look.skyHorizon[0], look.skyHorizon[1], look.skyHorizon[2]);
+    skyUniforms.uCloudDay.value.setRGB(look.cloud[0], look.cloud[1], look.cloud[2]);
+    skyUniforms.uSunDir.value.set(look.sunDir[0], look.sunDir[1], look.sunDir[2]);
     skyUniforms.uFog.value.copy(_col);
 
     // emissive materials

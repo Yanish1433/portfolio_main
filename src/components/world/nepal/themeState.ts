@@ -8,6 +8,10 @@ export const themeState = {
   /** Eased time-of-day: 0 = golden-hour day, 1 = night. */
   t: 0,
   initialised: false,
+  /** Goal time of day in minutes (written by the store; ThemeDriver eases toward it). */
+  minutes: 720,
+  /** Time of day currently shown (eased), minutes. */
+  shown: 720,
 };
 
 /** Objects whose look follows the theme, registered by the components that own them. */

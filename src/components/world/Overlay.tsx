@@ -1,5 +1,6 @@
 "use client";
 
+import TimeDial from "./time/TimeDial";
 import { useEffect, useMemo, useState } from "react";
 import { worldControl } from "./input";
 import Link from "next/link";
@@ -388,42 +389,6 @@ function HallHint() {
   );
 }
 
-/** Sun/moon toggle (also the N key). The scene blends over ~2 s. */
-function ThemeToggle() {
-  const theme = useWorld((s) => s.theme);
-  const toggle = useWorld((s) => s.toggleTheme);
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.code !== "KeyN" || e.repeat || e.metaKey || e.ctrlKey || e.altKey || isTypingTarget(e)) return;
-      useWorld.getState().toggleTheme();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
-  const night = theme === "night";
-  const label = night ? LABELS.ui.toDay : LABELS.ui.toNight;
-  return (
-    <button
-      type="button"
-      onClick={toggle}
-      aria-label={`${label} (N)`}
-      title={`${label} (N)`}
-      className={pillClass("h-10 w-10 !px-0 justify-center")}
-    >
-      {night ? (
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-          <circle cx="12" cy="12" r="4.2" />
-          <path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6" />
-        </svg>
-      ) : (
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinejoin="round" aria-hidden="true">
-          <path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z" />
-        </svg>
-      )}
-    </button>
-  );
-}
-
 const pill =
   pillClass("h-10");
 
@@ -489,7 +454,7 @@ export default function Overlay({ characters, thumbs = [], posters = [], aboutPh
       <div className="absolute right-4 top-4 z-20 flex items-center gap-2">
         <EagleViewButton />
         <ResetViewButton />
-        <ThemeToggle />
+        <TimeDial />
         <Link
           href={RECRUITER_HREF}
           className={pillClass()}

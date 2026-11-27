@@ -12,6 +12,8 @@ import { CLOUD_Y } from "./islandGeo";
 export const skyUniforms = {
   uT: { value: 0 },
   uTime: { value: 0 },
+  /** Unit vector toward the sun (driven by ThemeDriver from the time of day). */
+  uSunDir: { value: new THREE.Vector3(-0.75, 0.2, -0.66).normalize() },
   uDayTop: { value: new THREE.Color("#3f78c0") },
   uDayMid: { value: new THREE.Color("#8fbbe3") },
   uDayHorizon: { value: new THREE.Color("#f6dcc0") },
@@ -39,6 +41,7 @@ const fragment = /* glsl */ `
 #define CLOUD_Y ${CLOUD_Y.toFixed(1)}
 uniform float uT;
 uniform float uTime;
+uniform vec3 uSunDir;
 uniform vec3 uDayTop, uDayMid, uDayHorizon, uNightTop, uNightMid, uNightHorizon, uFog;
 uniform float uGrey, uMist;
 uniform vec3 uCloudDay, uCloudDayShade, uCloudNight;
@@ -71,7 +74,7 @@ void main() {
   vec3 col = mix(day, night, uT);
 
   // sun: soft low glow in the west-north-west by day
-  vec3 sunDir = normalize(vec3(-0.75, 0.2, -0.66));
+  vec3 sunDir = normalize(uSunDir);
   float sd = max(dot(d, sunDir), 0.0);
   col += vec3(1.0, 0.7, 0.38) * (pow(sd, 6.0) * 0.28 + pow(sd, 40.0) * 0.45) * (1.0 - uT);
   col += vec3(1.0, 0.95, 0.8) * smoothstep(0.9988, 0.9996, sd) * (1.0 - uT);
