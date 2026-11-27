@@ -20,23 +20,25 @@ export type InfoRef = {
 };
 
 /**
- * Cinema mode (the full-screen case study). `follow`: the Player's follow camera drives the view;
+ * Cinema mode (the full-screen project video). `follow`: the Player's follow camera drives the view;
  * `cinema`: the camera is flying into / parked at a stand's screen; `returning`: flying back.
  * The Player only writes the camera in `follow`.
  */
-export type CameraMode = "follow" | "cinema" | "returning";
+export type CameraMode = "follow" | "cinema" | "returning" | "eagle";
+
+/** Where the golden footprints lead: a section's ring centre and radius. */
+export type GuideTarget = { id: string; label: string; to: Vec2; radius: number; seq: number };
 
 const THEME_KEY = "world-theme";
 const CHARACTER_KEY = "world-character";
 
-/** The saved character, if it is one of the available ones. */
-export function savedCharacter(available: CharacterId[]): CharacterId | null {
-  if (typeof window === "undefined") return null;
+/** Older builds stored a picked character ("clay" / "astro" / "lakhey"). Lakhey is the only character now: drop the stale choice. */
+export function clearSavedCharacter() {
+  if (typeof window === "undefined") return;
   try {
-    const saved = window.localStorage.getItem(CHARACTER_KEY) as CharacterId | null;
-    return saved && available.includes(saved) ? saved : null;
+    window.localStorage.removeItem(CHARACTER_KEY);
   } catch {
-    return null;
+    // storage blocked: nothing to clear
   }
 }
 
@@ -91,8 +93,7 @@ type WorldState = {
   pickerOpen: boolean;
   /** Bumped on every pick; the avatar respawns at the plaza and dances. */
   spawnSeq: number;
-  setCharacter: (id: CharacterId, persist?: boolean) => void;
-  setPickerOpen: (v: boolean) => void;
+  setCharacter: (id: CharacterId) => void;
   /** Bumped to play the Dance emote once. */
   danceSeq: number;
   dance: () => void;
@@ -104,6 +105,9 @@ type WorldState = {
   arrive: () => void;
   tourActive: boolean;
   setTourActive: (v: boolean) => void;
+  /** Golden footprints: the section the path leads to (see components/world/guide), or null. `seq` restarts the path. */
+  guide: GuideTarget | null;
+  setGuide: (g: Omit<GuideTarget, "seq"> | null) => void;
   /** Project highlighted in the Project Hall card (robot "openProject"). */
   focusProject: string | null;
   setFocusProject: (id: string | null) => void;
@@ -117,15 +121,22 @@ type WorldState = {
   clearInfoDismissed: () => void;
   toast: { text: string; id: number } | null;
   showToast: (text: string) => void;
-  /** Project whose case study is open (cinema mode), or null. Movement and the robot bubble pause while set. */
+  /** Project whose video is open (cinema mode), or null. Movement and the robot bubble pause while set. */
   cinema: string | null;
+  /** Fly the camera into the stand's screen on open (false: just show the video, e.g. from a quick-open button far away). */
+  cinemaFly: boolean;
   /** The fly-in has finished: the overlay is on screen and the 3D scene is paused. */
   cinemaReady: boolean;
   cameraMode: CameraMode;
-  openCinema: (id: string) => void;
+  /** The follow camera is not on the default wide view (auto-framed or hand-set): shows "Reset view". */
+  viewCustom: boolean;
+  setViewCustom: (v: boolean) => void;
+  openCinema: (id: string, fly?: boolean) => void;
   closeCinema: () => void;
   setCinemaReady: (v: boolean) => void;
   setCameraMode: (m: CameraMode) => void;
+  /** Eagle (sky) view on / off. Only from follow or eagle; cinema and its return win. */
+  toggleEagle: () => void;
 
   /** The Ghar hint is on screen (the top-centre "Click anywhere" hint steps aside). */
   gharHint: boolean;
@@ -153,7 +164,7 @@ type WorldState = {
 export type SkillFilter = "all" | SkillCategory;
 
 export const useWorld = create<WorldState>((set, get) => ({
-  position: [0, 8.5],
+  position: [0, 11.9],
   target: null,
   activeZone: null,
   loaded: false,
@@ -182,17 +193,10 @@ export const useWorld = create<WorldState>((set, get) => ({
   character: null,
   pickerOpen: false,
   spawnSeq: 0,
-  setCharacter: (character, persist = true) => {
-    if (persist) {
-      try {
-        window.localStorage.setItem(CHARACTER_KEY, character);
-      } catch {
-        // ignore
-      }
-    }
+  // Lakhey is set once on load (CharacterInit); the spawnSeq bump keeps the first-visit spawn dance.
+  setCharacter: (character) => {
     set((s) => ({ character, pickerOpen: false, spawnSeq: s.spawnSeq + 1 }));
   },
-  setPickerOpen: (pickerOpen) => set({ pickerOpen }),
   danceSeq: 0,
   dance: () => set((s) => ({ danceSeq: s.danceSeq + 1 })),
   interruptSeq: 0,
@@ -201,6 +205,8 @@ export const useWorld = create<WorldState>((set, get) => ({
   arrive: () => set((s) => ({ arrivedSeq: s.arrivedSeq + 1 })),
   tourActive: false,
   setTourActive: (tourActive) => set({ tourActive }),
+  guide: null,
+  setGuide: (g) => set((s) => ({ guide: g ? { ...g, seq: (s.guide?.seq ?? 0) + 1 } : null })),
   focusProject: null,
   setFocusProject: (focusProject) => set({ focusProject }),
   info: null,
@@ -218,11 +224,15 @@ export const useWorld = create<WorldState>((set, get) => ({
   showToast: (text) => set({ toast: { text, id: Date.now() } }),
   cinema: null,
   cinemaReady: false,
+  cinemaFly: true,
   cameraMode: "follow",
-  openCinema: (cinema) => set((s) => (s.cinema === cinema ? s : { cinema, cinemaReady: false, cameraMode: "cinema", focusProject: cinema })),
+  viewCustom: false,
+  setViewCustom: (viewCustom) => set((s) => (s.viewCustom === viewCustom ? s : { viewCustom })),
+  openCinema: (cinema, fly = true) => set((s) => (s.cinema === cinema ? s : { cinema, cinemaFly: fly, cinemaReady: false, cameraMode: "cinema", focusProject: cinema })),
   closeCinema: () => set((s) => (s.cinema ? { cinema: null, cinemaReady: false, cameraMode: "returning" } : s)),
   setCinemaReady: (cinemaReady) => set({ cinemaReady }),
   setCameraMode: (cameraMode) => set({ cameraMode }),
+  toggleEagle: () => set((s) => (s.cinema || (s.cameraMode !== "follow" && s.cameraMode !== "eagle") ? s : { cameraMode: s.cameraMode === "eagle" ? "follow" : "eagle" })),
   gharHint: false,
   setGharHint: (gharHint) => set({ gharHint }),
   skillFilter: "all",
@@ -236,7 +246,7 @@ export const useWorld = create<WorldState>((set, get) => ({
   selectWheel: (i) => set({ wheelSelected: i, wheelSelectedAt: performance.now() }),
 }));
 
-/** Visitor movement (keys, joystick, ground clicks) is off while a case study is open or the camera is flying. */
+/** Visitor movement (keys, joystick, ground clicks) is off while a project video is open or the camera is flying. */
 export const movementLocked = (s: Pick<WorldState, "cinema" | "cameraMode">) => !!s.cinema || s.cameraMode !== "follow";
 
 /** True when a key event comes from a text field (world shortcuts must ignore it). */

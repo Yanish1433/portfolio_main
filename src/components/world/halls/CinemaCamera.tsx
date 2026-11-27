@@ -1,6 +1,6 @@
 "use client";
 
-// Cinema mode, the 3D half: when a case study opens, the camera eases from the follow view into
+// Cinema mode, the 3D half: when a project video opens, the camera eases from the follow view into
 // the stand's screen (~0.8 s, GSAP), then the HTML overlay (CinemaMode.tsx) fades in and the
 // render loop stops (frameloop "never") to save battery. On close the loop restarts and the
 // camera flies back onto the live follow pose (camRig), then hands control back to the Player.
@@ -68,7 +68,7 @@ export default function CinemaCamera({ reducedMotion }: { reducedMotion: boolean
       if (s.cinema && s.cinema !== prev.cinema) {
         stop();
         const screen = screenOf(s.cinema);
-        if (reducedMotion || !screen) {
+        if (reducedMotion || !screen || !s.cinemaFly) {
           useWorld.getState().setCinemaReady(true);
           pauseSoon();
           return;

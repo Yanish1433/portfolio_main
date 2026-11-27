@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { worldControl } from "./input";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useProgress } from "@react-three/drei";
@@ -15,8 +16,8 @@ import { JOURNEY } from "./journey";
 import { zoneById } from "./zones";
 import { LABELS } from "./nepal/labels";
 import { NAVIGATE_EVENT } from "./nepal/navigate";
-import { characterById, type CharacterId } from "./characters";
-import CharacterPicker from "./CharacterPicker";
+import type { CharacterId } from "./characters";
+import CharacterInit from "./CharacterInit";
 import RobotChat, { Toast } from "./robot/RobotChat";
 import Joystick from "./Joystick";
 import InfoPanel from "./halls/InfoPanel";
@@ -26,6 +27,8 @@ import { HALL } from "./halls/content";
 import { courseInfo, defaultInfo, projectInfo, visitByVisitor } from "./halls/visit";
 import { EASELS, SCROLL } from "./halls/layout";
 import type { InfoRef } from "@/store/world";
+import GuideMenu from "./guide/GuideMenu";
+import GuestbookButton from "./guestbook/GuestbookUi";
 import { WheelCard, SkillFilterBar, WheelHint } from "./wheels/WheelUi";
 
 const RECRUITER_HREF = "/recruiter";
@@ -265,6 +268,87 @@ function Hint() {
   );
 }
 
+const CAM_HINT_KEY = "world-cam-hint";
+const CAM_HINT_MS = 6000;
+
+/** Once per session, a few seconds after the visitor can play: how to look around. */
+function CameraHint() {
+  const [show, setShow] = useState(false);
+  const ready = useWorld((s) => s.loaded && !!s.character && !s.pickerOpen && !s.cinema);
+  useEffect(() => {
+    if (!ready) return;
+    try {
+      if (window.sessionStorage.getItem(CAM_HINT_KEY)) return;
+      window.sessionStorage.setItem(CAM_HINT_KEY, "1");
+    } catch {
+      /* storage blocked: it just shows again next load */
+    }
+    let hide = 0;
+    const start = window.setTimeout(() => {
+      setShow(true);
+      hide = window.setTimeout(() => setShow(false), CAM_HINT_MS);
+    }, 2500);
+    return () => {
+      window.clearTimeout(start);
+      window.clearTimeout(hide);
+    };
+  }, [ready]);
+  return (
+    <div
+      className={`pointer-events-none absolute inset-x-0 top-[7.5rem] z-10 flex justify-center px-4 transition-opacity duration-700 sm:top-16 ${show ? "opacity-100" : "opacity-0"}`}
+      aria-hidden={!show}
+    >
+      <p className="rounded-full bg-[#5a3d33]/80 px-4 py-2 text-sm text-white shadow" role="status">
+        <span className="hidden [@media(pointer:coarse)]:inline">Two fingers to turn and zoom</span>
+        <span className="[@media(pointer:coarse)]:hidden">Drag to look around · scroll to zoom</span>
+      </p>
+    </div>
+  );
+}
+
+/** Back to the default wide view (also the R key). Only shown while the camera is somewhere else. */
+function ResetViewButton() {
+  const custom = useWorld((s) => s.viewCustom);
+  const eagle = useWorld((s) => s.cameraMode === "eagle");
+  if (!custom && !eagle) return null;
+  return (
+    <button
+      type="button"
+      onClick={() => worldControl.resetView?.()}
+      aria-label="Reset view (R)"
+      title="Reset view (R)"
+      className="pointer-events-auto flex h-10 items-center gap-1.5 rounded-full bg-white/80 px-3 text-sm font-medium text-[#4a3228] shadow backdrop-blur transition hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#c9a227]"
+    >
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M4 12a8 8 0 1 0 2.5-5.8" />
+        <path d="M4 4v4.5h4.5" />
+      </svg>
+      <span className="hidden sm:inline">Reset view</span>
+    </button>
+  );
+}
+
+/** Sky view of the whole island (also the V key); click again to come back down. */
+function EagleViewButton() {
+  const eagle = useWorld((s) => s.cameraMode === "eagle");
+  const toggle = useWorld((s) => s.toggleEagle);
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-label="Eagle view (V)"
+      aria-pressed={eagle}
+      title="Eagle view (V)"
+      className={`pointer-events-auto flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-full px-3 text-sm font-medium text-[#4a3228] shadow backdrop-blur transition hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#c9a227] sm:h-10 ${eagle ? "bg-[#ffe9a8]" : "bg-white/80"}`}
+    >
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M2 9c3-1 6 0 10 5 4-5 7-6 10-5-1 5-4 8-10 9-6-1-9-4-10-9z" />
+      </svg>
+      <span className="hidden sm:inline">Eagle view</span>
+    </button>
+  );
+}
+
 /** Is a ground point in the Project Dalan (the gallery in front of the stands)? */
 // the whole frontage counts, including the gate between the two wings
 const inDalan = ([x, z]: [number, number]) =>
@@ -296,7 +380,7 @@ function HallHint() {
       aria-hidden={!show || hidden}
     >
       <p className="max-w-[min(34rem,calc(100vw-32px))] rounded-2xl bg-[#5a3d33]/85 px-4 py-2 text-center text-sm text-white shadow" role="status">
-        Walk up to a screen to see a project. Tap <strong className="font-semibold text-[#ffe08a]">Open case study</strong> for the full story.
+        Walk up to a screen to see a project. Tap <strong className="font-semibold text-[#ffe08a]">Watch demo</strong> to see it full screen.
       </p>
     </div>
   );
@@ -341,10 +425,9 @@ function ThemeToggle() {
 const pill =
   "pointer-events-auto flex h-10 items-center gap-2 rounded-full bg-white/80 px-3 text-sm font-medium text-[#4a3228] shadow backdrop-blur transition hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#c9a227]";
 
-/** "Change character" + Dance emote (also the G key). */
+/** Dance emote (also the G key). */
 function AvatarControls() {
   const character = useWorld((s) => s.character);
-  const pickerOpen = useWorld((s) => s.pickerOpen);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.code !== "KeyG" || e.repeat || e.metaKey || e.ctrlKey || e.altKey || isTypingTarget(e)) return;
@@ -354,18 +437,9 @@ function AvatarControls() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
-  if (!character || pickerOpen) return null;
-  const c = characterById(character);
+  if (!character) return null;
   return (
     <div className="absolute left-4 top-4 z-20 flex items-center gap-2">
-      <button type="button" className={`${pill} pl-1`} onClick={() => useWorld.getState().setPickerOpen(true)} title={LABELS.ui.changeCharacter}>
-        {c && (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={c.preview} alt="" width={32} height={32} className="h-8 w-8 rounded-full bg-[#b5643f] object-cover object-top" />
-        )}
-        <span className="hidden sm:inline">{LABELS.ui.changeCharacter}</span>
-        <span className="sr-only sm:hidden">{LABELS.ui.changeCharacter}</span>
-      </button>
       <button
         type="button"
         className={pill}
@@ -377,6 +451,8 @@ function AvatarControls() {
         <span className="hidden sm:inline">{LABELS.ui.dance}</span>
         <kbd className="hidden rounded bg-black/10 px-1.5 text-xs sm:inline [@media(pointer:coarse)]:hidden">G</kbd>
       </button>
+      <GuideMenu />
+      <GuestbookButton />
     </div>
   );
 }
@@ -384,13 +460,15 @@ function AvatarControls() {
 export default function Overlay({ characters, thumbs = [], posters = [], aboutPhoto = null }: { characters: CharacterId[]; thumbs?: string[]; posters?: string[]; aboutPhoto?: string | null }) {
   const files = useMemo(() => ({ thumbs: new Set(thumbs), showcasePosters: new Set(posters) }), [thumbs, posters]);
   const cinema = useWorld((s) => !!s.cinema);
+  const eagleMode = useWorld((s) => s.cameraMode === "eagle");
   return (
     <div className="pointer-events-none absolute inset-0 z-10">
-      {/* The world HUD steps aside while a case study is open: invisible (so out of the tab order
-          and the accessibility tree) but still mounted, so focus can return to "Open case study". */}
+      {/* The world HUD steps aside while a project video is open: invisible (so out of the tab order
+          and the accessibility tree) but still mounted, so focus can return to "Watch demo". */}
       <div className={cinema ? "invisible contents" : "contents"} aria-hidden={cinema || undefined}>
       <Hint />
       <HallHint />
+      <CameraHint />
       <GharHint />
       <AboutLogic />
       <ContactLogic />
@@ -406,6 +484,8 @@ export default function Overlay({ characters, thumbs = [], posters = [], aboutPh
         <RobotChat />
       </div>
       <div className="absolute right-4 top-4 z-20 flex items-center gap-2">
+        <EagleViewButton />
+        <ResetViewButton />
         <ThemeToggle />
         <Link
           href={RECRUITER_HREF}
@@ -414,11 +494,11 @@ export default function Overlay({ characters, thumbs = [], posters = [], aboutPh
           Recruiter mode
         </Link>
       </div>
-      {!cinema && <Joystick />}
+      {!cinema && !eagleMode && <Joystick />}
       </div>
       <CinemaMode files={files} />
       <LoadingScreen />
-      <CharacterPicker available={characters} />
+      <CharacterInit available={characters} />
     </div>
   );
 }

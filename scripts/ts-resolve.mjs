@@ -21,7 +21,7 @@ registerHooks({
     let base;
     if (specifier.startsWith("@/")) {
       base = new URL(specifier.slice(2), srcUrl);
-    } else if ((specifier.startsWith("./") || specifier.startsWith("../")) && context.parentURL) {
+    } else if ((specifier.startsWith("./") || specifier.startsWith("../")) && context.parentURL && !context.parentURL.includes("/node_modules/")) {
       base = new URL(specifier, context.parentURL);
     }
     if (base) {

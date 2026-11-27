@@ -11,11 +11,14 @@ import { HeroMotion, Reveal, SkillsMotion, TimelineMotion } from "./motion";
 import { Particles } from "./Particles";
 import { ThemeToggle } from "./ThemeToggle";
 import { ProjectsGallery } from "./ProjectsGallery";
+import { ProjectMedia } from "./ProjectMedia";
+import type { VideoProject } from "@/components/world/halls/ProjectVideo";
+import { videoUrl } from "@/components/world/halls/showcaseView";
 import { LeadOrder } from "./LeadOrder";
 import { TiltCard } from "./TiltCard";
 import { eduRow, eduSortKey, expPeriod, isNow } from "@/lib/robot/journey";
 import { ctaState, initials } from "@/components/world/about/aboutView";
-import { Himalaya } from "@/components/landing/Himalaya";
+import { PagodaHero } from "./PagodaHero";
 import { CarvedFrame, PagodaRoof } from "@/components/landing/Ornaments";
 import { isPlaceholder, isRealEmail, isRealLink } from "./links";
 import { WORLD_HREF } from "@/components/landing/routes";
@@ -64,7 +67,7 @@ export function Hero() {
   const { name, title, tagline, location, links } = profile;
   return (
     <section className={styles.hero} aria-labelledby="hero-title">
-      <Himalaya variant="band" />
+      <PagodaHero />
       <Particles />
       <HeroMotion className={styles.heroInner}>
         <p className={styles.heroSub} data-hero-fade>
@@ -81,13 +84,19 @@ export function Hero() {
         </h1>
         <p className={styles.heroTitle} data-hero-fade>{title}</p>
         <p className={styles.heroTag} data-hero-fade>{tagline}</p>
+        <p className={styles.heroLine} data-hero-fade>
+          Too busy to explore my 3D town? Here&rsquo;s my quick portfolio. When you have time, come back and walk through the city.
+        </p>
         <div className={styles.heroActions} data-hero-fade>
+          <MagneticLink href={WORLD_HREF} variant="primary">
+            Explore the 3D town <span aria-hidden="true">→</span>
+          </MagneticLink>
           {isRealLink(links.resumeUrl) && (
-            <MagneticLink href={links.resumeUrl} variant="primary" download>
+            <MagneticLink href={links.resumeUrl} variant="ghost" download>
               <DownloadIcon /> Download Resume
             </MagneticLink>
           )}
-          <MagneticLink href="#contact" variant={isRealLink(links.resumeUrl) ? "ghost" : "primary"}>
+          <MagneticLink href="#contact" variant="ghost">
             <MailIcon /> Contact
           </MagneticLink>
           {isRealEmail(links.email) && (
@@ -116,6 +125,23 @@ export function Hero() {
 
 /* ───────────────────────── Projects ───────────────────────── */
 
+const ACCENTS = ["#c9a227", "#d9775b", "#5fa38c", "#8f6fc2", "#d4604f", "#4f8fc0", "#c98a2e", "#7fa04a"];
+
+function toVideoProject(p: Project, index: number): VideoProject {
+  return {
+    id: p.id,
+    name: p.name,
+    tagline: p.pitch ?? taglineOf(p),
+    disclaimer: p.disclaimer,
+    video: videoUrl(p),
+    poster: p.media?.poster?.trim() || null,
+    screenshots: p.media?.screenshots ?? [],
+    liveUrl: p.liveUrl,
+    repoUrl: p.repoUrl,
+    accent: ACCENTS[index % ACCENTS.length],
+  };
+}
+
 function ProjectCard({ project, index }: { project: Project; index: number }) {
   const hue = (index * 55 + 165) % 360;
   const mediaStyle = {
@@ -126,21 +152,7 @@ function ProjectCard({ project, index }: { project: Project; index: number }) {
     <li className={styles.cardItem}>
       <TiltCard>
         <div className={styles.cardMedia} style={mediaStyle}>
-          {project.demoVideo ? (
-            <video
-              className={styles.cardVideo}
-              src={project.demoVideo}
-              muted
-              loop
-              playsInline
-              preload="none"
-              aria-label={`${project.name} demo video`}
-            />
-          ) : (
-            <span className={styles.cardMediaMark} aria-hidden="true">
-              {project.name.slice(0, 2)}
-            </span>
-          )}
+          <ProjectMedia project={toVideoProject(project, index)} />
           <span className={styles.cardYear}>{project.year}</span>
         </div>
         <div className={styles.cardBody}>
@@ -158,19 +170,14 @@ function ProjectCard({ project, index }: { project: Project; index: number }) {
             ))}
           </ul>
           <div className={styles.cardActions}>
-            {project.liveUrl && (
-              <a className={`${styles.btn} ${styles.btnPrimary} ${styles.btnSm}`} href={project.liveUrl} {...extProps(project.liveUrl)}>
-                Live<span className={styles.srOnly}> demo of {project.name}</span>
+            {isRealLink(project.liveUrl) && (
+              <a className={`${styles.btn} ${styles.btnPrimary} ${styles.btnSm}`} href={project.liveUrl!} {...extProps(project.liveUrl!)}>
+                Live site<span className={styles.srOnly}> of {project.name}</span>
               </a>
             )}
-            {project.repoUrl && (
-              <a className={`${styles.btn} ${styles.btnGhost} ${styles.btnSm}`} href={project.repoUrl} {...extProps(project.repoUrl)}>
+            {isRealLink(project.repoUrl) && (
+              <a className={`${styles.btn} ${styles.btnGhost} ${styles.btnSm}`} href={project.repoUrl!} {...extProps(project.repoUrl!)}>
                 Code<span className={styles.srOnly}> for {project.name}</span>
-              </a>
-            )}
-            {project.caseStudyUrl && (
-              <a className={`${styles.btn} ${styles.btnGhost} ${styles.btnSm}`} href={project.caseStudyUrl} {...extProps(project.caseStudyUrl)}>
-                Case study<span className={styles.srOnly}> for {project.name}</span>
               </a>
             )}
           </div>

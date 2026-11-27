@@ -2,7 +2,7 @@
 
 // The whole static town, merged to ~1 draw call per material. The kit pieces
 // are also exported as standalone components for reuse (see <KitPiece/>).
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import * as THREE from "three";
 import {
   BELL,
@@ -18,10 +18,16 @@ import {
   TEA_SIGN,
   TEA_STALL,
   TIMELINE_PATH,
+  TREES,
   GALLERY,
+  MARKET,
+  CHAUTARI,
+  POND,
+  GATE_ANGLES,
+  WALL,
   zones,
 } from "../zones";
-import { MAT_KEYS, Parts, T, beam, box, lathe, plane, seeded, type MatKey } from "./geom";
+import { MAT_KEYS, Parts, T, beam, box, lathe, plane, type MatKey } from "./geom";
 import {
   COL,
   buildBell,
@@ -38,24 +44,23 @@ import {
   type Built,
 } from "./kit";
 import { CASTS, getMaterials, materialFor } from "./materials";
+import { buildPlaces, POND_HOLE } from "./placesGeo";
+import { leafGeometry, tree, TOWN_TREE_KINDS, type Placed } from "./trees";
 import { buildHallParts } from "../halls/hallParts";
 import { buildWheelGallery } from "../wheels/frame";
 import { WHEELS } from "../wheels/wheelData";
 
-export const TOWN_RADIUS = 22.9;
+export const TOWN_RADIUS = WALL.outer;
 
 /** Renders one Built (or merged Parts) as one mesh per material. */
 export function MergedParts({ parts }: { parts: Parts }) {
-  const geoms = useMemo(() => parts.merge(), [parts]);
-  const smallGeoms = useMemo(() => parts.mergeNoCast(), [parts]);
+  // Small props (stands, plaques, finials...) are merged into the same mesh as the big pieces:
+  // they then also enter the shadow pass, which costs no extra draw call (one mesh per material).
+  const geoms = useMemo(() => parts.mergeAll(), [parts]);
   return (
     <group>
       {MAT_KEYS.filter((k) => geoms.has(k)).map((k) => (
         <mesh key={k} geometry={geoms.get(k)} material={materialFor(k)} castShadow={CASTS[k]} receiveShadow />
-      ))}
-      {/* small props (stands, plaques, finials...): drawn, but they skip the shadow pass */}
-      {MAT_KEYS.filter((k) => smallGeoms.has(k)).map((k) => (
-        <mesh key={`small-${k}`} geometry={smallGeoms.get(k)} material={materialFor(k)} receiveShadow />
       ))}
     </group>
   );
@@ -70,6 +75,24 @@ export function KitPiece({ built, position = [0, 0, 0], rotation = 0 }: { built:
   );
 }
 
+/** The square's trees (zones.ts TREES), grown once: species by index, a slow turn so no two look alike. */
+let townTreeCache: Placed[] | null = null;
+export function townTrees(): Placed[] {
+  if (!townTreeCache) townTreeCache = TREES.map(([x, z, s], i) => ({ tree: tree(TOWN_TREE_KINDS[i % TOWN_TREE_KINDS.length], 11 + i * 5), x, y: 0, z, rot: i * 1.9, scale: s }));
+  return townTreeCache;
+}
+
+/** All of the square's leaf cards: ONE mesh on the shared leaf material, no shadows (only the chautari tree casts). */
+function TownLeaves() {
+  const geo = useMemo(() => {
+    const g = leafGeometry(townTrees());
+    if (typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches) g.setDrawRange(0, Math.floor((g.index!.count / 6) * 0.55) * 6);
+    return g;
+  }, []);
+  useEffect(() => () => geo.dispose(), [geo]);
+  return <mesh geometry={geo} material={getMaterials().leaf} />;
+}
+
 export type TownData = { parts: Parts; anchors: Anchors; lanePosts: THREE.Vector3[] };
 
 const V = (x: number, y: number, z: number) => new THREE.Vector3(x, y, z);
@@ -78,6 +101,78 @@ function banner(P: Parts, top: THREE.Vector3, color: string, len = 2.0) {
   const g = plane(0.38, len, 8);
   g.translate(0, -len / 2, 0);
   P.add("cloth", g, color, T(top.x, top.y, top.z));
+}
+
+/**
+ * The old-city wall: a tiled brick curtain with a stone plinth, pilasters, a tiled coping, and four
+ * gates (south, east, north, west) each flanked by two tower stubs with pyramid roofs. It runs along
+ * WALL.inner..outer, beyond every roof of the town. The south arc is lower so the 45 deg camera sees over it.
+ */
+function buildWall(P: Parts, A: Anchors) {
+  const seg = 80;
+  const mid = (WALL.inner + WALL.outer) / 2;
+  const thick = WALL.outer - WALL.inner;
+  const gateTheta = (th: number) => GATE_ANGLES.some((g) => Math.abs(Math.atan2(Math.sin(th - g), Math.cos(th - g))) < (WALL.gateHalf + 0.2) / mid);
+  for (let i = 0; i < seg; i++) {
+    const a0 = (i / seg) * Math.PI * 2;
+    const a1 = ((i + 1) / seg) * Math.PI * 2;
+    const am = (a0 + a1) / 2;
+    if (gateTheta(am)) continue;
+    const x0 = Math.sin(a0) * mid;
+    const z0 = Math.cos(a0) * mid;
+    const x1 = Math.sin(a1) * mid;
+    const z1 = Math.cos(a1) * mid;
+    const len = Math.hypot(x1 - x0, z1 - z0) * 1.04;
+    const cx = (x0 + x1) / 2;
+    const cz = (z0 + z1) / 2;
+    const rot = Math.atan2(x1 - x0, z1 - z0);
+    // south (z > 0) stays low; the rest of the circle is a proper 2.6 m curtain
+    const h = 2.6 - 1.45 * Math.min(1, Math.max(0, (Math.cos(am) - 0.25) / 0.6));
+    P.add("brick", box(thick, h + 1.2, len), COL.brickWarm, T(cx, (h - 1.2) / 2, cz, rot));
+    P.add("plain", box(thick + 0.16, 0.34, len), COL.stone, T(cx, 0.17, cz, rot)); // plinth
+    P.add("roof", box(thick + 0.5, 0.16, len), "#ffffff", T(cx, h + 0.1, cz, rot)); // tiled coping
+    if (i % 5 === 2) {
+      // pilaster on the town side
+      const px = Math.sin(am) * (WALL.inner - 0.08);
+      const pz = Math.cos(am) * (WALL.inner - 0.08);
+      P.add("brick", box(0.7, h + 0.1, 0.7), COL.brick, T(px, h / 2, pz, rot));
+      P.add("plain", box(0.86, 0.12, 0.86), COL.stone, T(px, h + 0.12, pz, rot));
+    }
+  }
+  // gates
+  for (const g of GATE_ANGLES) {
+    const gx = Math.sin(g) * mid;
+    const gz = Math.cos(g) * mid;
+    const place = (lx: number, lz: number) => V(gx + Math.cos(g) * lx + Math.sin(g) * lz, 0, gz - Math.sin(g) * lx + Math.cos(g) * lz);
+    const M = T(gx, 0, gz, g);
+    const towerX = WALL.gateHalf + 1.5;
+    const th = g === 0 ? 3.0 : 4.8; // the south gate stays low so the camera can see over it
+    const k = th / 4.8;
+    for (const s of [-1, 1]) {
+      const tx = s * towerX;
+      P.add("brick", box(3.0, th + 0.6, 3.3), COL.brickWarm, T(0, 0, 0).setPosition(tx, (th + 0.6) / 2, 0).premultiply(M));
+      P.add("plain", box(3.3, 0.4, 3.6), COL.stone, T(0, 0.2, 0).setPosition(tx, 0.2, 0).premultiply(M));
+      P.add("wood", box(3.2, 0.22, 3.5), COL.woodDark, T(0, 0, 0).setPosition(tx, th + 0.5, 0).premultiply(M));
+      // upper window slits
+      for (const dz of [-1, 1]) P.add("window", box(0.5, 0.9, 0.05), "#ffffff", T(0, 0, 0).setPosition(tx, th * 0.7, dz * 1.67).premultiply(M), 1);
+      // pyramid roof + gold finial
+      const roof = new THREE.ConeGeometry(2.9, 1.9 * Math.max(k, 0.7), 4, 1).rotateY(Math.PI / 4).translate(0, 0.95 * Math.max(k, 0.7), 0);
+      P.add("roof", roof, "#ffffff", T(0, 0, 0).setPosition(tx, th + 0.7, 0).premultiply(M));
+      P.small(() => P.add("gold", lathe([[0, 0], [0.1, 0], [0.05, 0.16], [0, 0.34]], 6), COL.gold, T(0, 0, 0).setPosition(tx, th + 0.7 + 1.9 * Math.max(k, 0.7), 0).premultiply(M)));
+    }
+    // lintel across the opening: brick arch band + carved wooden beam, tiled cap
+    const span = WALL.gateHalf * 2 + 0.2;
+    P.add("brick", box(span + 0.4, 1.1, thick + 0.3), COL.brickWarm, T(0, 0, 0).setPosition(0, th - 0.8, 0).premultiply(M));
+    P.add("wood", box(span, 0.3, thick + 0.5), COL.woodDark, T(0, 0, 0).setPosition(0, th - 1.5, 0).premultiply(M));
+    P.add("roof", box(span + 1.2, 0.16, thick + 0.9), "#ffffff", T(0, 0, 0).setPosition(0, th - 0.15, 0).premultiply(M));
+    // the gate opens onto the island's rim: a carved-stone sill and a low railing keep the drop from looking like a hole
+    P.add("plain", box(span, 0.2, 0.7), COL.stone, T(0, 0, 0).setPosition(0, 0.1, thick / 2 + 0.1).premultiply(M));
+    for (const px of [-1.9, -0.95, 0, 0.95, 1.9]) P.add("plain", box(0.2, 0.85, 0.2), COL.stone, T(0, 0, 0).setPosition(px, 0.425, thick / 2 + 0.95).premultiply(M));
+    P.add("plain", box(span + 0.2, 0.12, 0.2), COL.stone, T(0, 0, 0).setPosition(0, 0.8, thick / 2 + 0.95).premultiply(M));
+    // lamps and a marigold garland across each gate
+    A.garlands.push({ a: place(-WALL.gateHalf - 0.3, 0).setY(th - 1.9), b: place(WALL.gateHalf + 0.3, 0).setY(th - 1.9), drop: 0.35 });
+    A.diyos.push(place(-WALL.gateHalf - 0.1, -1.4).setY(0.45), place(WALL.gateHalf + 0.1, -1.4).setY(0.45));
+  }
 }
 
 /** Build every static piece of the town into world space (cached for the session). */
@@ -96,6 +191,8 @@ export function buildTown(): TownData {
   for (const s of SHRINES) place(buildPagoda({ tiers: s.tiers, steps: s.steps, base: s.base, guardians: false }), s.x, s.z);
   place(buildPalace({ w: PALACE.w, d: PALACE.d }), PALACE.x, PALACE.z);
   for (const h of HOUSES) place(buildHouse(h), h.x, h.z, h.rot);
+  // the few trees in the square: procedural peepal / broadleaf / ashoka (bark here, leaf cards in <TownLeaves/>)
+  townTrees().forEach((t) => P.addRaw("wood", t.tree.bark, T(t.x, 0, t.z, t.rot, t.scale)));
   for (const p of PATIS) place(buildPati({ w: p.w, d: p.d }), p.x, p.z, p.rot);
   place(buildPati({ w: TEA_STALL.w, d: TEA_STALL.d, tea: true }), TEA_STALL.x, TEA_STALL.z, TEA_STALL.rot);
   place(buildDhara(DHARA.w, DHARA.d), DHARA.x, DHARA.z);
@@ -177,13 +274,17 @@ export function buildTown(): TownData {
     { a: V(-12.3, 4.0, 5.6), b: V(-16.4, 4.2, 4.6), drop: 0.5 },
     { a: V(-12.5, 4.6, -15.5), b: V(-9.9, 4.4, -16.2), drop: 0.5 },
     { a: V(12.5, 4.6, -15.5), b: V(9.9, 4.4, -16.2), drop: 0.5 },
-    { a: V(16.2, 4.4, 2.4), b: V(16.3, 3.6, 12.0), drop: 0.8 },
+    { a: V(17.6, 4.4, 3.4), b: V(16.3, 3.6, 12.0), drop: 0.8 },
   );
 
   // stone-slab paths
+  // Each slab sits a hair higher than the one before (0.7 mm steps), so where two paths cross their
+  // coplanar tops never z-fight.
+  let slabN = 0;
   const slab = (x0: number, z0: number, x1: number, z1: number, wdt: number) => {
     const len = Math.hypot(x1 - x0, z1 - z0);
-    P.add("slab", box(wdt, 0.03, len), "#fff", T((x0 + x1) / 2, 0.015, (z0 + z1) / 2, Math.atan2(x1 - x0, z1 - z0)));
+    const lift = 0.0007 * slabN++;
+    P.add("slab", box(wdt, 0.03, len), "#fff", T((x0 + x1) / 2, 0.015 + lift, (z0 + z1) / 2, Math.atan2(x1 - x0, z1 - z0)));
   };
   const pb = PAGODA.base / 2 + 0.9;
   slab(0, 18.5, 0, PAGODA.z + PAGODA.base / 2 + 0.6, 2.2); // main axis from the south
@@ -203,24 +304,20 @@ export function buildTown(): TownData {
     slab(ax, az, bx, bz, 1.9);
   }
   slab(-1, 7.4, TIMELINE_PATH[0][0], TIMELINE_PATH[0][1], 1.6);
+  // step8c: the main axis runs on to the market lane in front of the south gate; a lane of slabs along the stalls
+  slab(0, 18.5, 0, MARKET.laneZ, 2.2);
+  slab(MARKET.stalls[0].x - 1.2, MARKET.laneZ, MARKET.stalls[MARKET.stalls.length - 1].x + 2.2, MARKET.laneZ, 1.5);
+  // the pond: down the west side of the tank from the post box, then along its steps
+  slab(7.3, 8.6, 7.3, POND.z + POND.d / 2 + 1.5, 1.1);
+  slab(7.3, POND.z + POND.d / 2 + 1.5, POND.x + POND.w / 2 - 0.8, POND.z + POND.d / 2 + 1.5, 1.4);
+  slab(POND.x, 8.9, POND.x, POND.z - POND.d / 2 - 0.9, 1.3);
+  // the chautari: along the east corridor from the skills lane, up to the steps
+  slab(11, -3, 11, 0.4, 1.5);
+  slab(11, 0.4, CHAUTARI.x, 0.4, 1.5);
+  slab(CHAUTARI.x, 0.4, CHAUTARI.x, CHAUTARI.z + CHAUTARI.lowerD / 2 + 0.9, 1.5);
 
-  // parapet around the raised town platform
-  const seg = 72;
-  for (let i = 0; i < seg; i++) {
-    const a0 = (i / seg) * Math.PI * 2;
-    const a1 = ((i + 1) / seg) * Math.PI * 2;
-    const r = TOWN_RADIUS - 0.15;
-    const x0 = Math.sin(a0) * r;
-    const z0 = Math.cos(a0) * r;
-    const x1 = Math.sin(a1) * r;
-    const z1 = Math.cos(a1) * r;
-    const len = Math.hypot(x1 - x0, z1 - z0) + 0.02;
-    const rot = Math.atan2(x1 - x0, z1 - z0);
-    const south = (z0 + z1) / 2 > 6;
-    const h = south ? 0.35 : 0.6;
-    P.add("brick", box(0.32, h, len), COL.brickWarm, T((x0 + x1) / 2, h / 2, (z0 + z1) / 2, rot));
-    P.add("plain", box(0.38, 0.06, len), COL.stone, T((x0 + x1) / 2, h + 0.03, (z0 + z1) / 2, rot));
-  }
+  buildPlaces(P, A);
+  buildWall(P, A);
 
   townCache = { parts: P, anchors: A, lanePosts };
   return townCache;
@@ -241,66 +338,27 @@ function groundGeometry() {
   hole.lineTo(x1, y0);
   hole.lineTo(x0, y0);
   shape.holes.push(hole);
+  const pond = new THREE.Path();
+  pond.moveTo(POND_HOLE.x0, -POND_HOLE.z0);
+  pond.lineTo(POND_HOLE.x0, -POND_HOLE.z1);
+  pond.lineTo(POND_HOLE.x1, -POND_HOLE.z1);
+  pond.lineTo(POND_HOLE.x1, -POND_HOLE.z0);
+  pond.lineTo(POND_HOLE.x0, -POND_HOLE.z0);
+  shape.holes.push(pond);
   const g = new THREE.ShapeGeometry(shape, 48);
   g.rotateX(-Math.PI / 2);
-  return g;
-}
-
-/** Terraced fields stepping down from the town, then a hazy valley floor. */
-function terrainGeometry() {
-  const r = seeded(808);
-  const pts: [number, number][] = [
-    [TOWN_RADIUS - 0.1, -0.02],
-    [TOWN_RADIUS - 0.1, -1.4],
-  ];
-  let rad = TOWN_RADIUS + 0.4;
-  let y = -1.4;
-  for (let i = 0; i < 8; i++) {
-    const wdt = 2.6 + r() * 1.4 + i * 0.3;
-    pts.push([rad, y], [rad + wdt, y - 0.25]);
-    rad += wdt;
-    y -= 1.2 + i * 0.25;
-    pts.push([rad + 0.3, y]);
-  }
-  pts.push([rad + 18, y - 9], [rad + 45, -40], [210, -40]);
-  const g = lathe(pts, 64).toNonIndexed();
-  g.computeVertexNormals();
-  const pos = g.attributes.position;
-  const nrm = g.attributes.normal;
-  const col = new Float32Array(pos.count * 3);
-  const fields = ["#8fae5a", "#a9b860", "#c7b45a", "#7ea152", "#b5a24c", "#9cb766"].map((c) => new THREE.Color(c));
-  const earth = new THREE.Color("#8a6446");
-  const valley = new THREE.Color("#7f9a62");
-  const c = new THREE.Color();
-  for (let i = 0; i < pos.count; i += 3) {
-    const x = (pos.getX(i) + pos.getX(i + 1) + pos.getX(i + 2)) / 3;
-    const z = (pos.getZ(i) + pos.getZ(i + 1) + pos.getZ(i + 2)) / 3;
-    const yy = (pos.getY(i) + pos.getY(i + 1) + pos.getY(i + 2)) / 3;
-    const ny = nrm.getY(i);
-    const rr = Math.hypot(x, z);
-    if (ny < 0.6) c.copy(earth);
-    else if (yy < -20) c.copy(valley);
-    else {
-      const sector = Math.floor(((Math.atan2(z, x) + Math.PI) / (Math.PI * 2)) * 22);
-      const ring = Math.floor(rr / 3);
-      c.copy(fields[(sector * 7 + ring * 3) % fields.length]);
-    }
-    for (let k = 0; k < 3; k++) col.set([c.r, c.g, c.b], (i + k) * 3);
-  }
-  g.setAttribute("color", new THREE.Float32BufferAttribute(col, 3));
   return g;
 }
 
 export default function Town() {
   const town = useMemo(buildTown, []);
   const ground = useMemo(groundGeometry, []);
-  const terrain = useMemo(terrainGeometry, []);
   const m = getMaterials();
   return (
     <group>
       <mesh geometry={ground} material={m.ground} receiveShadow />
-      <mesh geometry={terrain} material={m.terrain} receiveShadow />
       <MergedParts parts={town.parts} />
+      <TownLeaves />
     </group>
   );
 }

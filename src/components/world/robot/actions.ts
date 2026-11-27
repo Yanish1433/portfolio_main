@@ -1,7 +1,7 @@
 // Robot brain wiring + action runner (walkTo, openProject, tour, ...).
 // Robot-led walks and the tour are async sequences with an AbortController;
 // any visitor input (ground click, WASD, joystick, chat) aborts them.
-import { createLocalBrain, ZONE_LABEL, type RobotAction, type RobotBrain, type RobotReply, type RobotSuggestion, type ZoneId } from "@/lib/robot";
+import { createLocalBrain, quickTourLines, QUICK_TOUR_PAUSE_MS, QUICK_TOUR_STOPS, runTourStops, ZONE_LABEL, type RobotAction, type RobotBrain, type RobotReply, type RobotSuggestion, type ZoneId } from "@/lib/robot";
 import { profile } from "@/content/profile";
 import { leadFirst } from "@/content/showcase";
 import { useWorld } from "@/store/world";
@@ -10,9 +10,9 @@ import { avatarMotion, playerPos, worldControl } from "../input";
 import { LABELS } from "../nepal/labels";
 import { NAVIGATE_EVENT } from "../nepal/navigate";
 import { robotMotion, useRobot } from "./robotStore";
-import { LEAD_ID, realUrl } from "../halls/content";
+import { HALL, LEAD_ID, realUrl } from "../halls/content";
 import { spotByKey, ZONE_FACE } from "../halls/layout";
-import { projectInfo, visit } from "../halls/visit";
+import { visit } from "../halls/visit";
 
 // The engine's ZoneIds are the same strings as zones.ts, so no mapping is needed.
 // This line stops compiling if the two unions ever drift apart.
@@ -67,6 +67,8 @@ function newTask(): AbortSignal {
     watching = true;
     useWorld.subscribe((s, prev) => {
       if (s.interruptSeq !== prev.interruptSeq) abortRobotTask();
+      // Eagle view and cinema also end a tour (the avatar can't be led while the camera is elsewhere).
+      else if (s.tourActive && (s.cinema || s.cameraMode === "eagle")) abortRobotTask();
     });
   }
   current = new AbortController();
@@ -174,22 +176,34 @@ async function walkSequence(zone: ZoneId, after?: () => void) {
   }
 }
 
-async function tour() {
+/** The full tour (8 stops, "Show me around") or the Quick tour (6 stops, ~5 s each, ~60 s in all). */
+async function tour(quick = false) {
   const signal = newTask();
   useWorld.getState().setTourActive(true);
   const say = useRobot.getState().say;
+  const stops: readonly ZoneId[] = quick ? QUICK_TOUR_STOPS : TOUR;
+  const lines: Partial<Record<ZoneId, string>> = quick ? quickTourLines(profile) : TOUR_LINES;
+  const pause = quick ? QUICK_TOUR_PAUSE_MS : 3200;
   try {
-    for (const zone of TOUR) {
-      if (!inZone(zone)) {
-        say(`${LABELS.robot.followMe} Next: ${ZONE_LABEL[zone].replace(/^the /, "")}.`, [stopTourChip]);
-        await leadTo(zone, signal);
-      }
-      console.info(`[tour] at ${zone} t=${Math.round(performance.now())}ms`);
-      faceZone(zone);
-      lookAtZone(zone, 3);
-      say(TOUR_LINES[zone], [stopTourChip]);
-      await sleep(3200, signal);
-    }
+    await runTourStops(
+      stops,
+      pause,
+      {
+        inZone,
+        leadTo: (zone, sig) => {
+          say(`${LABELS.robot.followMe} Next: ${ZONE_LABEL[zone].replace(/^the /, "")}.`, [stopTourChip]);
+          return leadTo(zone, sig);
+        },
+        arrive: (zone) => {
+          console.info(`[tour] at ${zone} t=${Math.round(performance.now())}ms`);
+          faceZone(zone);
+          lookAtZone(zone, quick ? 4 : 3);
+          say(lines[zone] ?? "", [stopTourChip]);
+        },
+        sleep,
+      },
+      signal,
+    );
     useWorld.getState().setTourActive(false);
     say("That's the whole town! Ask me anything, or wander around on your own.", [
       { label: "See the projects", message: "Show me the projects" },
@@ -203,10 +217,13 @@ async function tour() {
   }
 }
 
-/** Said at a project's stand once the robot has walked the visitor there. */
-export const CASE_STUDY_LINE = "Want the full story? Tap Open case study.";
-
 const stopTourChip: RobotSuggestion = { label: LABELS.ui.stopTour, message: "__stop_tour__" };
+
+/** The Quick tour button: same tour machinery (one cancel path), the 6-stop sequence. */
+export function startQuickTour() {
+  useWorld.getState().interrupt();
+  void tour(true);
+}
 
 /** Run one RobotAction. `spoken`: the brain already said something for it. */
 export function runAction(action: RobotAction, spoken = false) {
@@ -231,25 +248,16 @@ export function runAction(action: RobotAction, spoken = false) {
         void visit({ kind: "workshop", id: "all", spot: "workshop" }, { signal: newTask(), lead: "project-hall" });
         return;
       }
-      // Walk to that project's stand in the dalan and open its panel.
+      // Open that project's demo video full screen (no walk to the stand: that was the "zooming in" chore).
       const proj = profile.projects.find((p) => p.id === action.projectId);
-      const ref = projectInfo(action.projectId);
-      if (!spoken) robot.say(`${LABELS.robot.followMe} ${proj ? `${proj.name} has its own stand` : "That project is"} in the Project Hall.`);
-      useWorld.getState().setFocusProject(action.projectId);
-      if (!ref) {
-        void walkSequence("project-hall");
+      if (proj && HALL.projects.some((p) => p.id === action.projectId)) {
+        abortRobotTask();
+        useWorld.getState().openCinema(action.projectId, false);
         return;
       }
-      const signal = newTask();
-      const spot = spotByKey(ref.spot);
-      if (spot) {
-        robotMotion.lookAt = [spot.x, spot.z];
-        robotMotion.lookUntil = performance.now() / 1000 + 3;
-      }
-      // Arrived: the stand's teaser is open. Point at the case study, but don't open it for them.
-      void visit(ref, { signal, lead: "project-hall" }).then((ok) => {
-        if (ok && useWorld.getState().info?.id === action.projectId) useRobot.getState().say(CASE_STUDY_LINE);
-      });
+      // Unknown id: just take them to the Project Hall.
+      if (!spoken) robot.say(`${LABELS.robot.followMe} That project is in the Project Hall.`);
+      void walkSequence("project-hall");
       return;
     }
     case "showResume":

@@ -1,5 +1,6 @@
 "use client";
 
+import * as THREE from "three";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import { KeyboardControls, PerformanceMonitor, type KeyboardControlsEntry } from "@react-three/drei";
@@ -9,17 +10,23 @@ import Player, { type Controls } from "./Player";
 import Town from "./nepal/Town";
 import Props from "./nepal/Props";
 import Sky from "./nepal/Sky";
+import Island from "./nepal/Island";
 import Labels from "./nepal/LabelSprites";
 import Rings from "./nepal/Rings";
+import Places from "./nepal/Places";
 import Milestones from "./nepal/Milestones";
 import Ghar from "./nepal/Ghar";
+import HireLantern from "./nepal/HireLantern";
+import Weather from "./weather/WeatherLayer";
 import ThemeDriver from "./nepal/ThemeDriver";
 import RobotBuddy from "./robot/RobotBuddy";
 import Halls from "./halls/Halls";
+import GuideFootprints from "./guide/GuideFootprints";
 import CinemaCamera from "./halls/CinemaCamera";
 import WheelGallery from "./wheels/WheelGallery";
 import WheelLabels from "./wheels/WheelLabels";
 import Threads from "./wheels/ThreadsLayer";
+import Guestbook from "./guestbook/Guestbook";
 import { themeTargets } from "./nepal/themeState";
 import { initialTheme, useWorld } from "@/store/world";
 
@@ -63,18 +70,36 @@ function Ready() {
 
 /** Renderer stats (draw calls / triangles of the last frame) for checks and the report. */
 function Stats() {
-  const { gl } = useThree();
+  const { gl, scene, camera } = useThree();
   const last = useRef({ calls: 0, triangles: 0, points: 0, frames: 0 });
   useEffect(() => {
     gl.info.autoReset = false;
     // `frames` counts rendered frames (it stops while cinema mode pauses the loop)
     const w = window as unknown as { __render?: () => { calls: number; triangles: number; points: number; frames: number } };
     w.__render = () => ({ ...last.current });
+    // Draw-call inventory (debug only): every visible drawable, with whether it is in the camera frustum.
+    (w as unknown as { __inventory?: () => unknown }).__inventory = () => {
+      const fr = new THREE.Frustum().setFromProjectionMatrix(new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
+      const rows: unknown[] = [];
+      scene.traverse((o) => {
+        const m = o as THREE.Mesh;
+        if (!(m.isMesh || (o as THREE.Points).isPoints || (o as THREE.Line).isLine)) return;
+        let vis = true;
+        for (let p: THREE.Object3D | null = o; p; p = p.parent) if (!p.visible) vis = false;
+        const mat = Array.isArray(m.material) ? m.material[0] : m.material;
+        const g = m.geometry;
+        if (!g.boundingSphere) g.computeBoundingSphere();
+        const sph = g.boundingSphere!.clone().applyMatrix4(o.matrixWorld);
+        rows.push({ n: o.name || o.type, mat: mat?.name || mat?.type, vis: vis && mat?.visible !== false, cast: m.castShadow, cull: m.frustumCulled, inView: !m.frustumCulled || fr.intersectsSphere(sph), tris: (g.index ? g.index.count : g.attributes.position?.count ?? 0) / 3 * ((m as THREE.InstancedMesh).count ?? 1), inst: (m as THREE.InstancedMesh).isInstancedMesh ? (m as THREE.InstancedMesh).count : 0, r: Math.round(sph.radius), c: [sph.center.x, sph.center.y, sph.center.z].map(Math.round).join(",") });
+      });
+      return rows;
+    };
     return () => {
       gl.info.autoReset = true;
       delete w.__render;
+      delete (w as unknown as { __inventory?: unknown }).__inventory;
     };
-  }, [gl]);
+  }, [gl, scene, camera]);
   // Runs first each frame: store the previous frame's totals, then reset.
   useFrame(() => {
     const r = gl.info.render;
@@ -146,7 +171,7 @@ export default function World({ characters, thumbs, posters = [], aboutPhoto = n
       <Canvas
         shadows="percentage"
         dpr={dpr}
-        camera={{ fov: 45, near: 0.5, far: 260, position: [0, 11, 18] }}
+        camera={{ fov: 45, near: 0.5, far: 280, position: [0, 11, 18] }}
         gl={{ antialias: !bloom, powerPreference: "high-performance" }}
         style={{ touchAction: "none" }}
         aria-label="Interactive 3D portfolio world: a Newari heritage square. Click or tap the ground to walk."
@@ -163,17 +188,23 @@ export default function World({ characters, thumbs, posters = [], aboutPhoto = n
         )}
         <ThemeDriver shadows={shadows} reducedMotion={reducedMotion} hiShadow={!coarse} />
         <Sky />
+        <Weather reducedMotion={reducedMotion} lite={!liveVideo} />
         <Suspense fallback={null}>
           <Town />
+          <Island lite={coarse} />
+          <Places />
           <Props lite={coarse} reducedMotion={reducedMotion || !liveVideo} />
           <Ghar photo={aboutPhoto} />
+          <HireLantern reducedMotion={reducedMotion} />
           <Rings reducedMotion={reducedMotion} />
           <Milestones reducedMotion={reducedMotion} />
+          <GuideFootprints />
           <Labels />
           <Halls thumbs={thumbs} posters={posters} liveVideo={liveVideo} reducedMotion={reducedMotion} />
           <WheelGallery reducedMotion={reducedMotion} />
           <WheelLabels />
           <Threads reducedMotion={reducedMotion} />
+          <Guestbook reducedMotion={reducedMotion || !liveVideo} />
           <CinemaCamera reducedMotion={reducedMotion} />
           <Player characters={characters} reducedMotion={reducedMotion} />
           <Robot reducedMotion={reducedMotion} />

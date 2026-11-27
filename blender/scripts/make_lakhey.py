@@ -5,7 +5,9 @@
 
 Stages:
   mask : the hero mask only            -> blender/export/lakhey_mask_raw.glb
-  full : body + mask + hair + costume + rig + Idle/Dance clips
+  full : body + mask + hair + costume + rig + Idle/Walk/Run/Dance clips
+         -> blender/characters/lakhey.blend, blender/export/lakhey_raw.glb
+  clips: keep the built character in lakhey.blend, replace only its clips (seconds, not minutes)
          -> blender/characters/lakhey.blend, blender/export/lakhey_raw.glb
 Then compress with gltf-transform (see blender/README.md) -> public/models/lakhey.glb.
 Run WITHOUT --factory-startup (the base body comes from the MPFB extension).
@@ -25,7 +27,7 @@ import lakhey_mask as LM  # noqa: E402
 from clips import make_clips  # noqa: E402
 
 ap = argparse.ArgumentParser()
-ap.add_argument("--stage", default="full", choices=["mask", "full"])
+ap.add_argument("--stage", default="full", choices=["mask", "full", "clips"])
 ap.add_argument("--tex", type=int, default=2048)
 args = ap.parse_args(C.script_args())
 
@@ -102,7 +104,24 @@ def build_full():
     C.export_glb(C.p("blender", "export", "lakhey_raw.glb"), objects=[arm, lak])
 
 
+def rebuild_clips():
+    """Open the built character, drop its old actions, regenerate Idle/Walk/Run/Dance, export."""
+    bpy.ops.wm.open_mainfile(filepath=C.p("blender", "characters", "lakhey.blend"))
+    arm = next(o for o in bpy.data.objects if o.type == "ARMATURE")
+    lak = next(o for o in bpy.data.objects if o.type == "MESH" and o.name == "Lakhey")
+    arm.animation_data_create()
+    arm.animation_data.action = None
+    for a in list(bpy.data.actions):
+        bpy.data.actions.remove(a)
+    make_clips(arm)
+    C.save_blend(C.p("blender", "characters", "lakhey.blend"))
+    C.export_glb(C.p("blender", "export", "lakhey_raw.glb"), objects=[arm, lak])
+
+
 def main():
+    if args.stage == "clips":
+        rebuild_clips()
+        return
     if args.stage == "mask":
         C.reset_scene()
         mask, metal = LM.build_mask(TEX_DIR, tex_size=args.tex)

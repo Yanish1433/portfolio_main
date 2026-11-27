@@ -1,7 +1,7 @@
 "use client";
 
 // The one panel for a project stand, a degree plaque, a certificate easel and a book.
-// For a project it is a compact teaser (pitch, one number, "Open case study"); the full story
+// For a project it is a compact teaser (pitch, one number, "Watch demo"); the video
 // is cinema mode (CinemaMode.tsx).
 // Non-modal dialog: focus moves in when it opens (unless the visitor is typing), returns
 // when it closes, Escape closes it, walking away closes it (halls/Halls.tsx). Desktop: a
@@ -142,7 +142,7 @@ function Body({ info, theme, headingId, aboutPhoto }: { info: InfoRef; theme: Th
       );
     }
     case "project": {
-      // The teaser: plain-words pitch, one big number and the way into the full case study.
+      // The teaser: plain-words pitch, one big number and the way into the demo video.
       const i = HALL.projects.findIndex((p) => p.id === info.id);
       const p = HALL.projects[i];
       if (!p) return heading("Project not found");
@@ -187,13 +187,13 @@ function Body({ info, theme, headingId, aboutPhoto }: { info: InfoRef; theme: Th
             </div>
           )}
           <div className="mt-4 flex flex-wrap items-center gap-2">
-            <button type="button" data-open-case-study={p.id} className={linkBtn(theme, true)} onClick={() => useWorld.getState().openCinema(p.id)}>
-              Open case study
+            <button type="button" data-open-video={p.id} className={linkBtn(theme, true)} onClick={() => useWorld.getState().openCinema(p.id)}>
+              Watch demo
               <span aria-hidden="true">→</span>
             </button>
             <ExtLink href={p.liveUrl} label="Live demo" theme={theme} />
           </div>
-          <p className="mt-2 text-xs opacity-65">The full story: what it does, how it works, the tech and the results.</p>
+          <p className="mt-2 text-xs opacity-65">A short demo video, full screen.</p>
         </>
       );
     }
@@ -319,7 +319,7 @@ export default function InfoPanel({ aboutPhoto = null }: { aboutPhoto?: string |
     if (!key) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape" || isTypingTarget(e)) return;
-      // Esc belongs to the case study while it's open (it closes that, not this teaser)
+      // Esc belongs to the video while it's open (it closes that, not this teaser)
       if (useWorld.getState().cinema) return;
       e.preventDefault();
       useWorld.getState().closeInfo(true);

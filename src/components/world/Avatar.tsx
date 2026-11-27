@@ -6,7 +6,7 @@ import { useGLTF } from "@react-three/drei";
 import * as THREE from "three";
 import type { GLTF } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { clone as cloneSkinned } from "three/examples/jsm/utils/SkeletonUtils.js";
-import { characterById, type CharacterId } from "./characters";
+import { characterById, GAIT_CLIPS, gaitCycleRate, type CharacterId } from "./characters";
 import { avatarMotion, RUN_SPEED, WALK_SPEED } from "./input";
 import { applyLookdev, releaseLookdev } from "./lookdev";
 import { useWorld } from "@/store/world";
@@ -14,9 +14,13 @@ import { useWorld } from "@/store/world";
 const DRACO_PATH = "/draco/";
 const TARGET_HEIGHT = 1.7;
 
-// --- Procedural walk / run cycle -------------------------------------------
-// The characters only ship Idle + Dance, so the gait is built per frame on the
-// Mixamo bones, AFTER the mixer has written the Idle pose, and blended over it
+// --- Walk / run -------------------------------------------------------------
+// The model ships Idle, Walk, Run and Dance clips. Idle / Walk / Run all play, weighted by the avatar's
+// speed; Walk and Run share one phase (so the feet never scissor mid-blend) that advances at
+// speed / stride, i.e. each clip's playback rate = speed / its measured ground speed.
+//
+// The procedural gait below is only a FALLBACK for a model without the Walk / Run clips. It is built per
+// frame on the Mixamo bones, AFTER the mixer has written the Idle pose, and blended over it
 // by speed (idle -> walk -> run). The phase is integrated from the distance
 // travelled (phase += d / stride), so the feet don't slide and the legs don't
 // pop when the stride length changes between walk and run.
@@ -282,13 +286,24 @@ function CharacterModel({ url, gait, idleRelax, idleArmDown }: { url: string; ga
     const clip = (n: string) => gltf.animations.find((c) => c.name === n);
     const idleClip = clip("Idle");
     const danceClip = clip("Dance");
+    const walkClip = clip(GAIT_CLIPS.walk.name);
+    const runClip = clip(GAIT_CLIPS.run.name);
     const idle = idleClip ? mixer.clipAction(idleClip) : null;
     const dance = danceClip ? mixer.clipAction(danceClip) : null;
+    // Phase-driven: time is set by hand every frame, so the mixer must not advance these two.
+    const walk = walkClip && runClip ? mixer.clipAction(walkClip) : null;
+    const run = walkClip && runClip ? mixer.clipAction(runClip) : null;
+    for (const a of [walk, run]) {
+      if (!a) continue;
+      a.timeScale = 0;
+      a.setEffectiveWeight(0);
+      a.play();
+    }
     if (dance) {
       dance.setLoop(THREE.LoopOnce, 1);
       dance.clampWhenFinished = true;
     }
-    return { mixer, idle, dance };
+    return { mixer, idle, dance, walk, run, walkDur: walkClip?.duration ?? 1, runDur: runClip?.duration ?? 1 };
   }, [scene, gltf.animations]);
 
   const st = useRef({
@@ -302,6 +317,10 @@ function CharacterModel({ url, gait, idleRelax, idleArmDown }: { url: string; ga
     danceSeq: -1,
     spawnSeq: useWorld.getState().spawnSeq,
     w: 0,
+    /** Dance clip weight (eased in / out over 0.25 s; the other clips share the rest). */
+    dw: 0,
+    /** Walk / Run clip phase, 0..1 cycles. */
+    cycle: 0,
     /** Walk -> run blend (eased). */
     run: 0,
     phase: 0,
@@ -315,14 +334,9 @@ function CharacterModel({ url, gait, idleRelax, idleArmDown }: { url: string; ga
   });
 
   useEffect(() => {
-    const { mixer, idle, dance } = anim;
+    const { mixer, dance } = anim;
     const backToIdle = () => {
-      if (!st.current.dancing) return;
-      st.current.dancing = false;
-      if (idle && dance) {
-        idle.reset().play();
-        idle.crossFadeFrom(dance, 0.25, false);
-      }
+      st.current.dancing = false; // useFrame fades the dance weight out
     };
     const onFinished = (e: { action: THREE.AnimationAction }) => {
       if (e.action === dance) backToIdle();
@@ -339,7 +353,8 @@ function CharacterModel({ url, gait, idleRelax, idleArmDown }: { url: string; ga
   useFrame((_, dtRaw) => {
     const dt = Math.min(dtRaw, 0.05);
     const s = st.current;
-    const { mixer, idle, dance } = anim;
+    const { mixer, idle, dance, walk, run: runAction } = anim;
+    const useClips = !!(walk && runAction);
     const world = useWorld.getState();
 
     if (!s.rig) {
@@ -370,8 +385,9 @@ function CharacterModel({ url, gait, idleRelax, idleArmDown }: { url: string; ga
     s.spawnSeq = world.spawnSeq;
     if (wantDance && dance && avatarMotion.speed < 0.3) {
       s.dancing = true;
-      dance.reset().play();
-      if (idle) dance.crossFadeFrom(idle, 0.25, false);
+      dance.reset();
+      dance.setEffectiveWeight(0);
+      dance.play();
     }
     // Any movement cancels the dance.
     if (s.dancing && avatarMotion.speed > 0.4) s.stopDance?.();
@@ -380,7 +396,6 @@ function CharacterModel({ url, gait, idleRelax, idleArmDown }: { url: string; ga
       b.o.quaternion.copy(b.q);
       b.o.position.copy(b.p);
     }
-    mixer.update(dt);
 
     // Gait weights by speed (eased so stops don't snap): idle -> walk -> run.
     const speed = avatarMotion.speed;
@@ -392,6 +407,25 @@ function CharacterModel({ url, gait, idleRelax, idleArmDown }: { url: string; ga
     s.run += (runTarget - s.run) * (1 - Math.exp(-dt * 6)); // ~0.3 s blend
     const w = s.w < 0.002 ? 0 : s.w;
     const run = s.run;
+
+    // Clip weights (sum to 1): dance fades in / out over 0.25 s, the rest is idle / walk / run by speed.
+    if (dance) {
+      s.dw = THREE.MathUtils.clamp(s.dw + (s.dancing ? dt : -dt) / 0.25, 0, 1);
+      if (s.dw > 0) dance.setEffectiveWeight(s.dw);
+      else if (dance.isRunning()) dance.stop();
+    }
+    const rest = 1 - s.dw;
+    if (walk && runAction) {
+      // Start every step from the left foot's contact; then advance by speed / stride.
+      if (w === 0 && avatarMotion.speed < 0.1) s.cycle = 0;
+      else s.cycle = (s.cycle + dt * gaitCycleRate(avatarMotion.speed, scale, run)) % 1;
+      walk.time = s.cycle * anim.walkDur;
+      runAction.time = s.cycle * anim.runDur;
+      walk.setEffectiveWeight(rest * w * (1 - run));
+      runAction.setEffectiveWeight(rest * w * run);
+    }
+    idle?.setEffectiveWeight(useClips ? rest * (1 - w) : rest);
+    mixer.update(dt);
     // Integrate the phase from the distance actually travelled.
     const d = avatarMotion.dist - s.lastDist;
     s.lastDist = avatarMotion.dist;
@@ -423,7 +457,7 @@ function CharacterModel({ url, gait, idleRelax, idleArmDown }: { url: string; ga
       nudge(r.spine1, 0, -shift * 0.4);
     }
 
-    if (w > 0 && s.rig) {
+    if (!useClips && w > 0 && s.rig) {
       const r = s.rig;
       const phi = s.phase;
       const sn = Math.sin(phi);

@@ -9,3 +9,6 @@ next-env.d.ts
 __pycache__/
 blender/export/*_raw.glb
 media-originals/
+
+blender/export/pagoda/*.blend
+.firstmate/locks/

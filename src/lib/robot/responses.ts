@@ -121,7 +121,6 @@ function projectLinkSuggestions(p: Profile, idx: number): RobotSuggestion[] {
   const out: RobotSuggestion[] = [];
   if (isRealUrl(proj.liveUrl)) out.push(act(`${proj.name}: live demo`, { type: "openLink", url: proj.liveUrl, label: `${proj.name} live demo` }));
   if (isRealUrl(proj.repoUrl)) out.push(act(`${proj.name}: source code`, { type: "openLink", url: proj.repoUrl, label: `${proj.name} source` }));
-  if (isRealUrl(proj.caseStudyUrl)) out.push(act(`${proj.name}: case study`, { type: "openLink", url: proj.caseStudyUrl, label: `${proj.name} case study` }));
   return out;
 }
 
@@ -626,5 +625,8 @@ export function runOfferReply(input: Omit<BuildInput, "match">, offer: RobotActi
 }
 
 export function greetReply(input: Omit<BuildInput, "match">): Built {
-  return buildReply({ ...input, match: { intent: "greeting", confidence: 1 } });
+  const built = buildReply({ ...input, match: { intent: "greeting", confidence: 1 } });
+  // in the world the Ghar (About house) is right in front of the spawn point: point the visitor to it first
+  if (input.mode === "world") return { ...built, reply: { ...built.reply, text: `Start here: ${firstName(input.profile)}'s home is right in front of you. Walk up to it and say hello!` } };
+  return built;
 }

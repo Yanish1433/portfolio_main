@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { profile } from "@/content/profile";
 import { JOURNEY, stonePositions } from "./journey";
-import { GHAR, ISLAND_RADIUS, MILESTONES, STATIC_OBSTACLES, TIMELINE_PATH, zones, type Obstacle } from "./zones";
+import { GHAR, ISLAND_RADIUS, MILESTONES, SPAWN, STATIC_OBSTACLES, TIMELINE_PATH, zones, type Obstacle } from "./zones";
 import { HALL_OBSTACLES, SCROLL, SHELF, EASELS, SPOTS } from "./halls/layout";
 import { SCROLL_XS, WORKSHOP, WORKSHOP_SPOT } from "./halls/workshopLayout";
 
@@ -17,8 +17,8 @@ function blockedAt(x: number, z: number, pad = PAD): boolean {
 function reachable(from: [number, number], to: [number, number]): boolean {
   const C = 0.5;
   const key = (i: number, j: number) => i * 1000 + j;
-  const cell = (v: number) => Math.floor((v + 24) / C);
-  const centre = (i: number) => -24 + (i + 0.5) * C;
+  const cell = (v: number) => Math.floor((v + 26) / C);
+  const centre = (i: number) => -26 + (i + 0.5) * C;
   const start: [number, number] = [cell(from[0]), cell(from[1])];
   const goal: [number, number] = [cell(to[0]), cell(to[1])];
   const seen = new Set([key(...start)]);
@@ -29,7 +29,7 @@ function reachable(from: [number, number], to: [number, number]): boolean {
     for (const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
       const ni = i + di;
       const nj = j + dj;
-      if (ni < 0 || nj < 0 || ni >= 96 || nj >= 96 || seen.has(key(ni, nj)) || blockedAt(centre(ni), centre(nj))) continue;
+      if (ni < 0 || nj < 0 || ni >= 104 || nj >= 104 || seen.has(key(ni, nj)) || blockedAt(centre(ni), centre(nj))) continue;
       seen.add(key(ni, nj));
       queue.push([ni, nj]);
     }
@@ -59,7 +59,7 @@ test("stones are well spaced, clear of the Ghar and off the lane itself", () => 
 });
 
 test("every zone ring, the scroll ring and the walk-up spots can be reached from the plaza", () => {
-  const from = { x: 0, z: 4.4 };
+  const from = { x: SPAWN[0], z: SPAWN[1] };
   for (const z of zones) assert.ok(findPath(from, { x: z.ring[0], z: z.ring[1] }), `no path to ${z.id}`);
   if (SCROLL) assert.ok(findPath(from, { x: SCROLL.ring[0], z: SCROLL.ring[1] }), "no path to the scroll");
   for (const e of EASELS) assert.ok(findPath(from, { x: e.spot.ring[0], z: e.spot.ring[1] }), "no path to an easel");
@@ -81,6 +81,6 @@ test("the Workshop: one scroll per GitHub project, on the palace wall, and its r
   assert.ok(SCROLL_XS[0] > 8.3, "the board stands beyond the dalan roof (x > 8.25)");
   const [rx, rz] = WORKSHOP_SPOT!.ring;
   assert.ok(!blockedAt(rx, rz), "the ring is clear");
-  assert.ok(findPath({ x: 0, z: 4.4 }, { x: rx, z: rz }), "no path to the Workshop");
-  for (const s of SPOTS) assert.ok(findPath({ x: 0, z: 4.4 }, { x: s.ring[0], z: s.ring[1] }), `no path to ${s.key}`);
+  assert.ok(findPath({ x: SPAWN[0], z: SPAWN[1] }, { x: rx, z: rz }), "no path to the Workshop");
+  for (const s of SPOTS) assert.ok(findPath({ x: SPAWN[0], z: SPAWN[1] }, { x: s.ring[0], z: s.ring[1] }), `no path to ${s.key}`);
 });

@@ -12,6 +12,7 @@ import { getEnvironment, getMaterials, occlusion, timeUniform } from "./material
 import { skyUniforms } from "./Sky";
 import { themeState, themeTargets } from "./themeState";
 import { charMaterials, charRim } from "../lookdev";
+import { weather } from "../weather/weatherState";
 
 const POOL = 4;
 const DUR = 2; // seconds for a full blend
@@ -24,7 +25,7 @@ const DAY = {
   hemiSky: C("#ffe1bd"),
   hemiGround: C("#8a5a3c"),
   hemiI: 1.0,
-  fog: C("#f0cda4"),
+  fog: C("#ecd3b6"),
   window: 0,
   gold: 0,
   env: 1.0,
@@ -53,6 +54,13 @@ const RIM_DAY = C("#ffcf8a");
 const RIM_NIGHT = C("#8fb4ff").lerp(C("#ffb070"), 0.15);
 const RIM_DAY_I = 0.35;
 const RIM_NIGHT_I = 0.3;
+
+// Weather tints (factors come from weather/WeatherDriver): fog colour + range, light dimming.
+const MIST_DAY = C("#cfdbe2");
+const MIST_NIGHT = C("#2c3d68");
+const RAIN_DAY = C("#9aa4ad");
+const RAIN_NIGHT = C("#161e36");
+const _wc = new THREE.Color();
 
 const _col = new THREE.Color();
 const _v = new THREE.Vector3();
@@ -84,7 +92,7 @@ export default function ThemeDriver({
     m.gold.needsUpdate = true;
     m.water.needsUpdate = true;
     if (new URLSearchParams(window.location.search).has("debug")) (window as unknown as { __occl?: unknown }).__occl = occlusion.value;
-    scene.fog = new THREE.Fog(DAY.fog.clone(), 38, 125);
+    scene.fog = new THREE.Fog(DAY.fog.clone(), 100, 250);
     scene.background = DAY.fog.clone();
     return () => {
       scene.fog = null;
@@ -113,15 +121,22 @@ export default function ThemeDriver({
       _v.lerpVectors(DAY.sunOff, NIGHT.sunOff, t);
       sun.current.position.set(playerPos.x + _v.x, _v.y, playerPos.z + _v.z);
       sun.current.color.lerpColors(DAY.sun, NIGHT.sun, t);
-      sun.current.intensity = L(DAY.sunI, NIGHT.sunI);
+      sun.current.intensity = L(DAY.sunI, NIGHT.sunI) * (1 - 0.45 * weather.rain - 0.15 * weather.mist);
     }
     if (hemi.current) {
       hemi.current.color.lerpColors(DAY.hemiSky, NIGHT.hemiSky, t);
       hemi.current.groundColor.lerpColors(DAY.hemiGround, NIGHT.hemiGround, t);
-      hemi.current.intensity = L(DAY.hemiI, NIGHT.hemiI);
+      hemi.current.intensity = L(DAY.hemiI, NIGHT.hemiI) * (1 - 0.12 * weather.rain);
     }
     _col.lerpColors(DAY.fog, NIGHT.fog, t);
-    if (scene.fog) (scene.fog as THREE.Fog).color.copy(_col);
+    if (weather.mist > 0.001) _col.lerp(_wc.lerpColors(MIST_DAY, MIST_NIGHT, t), weather.mist * 0.85);
+    if (weather.rain > 0.001) _col.lerp(_wc.lerpColors(RAIN_DAY, RAIN_NIGHT, t), weather.rain * 0.7);
+    if (scene.fog) {
+      const f = scene.fog as THREE.Fog;
+      f.color.copy(_col);
+      f.near = 100 - 90 * weather.mist - 40 * weather.rain;
+      f.far = 250 - 155 * weather.mist - 70 * weather.rain;
+    }
     if (scene.background instanceof THREE.Color) scene.background.copy(_col);
     skyUniforms.uT.value = t;
     skyUniforms.uFog.value.copy(_col);

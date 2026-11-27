@@ -62,6 +62,19 @@ export class Parts {
     return this;
   }
 
+  /** Like add(), but keeps the geometry's own vertex colours (it needs position, normal, uv and color). Used by the procedural trees. */
+  addRaw(key: MatKey, g: THREE.BufferGeometry, m?: THREE.Matrix4) {
+    const geo = g.index ? g.toNonIndexed() : g.clone();
+    geo.clearGroups();
+    for (const k of Object.keys(geo.attributes)) if (!["position", "normal", "uv", "color"].includes(k)) geo.deleteAttribute(k);
+    if (m) geo.applyMatrix4(m);
+    const map = this.smallDepth > 0 && !NEVER_CASTS.has(key) ? this.noCast : this.buckets;
+    let list = map.get(key);
+    if (!list) map.set(key, (list = []));
+    list.push(geo);
+    return this;
+  }
+
   /** Box centred at (x,y,z), rotated by ry about Y. UVs in metres. */
   box(key: MatKey, w: number, h: number, d: number, x: number, y: number, z: number, color: THREE.ColorRepresentation = "#fff", ry = 0) {
     return this.add(key, box(w, h, d), color, T(x, y, z, ry));
@@ -81,6 +94,13 @@ export class Parts {
 
   merge(): Map<MatKey, THREE.BufferGeometry> {
     return mergeBuckets(this.buckets);
+  }
+
+  /** Big and small pieces together: one geometry per material. */
+  mergeAll(): Map<MatKey, THREE.BufferGeometry> {
+    const all = new Map<MatKey, THREE.BufferGeometry[]>();
+    for (const m of [this.buckets, this.noCast]) for (const [k, l] of m) all.set(k, [...(all.get(k) ?? []), ...l]);
+    return mergeBuckets(all);
   }
 
   /** The small, shadow-free props, merged one mesh per material. */

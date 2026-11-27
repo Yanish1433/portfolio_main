@@ -212,9 +212,8 @@ function SpotRings() {
   );
 }
 
-const _screenPlane = new THREE.Plane();
-const _zAxis = new THREE.Vector3(0, 0, 1);
-const _hit = new THREE.Vector3();
+/** Within this many metres of a stand, opening its video also flies the camera into the screen. */
+const FLY_NEAR_M = 9;
 
 /** One invisible mesh of boxes over the stands, plaques and easels. Clicking one walks there and opens it. */
 function ClickTargets() {
@@ -251,16 +250,15 @@ function ClickTargets() {
         const base = spot ? defaultInfo(spot) : null;
         if (!base) return;
         const ref = box?.item ? { ...base, id: box.item } : base;
-        // A click on a project's screen goes all the way: walk there, then open its case study.
-        // (Where the click ray crosses the screen's plane; the diorama in front never counts.)
-        const stand = spot?.kind === "project" && box?.part !== "diorama" ? STANDS.find((s) => s.spot.key === spot.key) : undefined;
-        let onScreen = false;
-        if (stand && e.ray.intersectPlane(_screenPlane.set(_zAxis, -(stand.z + 0.03)), _hit)) {
-          onScreen = Math.abs(_hit.y - stand.screen.y) < stand.screen.h / 2 + 0.05 && Math.abs(_hit.x - stand.x) < stand.screen.w / 2 + 0.05;
+        // A click on a project stand (not its diorama) opens the demo video. The camera flies into the
+        // screen only when the visitor is already near; from across the hall the video just opens.
+        if (spot?.kind === "project" && box?.part !== "diorama" && ref.kind === "project") {
+          const w = useWorld.getState();
+          w.interrupt();
+          w.openCinema(ref.id, Math.hypot(playerPos.x - spot.ring[0], playerPos.z - spot.ring[1]) < FLY_NEAR_M);
+          return;
         }
-        void visitByVisitor(ref).then((ok) => {
-          if (ok && onScreen && useWorld.getState().info?.id === ref.id) useWorld.getState().openCinema(ref.id);
-        });
+        void visitByVisitor(ref);
       }}
     />
   );

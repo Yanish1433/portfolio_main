@@ -31,9 +31,17 @@ export type Zone = {
   obstacles: Obstacle[];
 };
 
-/** Walkable radius of the raised town platform. */
-export const ISLAND_RADIUS = 22;
-export const SPAWN: [number, number] = [0, 8.5];
+/**
+ * The old-city brick wall that rings the town (inner and outer face, metres from the centre).
+ * Every roof and eave must stay inside `inner` (wall.test.ts measures the real geometry).
+ */
+export const WALL = { inner: 26.4, outer: 27.6, gateHalf: 1.8 };
+/** Gate centres (radians, 0 = +z south, then clockwise as seen from above): south, east, north, west. */
+export const GATE_ANGLES = [0, Math.PI / 2, Math.PI, -Math.PI / 2];
+/** Walkable radius of the raised town platform (the wall's inner face is 0.8 m beyond it, so nobody can step off). */
+export const ISLAND_RADIUS = 25.6;
+/** outside the Ghar ring + its camera preset radius, so the Ghar panel and framing never trigger on load (layout.test). */
+export const SPAWN: [number, number] = [0, 11.9];
 
 // --- Landmarks -------------------------------------------------------------
 
@@ -51,7 +59,7 @@ export const COURTYARD = { x0: -13.5, x1: -10.5, z0: -5.3, z1: 0.3, gate: [-3.9,
 /** Prayer-wheel gallery (Skills): ONE row along x, wheels facing +z (south, toward the camera), walkable lane in front. */
 export const GALLERY = {
   x: 13.3,
-  z: -4.7,
+  z: 0,
   /** Frame depth (z). */
   d: 1.3,
   /** Most room the wheels may take along x, and the widest pitch between two of them. */
@@ -74,14 +82,39 @@ export const DHARA = { x: 9.2, z: -9.6, w: 3.6, d: 2.8 };
 /** Open rest houses. rot = rotation about Y (front faces +z when 0). */
 export const PATIS = [
   { x: -8, z: 4, w: 3.2, d: 2, rot: 0 },
-  { x: 7, z: 5, w: 3.2, d: 2, rot: 0 },
-  { x: 18.2, z: -3, w: 4.2, d: 2, rot: -Math.PI / 2 },
+  { x: 6.4, z: 6.6, w: 3.2, d: 2, rot: 0 },
+  { x: 18.2, z: -1.3, w: 4.2, d: 2, rot: -Math.PI / 2 },
 ];
 /** Recruiter tea stall (front faces west toward its ring). */
 export const TEA_STALL = { x: 5, z: 16, w: 3, d: 2.4, rot: -Math.PI / 2 };
 export const HULAK = { x: 12, z: 9 };
 /** "Recruiter Chiya Pasal" sign board (clickable). */
 export const TEA_SIGN = { x: 3.0, y: 1.75, z: 18.2 };
+
+// --- New places (step8c) ----------------------------------------------------
+
+/** Temple pond (pokhari): a sunken stone tank east of the post box, stone steps on the south side. */
+export const POND = { x: 10.9, z: 13.2, w: 5.0, d: 3.4 };
+/**
+ * Market lane along the inside of the south wall: six stalls in two groups either side of the main axis, their
+ * fronts toward the camera (+z), a stone lane in front of them.
+ */
+export const MARKET = {
+  stallZ: 20.4,
+  laneZ: 22.4,
+  stallW: 1.7,
+  /** x of each stall centre, and what it sells. */
+  stalls: [
+    { x: -8.6, kind: "pots" },
+    { x: -6.6, kind: "cloth" },
+    { x: -4.6, kind: "spice" },
+    { x: 3.9, kind: "veg" },
+    { x: 5.9, kind: "flowers" },
+    { x: 7.9, kind: "fruit" },
+  ] as { x: number; kind: "pots" | "cloth" | "spice" | "veg" | "flowers" | "fruit" }[],
+};
+/** Chautari: a peepal tree on a two-tier stone platform at the east edge, behind the prayer-wheel lane (tall things stay on the north/east edge, never in front of the camera). */
+export const CHAUTARI = { x: 22.0, z: -4.4, lowerW: 3.6, lowerD: 3.4, upperW: 2.4, upperD: 2.2 };
 
 export type HouseSpec = {
   x: number;
@@ -109,8 +142,8 @@ export const HOUSES: HouseSpec[] = [
   { x: -17.2, z: -9.2, w: 5, d: 3.6, floors: 3, rot: E, shop: true, seed: 13 },
   { x: 17.4, z: -10, w: 5, d: 3.6, floors: 3, rot: W, ornate: true, seed: 14 },
   { x: -18.4, z: 4, w: 4, d: 3.6, floors: 3, rot: E, shop: true, seed: 15 },
-  { x: -14, z: 5.6, w: 3.6, d: 3, floors: 2, rot: 0, seed: 16, ghar: true },
-  { x: 18, z: 4.4, w: 4.4, d: 3.6, floors: 3, rot: W, shop: true, seed: 17 },
+  { x: 0, z: 5.2, w: 3.6, d: 3, floors: 2, rot: 0, seed: 16, ghar: true },
+  { x: 19.4, z: 5.4, w: 4.4, d: 3.6, floors: 3, rot: W, shop: true, seed: 17 },
   { x: 16.4, z: 13, w: 4, d: 3.4, floors: 2, rot: N, seed: 18 },
   { x: -11.5, z: 16.8, w: 4, d: 3, floors: 2, rot: N, shop: true, seed: 19 },
   { x: -7.4, z: -18.6, w: 3.6, d: 3, floors: 3, rot: 0, seed: 20 },
@@ -124,7 +157,7 @@ export const TREES: [number, number, number][] = [
   [13.2, 16.8, 0.85],
 ];
 
-/** "Yanish's Ghar" (About me): the small two-storey house west of the plaza, its front facing the camera. */
+/** "Yanish's Ghar" (About me): the small two-storey house at the centre of the town, right in front of SPAWN, its front (+z) facing the camera. */
 export const GHAR = HOUSES.find((h) => h.ghar)!;
 
 /** Work Timeline brick lane (also used by the visuals). */
@@ -159,6 +192,10 @@ export const STATIC_OBSTACLES: Obstacle[] = [
   ...TREES.map(([x, z]) => circle(x, z, 0.55)),
   ...MILESTONES.map(([x, z]) => circle(x, z, 0.35)),
   rect(TEA_SIGN.x, TEA_SIGN.z, 2.2, 0.3),
+  // step8c places
+  rect(POND.x, POND.z, POND.w + 0.3, POND.d + 0.3),
+  ...MARKET.stalls.map((st) => rect(st.x, MARKET.stallZ, MARKET.stallW + 0.2, 1.5)),
+  rect(CHAUTARI.x, CHAUTARI.z, CHAUTARI.lowerW + 0.3, CHAUTARI.lowerD + 0.3),
 ];
 
 export const zones: Zone[] = [
@@ -167,8 +204,8 @@ export const zones: Zone[] = [
     label: LABELS.zones.plaza.en,
     prompt: "Welcome! Press E or tap to look around",
     // label hangs low over the entrance ring, so it never covers an avatar behind the pagoda
-    position: [0, 4.4],
-    ring: [0, 4.4],
+    position: [-4.4, 3.6],
+    ring: [-4.4, 3.6],
     ringRadius: 1.5,
     color: "#ffb347",
     labelY: 3.3,
@@ -213,7 +250,7 @@ export const zones: Zone[] = [
     label: LABELS.zones["skills-lab"].en,
     prompt: "Press E or tap to look at the prayer wheels",
     position: [GALLERY.x, GALLERY.z + 0.4],
-    ring: [9.6, -3],
+    ring: [GALLERY.x - 3.7, GALLERY.z + 1.7],
     ringRadius: 1.4,
     color: "#e8925a",
     labelY: 5.6,

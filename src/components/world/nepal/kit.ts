@@ -102,7 +102,7 @@ function faceMatrix(face: Face, w: number, d: number, x: number, y: number) {
 }
 
 /** Angled carved struts (tunala) from the wall up to the eave, along one side. */
-function struts(P: Parts, side: Face, w: number, d: number, n: number, wallY: number, eaveY: number, reach: number) {
+function struts(P: Parts, side: Face, w: number, d: number, n: number, wallY: number, eaveY: number, reach: number, carved = false) {
   const span = side === "front" || side === "back" ? w : d;
   for (let i = 0; i < n; i++) {
     const x = n === 1 ? 0 : -span / 2 + 0.25 + ((span - 0.5) * i) / (n - 1);
@@ -111,6 +111,11 @@ function struts(P: Parts, side: Face, w: number, d: number, n: number, wallY: nu
     const b = V(0, eaveY, reach).applyMatrix4(m);
     // thin carved struts sit under the eave, already in shade: they skip the shadow pass
     P.small(() => P.add("wood", beam(a, b, 0.09, 0.16), i % 2 ? COL.wood : COL.woodDark));
+    if (carved) {
+      // carved strut: a gilded knop between wall and eave
+      P.small(() => {
+      });
+    }
   }
 }
 
@@ -168,6 +173,32 @@ function gharDetails(P: Parts, A: Anchors, o: HouseOpts) {
   });
 }
 
+/**
+ * Shopfront dressing on a house's front wall (matrix m = the wall's centre at y 0): open painted shutter
+ * leaves either side, a half-rolled shutter slat set, a striped cloth awning on two poles and a hanging lamp.
+ */
+function shopFront(P: Parts, A: Anchors, m: THREE.Matrix4, sw: number, r: () => number) {
+  const at = (x: number, y: number, z: number, ry = 0) => m.clone().multiply(T(x, y, z, ry));
+  const paint = ["#2f6f8f", "#3f7a3a", "#8e2f26", "#c8981f"][Math.floor(r() * 4)];
+  for (const s of [-1, 1]) {
+    // each leaf is a framed board swung open about 70 degrees from the jamb
+    P.add("wood", box(0.5, 1.6, 0.05), paint, at(s * (sw / 2 + 0.09), 1.0, 0.3, s * 1.15));
+    P.small(() => P.add("wood", box(0.5, 0.06, 0.07), COL.woodDark, at(s * (sw / 2 + 0.09), 1.5, 0.3, s * 1.15)));
+  }
+  // rolled-down slats over the upper part of the opening
+  for (let i = 0; i < 4; i++) P.small(() => P.add("wood", box(sw, 0.05, 0.05), i % 2 ? COL.wood : COL.woodDark, at(0, 1.86 - i * 0.07, 0.08)));
+  // awning
+  const stripes = 6;
+  const c1 = paint;
+  const slope = Math.atan2(0.4, 0.95);
+  for (let i = 0; i < stripes; i++) {
+    const g = plane(sw / stripes + 0.15 / stripes + 0.003, 1.0).rotateX(-(Math.PI / 2 - slope));
+    P.add("cloth", g, i % 2 ? "#f1e6c8" : c1, at(-sw / 2 - 0.075 + ((i + 0.5) * (sw + 0.15)) / stripes, 2.2, 0.55));
+  }
+  for (const s of [-1, 1]) P.small(() => P.add("wood", beam(V(0, 0, 0), V(0, 2.0, 0), 0.07), COL.wood, at(s * (sw / 2 + 0.05), 0, 0.98)));
+  A.lanterns.push(V(0, 1.95, 0.9).applyMatrix4(m));
+}
+
 export function buildHouse(o: HouseOpts): Built {
   return cached(`house:${JSON.stringify(o)}`, () => {
     const P = new Parts();
@@ -188,7 +219,9 @@ export function buildHouse(o: HouseOpts): Built {
     // ground floor
     const gy = 1.05;
     if (o.shop) {
-      windowParts(P, faceMatrix("front", w, d, 0, gy), Math.min(w * 0.6, 2.6), 1.7, "shop", 1);
+      const sw = Math.min(w * 0.6, 2.6);
+      windowParts(P, faceMatrix("front", w, d, 0, gy), sw, 1.7, "shop", 1);
+      shopFront(P, A, faceMatrix("front", w, d, 0, 0), sw, r);
     } else {
       // the Ghar's doorway always glows at night
       windowParts(P, faceMatrix("front", w, d, 0, 0.95), 0.9, 1.7, "door", o.ghar ? 1 : r() > 0.5 ? 1 : 0);
@@ -364,7 +397,7 @@ export function buildPagoda(o: PagodaOpts): Built {
         P.box("brick", 0.55, yTop, 0.6, s * (stairW / 2 + 0.27), yTop / 2, zf - 0.3, COL.brickWarm);
         if (o.guardians) {
           const kind = GUARDIAN_ORDER[i % GUARDIAN_ORDER.length];
-          const sc = 0.95 - i * 0.05;
+          const sc = o.tiers >= 4 ? 0.82 + i * 0.07 : 0.95 - i * 0.05; // Nyatapola's guardians grow stronger up the stair
           guardian(P, kind, T(s * (stairW / 2 + 0.27), yTop, zf - 0.3, 0, sc));
         }
       }
@@ -406,7 +439,7 @@ export function buildPagoda(o: PagodaOpts): Built {
       const eaveUnder = rb + roof.yIn + (-0.1 - roof.yIn) * 0.8;
       const ns = Math.max(2, Math.round(size / 0.5));
       for (const face of ["front", "back", "left", "right"] as Face[])
-        struts(P, face, size, size, ns, wallBase + wallH - 0.85 * (k === 0 ? 1 : 0.7), eaveUnder, ov * 0.8);
+        struts(P, face, size, size, ns, wallBase + wallH - 0.85 * (k === 0 ? 1 : 0.7), eaveUnder, ov * 0.8, big);
       // bells along the eave edge (corners + every ~0.6 m)
       const he = eave / 2;
       const nb = Math.max(2, Math.round(eave / 0.6));
@@ -425,29 +458,49 @@ export function buildPagoda(o: PagodaOpts): Built {
           A.bells.push(V(bx, rb - 0.14 + lift, bz));
         }
       }
+      if (big) {
+        // gilded trim along the eave edge, bronze hip ridges, up-turned corner horns with a hanging bell,
+        // and (on the lower tiers) a lantern at each corner that glows at night
+        const eaveY = rb + 0.03;
+        P.small(() => {
+          for (const [ax, az, bx2, bz2] of [[-he, he, he, he], [-he, -he, he, -he], [he, -he, he, he], [-he, -he, -he, he]] as const) {
+            const mx = (ax + bx2) / 2;
+            const mz = (az + bz2) / 2;
+            P.add("gold", beam(V(ax, eaveY + 0.14, az), V(mx, eaveY + 0.03, mz), 0.06, 0.1), COL.bronze);
+            P.add("gold", beam(V(mx, eaveY + 0.03, mz), V(bx2, eaveY + 0.14, bz2), 0.06, 0.1), COL.bronze);
+          }
+          for (const [hx, hz] of [[-1, -1], [1, -1], [1, 1], [-1, 1]] as const) {
+            const corner = V(hx * he, eaveY + 0.14, hz * he);
+            const apex = V(hx * (next / 2 + 0.05), rb + rise - 0.03, hz * (next / 2 + 0.05));
+            P.add("gold", beam(corner, apex, 0.09, 0.09), "#8a7048");
+            P.add("gold", new THREE.ConeGeometry(0.075, 0.34, 6).rotateX(-0.5 * hz).rotateZ(0.5 * hx).translate(corner.x + hx * 0.1, corner.y + 0.16, corner.z + hz * 0.1), COL.bronze);
+            P.add("gold", lathe([[0, 0], [0.075, 0.07], [0.06, 0.12], [0, 0.14]], 5), COL.bronze, T(corner.x + hx * 0.2, corner.y - 0.2, corner.z + hz * 0.2));
+            if (k < 3) A.lanterns.push(V(corner.x + hx * 0.2, corner.y - 0.6, corner.z + hz * 0.2));
+          }
+        });
+      }
       roofTop = rb + rise;
       wallBase = rb + rise * 0.72;
       size = next;
     }
-    // golden gajur finial + a golden pataka ribbon down the front of the top roof
-    const g = lathe(
-      [
-        [0.0, 0],
-        [0.26, 0],
-        [0.3, 0.1],
-        [0.18, 0.2],
-        [0.27, 0.38],
-        [0.11, 0.58],
-        [0.19, 0.72],
-        [0.06, 0.95],
-        [0.12, 1.08],
-        [0.0, 1.4],
-      ].map(([r, yy]) => [r * (big ? 1 : 0.75), yy * (big ? 1 : 0.75)]) as [number, number][],
-      12,
-    );
+    // golden gajur finial (a stack of flared discs under a pointed bud) + a golden pataka ribbon down the front of the top roof
+    const gp: [number, number][] = [[0, 0], [0.3, 0], [0.34, 0.08], [0.2, 0.18], [0.0, 0.2]];
+    let gy = 0.2;
+    for (let i = 0; i < 6; i++) {
+      const rr = 0.3 - i * 0.04;
+      gp.push([rr * 0.5, gy], [rr, gy + 0.03], [rr * 0.9, gy + 0.07], [rr * 0.4, gy + 0.1]);
+      gy += 0.13;
+    }
+    gp.push([0.17, gy + 0.04], [0.2, gy + 0.2], [0.1, gy + 0.36], [0.12, gy + 0.46], [0.04, gy + 0.62], [0, gy + 0.9]);
+    const k0 = big ? 1 : 0.75;
+    const g = lathe(gp.map(([rr, yy]) => [rr * k0, yy * k0]) as [number, number][], 10);
     P.add("gold", g, COL.gold, T(0, roofTop - 0.02, 0));
-    if (big) P.add("gold", beam(V(0, roofTop - 0.1, 0.12), V(0, roofTop - 1.05, 1.0), 0.16, 0.02), COL.gold);
-    return { parts: P, anchors: A, height: roofTop + (big ? 1.4 : 1.05) };
+    if (big) {
+      P.add("gold", beam(V(0, roofTop - 0.1, 0.12), V(0, roofTop - 1.05, 1.0), 0.16, 0.02), COL.gold);
+      // a thin banner on the finial
+      P.add("cloth", plane(0.36, 0.9).translate(0.18, -0.45, 0), COL.red, T(0, roofTop + gy * k0 + 0.9, 0));
+    }
+    return { parts: P, anchors: A, height: roofTop + (big ? 2.4 : 1.05) };
   });
 }
 

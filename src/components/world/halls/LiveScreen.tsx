@@ -6,7 +6,7 @@
 // exists at a time: entering another stand releases the previous clip (pause, drop src, load(),
 // dispose the texture), and a clip left behind is released after RELEASE_AFTER_S seconds.
 // Desktop autoplays on the ring. Phones / ?perf=low (autoplay=false): tapping the screen while on
-// the ring plays it (muted, inline); the same stop-on-leave rule applies. It pauses while a case study is open.
+// the ring plays it (muted, inline); the same stop-on-leave rule applies. It pauses while a project video is open.
 import { useEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
@@ -44,7 +44,20 @@ export default function LiveScreen({ autoplay }: { autoplay: boolean }) {
   const mesh = useRef<THREE.Mesh>(null);
   const tap = useRef<THREE.Mesh>(null);
   const last = useRef(-1);
-  const mat = useMemo(() => new THREE.MeshBasicMaterial({ toneMapped: false, color: new THREE.Color(0.84, 0.84, 0.84) }), []);
+  const mat = useMemo(() => {
+    const m = new THREE.MeshBasicMaterial({ toneMapped: false, color: new THREE.Color(0.84, 0.84, 0.84) });
+    // letterbox: outside the clip's UV range, draw a dark bar instead of smearing the edge pixels
+    m.onBeforeCompile = (sh) => {
+      sh.fragmentShader = sh.fragmentShader.replace(
+        "#include <map_fragment>",
+        `#include <map_fragment>
+#ifdef USE_MAP
+if (vMapUv.x < 0.0 || vMapUv.x > 1.0 || vMapUv.y < 0.0 || vMapUv.y > 1.0) diffuseColor.rgb = vec3(0.03);
+#endif`,
+      );
+    };
+    return m;
+  }, []);
   // a unit quad, scaled and moved onto the chosen screen
   const geo = useMemo(() => new THREE.PlaneGeometry(1, 1), []);
 
@@ -65,15 +78,16 @@ export default function LiveScreen({ autoplay }: { autoplay: boolean }) {
     tex.colorSpace = THREE.SRGBColorSpace;
     const l: Live = { key: c.stand.spot.key, stand: c.stand, video, tex, ready: false, on: true, leftAt: 0 };
     video.addEventListener("loadedmetadata", () => {
-      // cover-fit the clip into the screen (crop the long side)
+      // contain-fit the clip into the screen: the whole site stays visible, and the
+      // unused band (UV outside 0..1) is painted dark by the material's shader patch
       const va = video.videoWidth / Math.max(1, video.videoHeight);
       const sa = c.stand.screen.w / c.stand.screen.h;
       if (va > sa) {
-        tex.repeat.set(sa / va, 1);
-        tex.offset.set((1 - sa / va) / 2, 0);
-      } else {
         tex.repeat.set(1, va / sa);
         tex.offset.set(0, (1 - va / sa) / 2);
+      } else {
+        tex.repeat.set(sa / va, 1);
+        tex.offset.set((1 - sa / va) / 2, 0);
       }
     });
     video.addEventListener("playing", () => {
@@ -133,7 +147,7 @@ export default function LiveScreen({ autoplay }: { autoplay: boolean }) {
     l.video.play().catch(() => undefined);
   };
 
-  // pause while a case study is open (the 3D loop is paused too), resume after
+  // pause while a project video is open (the 3D loop is paused too), resume after
   useEffect(
     () =>
       useWorld.subscribe((s, prev) => {

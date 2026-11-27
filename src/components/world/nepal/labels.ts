@@ -15,6 +15,13 @@ export const LABELS = {
     // Captain's choice (2026-11-26): "quick introduction".
     kiosk: { en: "Recruiter Mode", ne: "छिटो परिचय" },
   } satisfies Record<string, BiLabel>,
+  /** Extra places (step8c): name tags only, not zones. */
+  places: {
+    temple: { en: "Five-Roof Temple", ne: "पाँचतले मन्दिर" },
+    pond: { en: "Temple Pond", ne: "पोखरी" },
+    market: { en: "Market Lane", ne: "बजार गल्ली" },
+    chautari: { en: "Chautari", ne: "चौतारा" },
+  } satisfies Record<string, BiLabel>,
   signs: {
     teaStall: { en: "Recruiter Chiya Pasal", ne: "चिया पसल" },
     school: { en: "Pathshala", ne: "पाठशाला" },

@@ -29,7 +29,7 @@ export function loadLabelFonts(): Promise<void> {
   return fontPromise;
 }
 
-function drawBilingual(en: string, ne: string, opts: { bg?: string; fg?: string; stroke?: string; pad?: number } = {}) {
+export function drawBilingual(en: string, ne: string, opts: { bg?: string; fg?: string; stroke?: string; pad?: number } = {}) {
   const scale = 2;
   const enPx = 46 * scale;
   const nePx = 42 * scale;

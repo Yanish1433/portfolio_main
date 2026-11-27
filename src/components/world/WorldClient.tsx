@@ -3,6 +3,7 @@
 import type { CharacterId } from "./characters";
 import dynamic from "next/dynamic";
 import Overlay from "./Overlay";
+import LoadingOverlay from "./loading/LoadingOverlay";
 
 const FONT_FACES = `
 @font-face { font-family: "Mukta"; font-weight: 600; font-display: swap;
@@ -41,6 +42,7 @@ export default function WorldClient({ characters, thumbs = [], posters = [], abo
       <style>{FONT_FACES}</style>
       <World characters={characters} thumbs={thumbs} posters={posters} aboutPhoto={aboutPhoto} />
       <Overlay characters={characters} thumbs={thumbs} posters={posters} aboutPhoto={aboutPhoto} />
+      <LoadingOverlay />
     </div>
   );
 }

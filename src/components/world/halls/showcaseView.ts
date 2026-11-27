@@ -1,76 +1,7 @@
-// Pure helpers for the Project Hall showcase (cinema mode, living screens, dioramas).
+// Pure helpers for the Project Hall showcase (project video, living screens, dioramas).
 // No React, no three.js, no DOM: safe in node tests.
-import { plainArchitecture, type ArchLayer } from "@/content/showcase";
+import type { ArchLayer } from "@/content/showcase";
 import type { Project } from "@/content/profile";
-
-// ---------------------------------------------------------------- metrics
-
-/** A metric value split for the count-up: "1.2k" -> 1.2 + "k", "-30%" -> "-" 30 "%", "$4,000" -> "$" 4000. */
-export type MetricParts = { prefix: string; num: number; decimals: number; suffix: string; grouped: boolean };
-
-export function parseMetric(value: string): MetricParts | null {
-  const m = /^\s*([^\d\s.,]*)\s*(\d[\d,]*(?:\.\d+)?|\.\d+)\s*(.*?)\s*$/.exec(value);
-  if (!m) return null;
-  const [, prefix, raw, suffix] = m;
-  const grouped = raw.includes(",");
-  const clean = raw.replace(/,/g, "");
-  const num = Number(clean);
-  if (!Number.isFinite(num)) return null;
-  const dot = clean.indexOf(".");
-  return { prefix, num, decimals: dot < 0 ? 0 : clean.length - dot - 1, suffix, grouped };
-}
-
-/** The metric shown at count-up progress `n` (0..num). formatMetric(p, p.num) gives back the original look. */
-export function formatMetric(p: MetricParts, n: number): string {
-  let body = n.toFixed(p.decimals);
-  if (p.grouped) {
-    const [int, frac] = body.split(".");
-    body = int.replace(/\B(?=(\d{3})+(?!\d))/g, ",") + (frac ? `.${frac}` : "");
-  }
-  return `${p.prefix}${body}${p.suffix}`;
-}
-
-// ---------------------------------------------------------------- tech chips
-
-/** Plain group name for one technology (same guess as plainArchitecture; languages -> "Languages"). */
-export function techGroup(tech: string): string {
-  const layer = plainArchitecture({ stack: [tech] })[0]?.label;
-  if (!layer || layer === "Code") return "Languages";
-  return layer;
-}
-
-/** The stack grouped for the Tech tab, groups in first-seen order. */
-export function groupStack(stack: string[]): { group: string; items: string[] }[] {
-  const out: { group: string; items: string[] }[] = [];
-  for (const t of stack) {
-    const g = techGroup(t);
-    const row = out.find((r) => r.group === g);
-    if (row) row.items.push(t);
-    else out.push({ group: g, items: [t] });
-  }
-  return out;
-}
-
-// ---------------------------------------------------------------- "How it works"
-
-const lowerFirst = (s: string) => (/^[A-Z][a-z]/.test(s) ? s[0].toLowerCase() + s.slice(1) : s);
-
-/**
- * One plain sentence that reads the diagram aloud:
- * [Website, Server, Database] -> "A visitor's click on the website travels to the server, then the database."
- */
-export function flowSentence(layers: Pick<ArchLayer, "label">[]): string {
-  const names = layers.map((l) => lowerFirst(l.label.trim())).filter(Boolean);
-  if (!names.length) return "";
-  if (names.length === 1) return `Everything runs in one place: the ${names[0]}.`;
-  const [first, ...rest] = names;
-  // "the server", but "payments" (plural layers read better without "the")
-  const the = (n: string) => (/s$/i.test(n) && !/ss$/i.test(n) ? n : `the ${n}`);
-  const tail = rest.map((n, i) => (i === 0 ? `travels to ${the(n)}` : `then ${the(n)}`)).join(", ");
-  return /website|app|page|site/i.test(first)
-    ? `A visitor's click on the ${first} ${tail}.`
-    : `A visitor's request starts at the ${first}, then ${tail}.`;
-}
 
 // ---------------------------------------------------------------- media
 

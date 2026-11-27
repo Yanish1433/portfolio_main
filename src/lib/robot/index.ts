@@ -15,3 +15,6 @@ export type {
   RobotSuggestion,
   ZoneId,
 } from "./types";
+export { QUICK_TOUR_STOPS, QUICK_TOUR_PAUSE_MS, quickTourLines, quickTourDurationMs } from "./quickTour";
+export { runTourStops } from "./quickTour";
+export type { TourDeps } from "./quickTour";

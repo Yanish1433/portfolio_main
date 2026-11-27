@@ -7,8 +7,8 @@ import type { Vec2 } from "@/store/world";
 
 export const AVATAR_RADIUS = 0.45;
 const CELL = 0.5;
-const HALF = 24; // grid covers [-24, 24]
-const N = (HALF * 2) / CELL; // 96
+const HALF = 26; // grid covers [-26, 26] (the island is 25.6 m)
+const N = (HALF * 2) / CELL; // 104
 const EDGE_MARGIN = 0.9;
 
 // Project stands, plaques, easels and the bookshelf are laid out from profile.ts (halls/layout.ts),

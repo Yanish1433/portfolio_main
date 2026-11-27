@@ -9,7 +9,34 @@ import Avatar from "./Avatar";
 import { blockedAt, findPath, resolveMove } from "./nav";
 import { avatarMotion, camRig, joystick, navPath, playerPos, pointerClaim, RUN_SPEED, WALK_SPEED, worldControl } from "./input";
 import { SPAWN, zones } from "./zones";
-import { movementLocked, useWorld, type Vec2 } from "@/store/world";
+import {
+  DEFAULT_VIEW,
+  EAGLE_DEFAULT,
+  EAGLE_SECS,
+  FLY_IN_KEY,
+  FLY_IN_SECS,
+  GestureTracker,
+  WHEEL_ZOOM,
+  clampDist,
+  clampEagleDist,
+  eagleOrbitBy,
+  eaglePose,
+  flyBetween,
+  wrapEagleYaw,
+  type Pose,
+  clampPitch,
+  clampYaw,
+  flyInPose,
+  frozenFlyT,
+  moveVector,
+  newFrameState,
+  noteManual,
+  orbitBy,
+  shouldFlyIn,
+  updateFrame,
+  type Ring,
+} from "./cameraRig";
+import { isTypingTarget, movementLocked, useWorld, type Vec2 } from "@/store/world";
 import { themeState } from "./nepal/themeState";
 
 /** Soft contact-shadow blob texture (radial falloff). */
@@ -45,13 +72,15 @@ const _pathLeft = (x: number, z: number, path: Vec2[], idx: number) => {
   }
   return d;
 };
-const CAM_ANGLE = Math.PI / 4; // 45° down
-const ZOOM_MIN = 6; // close enough to admire the character
 /** Camera distance for the pick / Dance showcase, and how long it holds. */
 const SHOWCASE_DIST = 9;
 const SHOWCASE_SECS = 2;
-const ZOOM_MAX = 36;
-const TAP_SLOP_PX = 6;
+/** Preset zones' entrance rings, for the auto-framer (cameraRig.ts holds the per-zone views). */
+const RINGS: Ring[] = zones.map((z) => ({ id: z.id, x: z.ring[0], z: z.ring[1] }));
+/** Keyboard camera: orbit speed (rad/s) and zoom speed (m/s). */
+const KEY_ORBIT = 1.6;
+const KEY_ZOOM = 14;
+const CAM_KEYS = new Set(["KeyZ", "KeyC", "Equal", "NumpadAdd", "Minus", "NumpadSubtract"]);
 
 const wrapAngle = (a: number) => Math.atan2(Math.sin(a), Math.cos(a));
 
@@ -62,6 +91,10 @@ type DebugApi = {
   /** Teleport (screenshots). */
   place: (x: number, z: number) => void;
   zoom: (d: number) => void;
+  /** Set the orbit (radians; `snap` skips the easing). */
+  orbit: (yaw: number, pitch: number, snap?: boolean) => void;
+  /** Camera state now: yaw / pitch (radians), distance, framed zone. */
+  camState: () => { yaw: number; pitch: number; dist: number; zone: string | null; manual: boolean };
   /** Fixed camera for overview screenshots (null = back to the normal follow camera). */
   cam: (view: { pos: [number, number, number]; look: [number, number, number] } | null) => void;
 };
@@ -82,8 +115,15 @@ export default function Player({ characters, reducedMotion }: { characters: Char
     path: [] as Vec2[],
     idx: 0,
     zone: null as string | null,
-    camDist: 23,
-    zoomTarget: 23,
+    camDist: DEFAULT_VIEW.dist,
+    zoomTarget: DEFAULT_VIEW.dist,
+    /** Orbit angles (current / wanted), see cameraRig.ts. */
+    yaw: DEFAULT_VIEW.yaw,
+    pitch: DEFAULT_VIEW.pitch,
+    yawTarget: DEFAULT_VIEW.yaw,
+    pitchTarget: DEFAULT_VIEW.pitch,
+    frame: newFrameState(),
+    viewCustom: false,
     camTarget: new THREE.Vector3(SPAWN[0], 1, SPAWN[1]),
     lastStore: 0,
     manual: false,
@@ -98,6 +138,10 @@ export default function Player({ characters, reducedMotion }: { characters: Char
     camSpeed: 0,
     /** Heading to turn to while standing (worldControl.face), or null. */
     faceTo: null as number | null,
+    /** First-visit fly-in: checked once when the world has loaded; `t0` in performance.now() ms, `frozen` for screenshots. */
+    /** Eagle (sky) view: orbit targets + the glide. `t` 0..1 (in = up, out = down); `from` = the pose the glide leaves. */
+    eagle: { on: false, out: false, t: 1, yaw: 0, pitch: EAGLE_DEFAULT.pitch, dist: EAGLE_DEFAULT.dist, yawT: 0, pitchT: EAGLE_DEFAULT.pitch, distT: EAGLE_DEFAULT.dist, from: null as Pose | null },
+    fly: { checked: false, on: false, t0: 0, frozen: null as number | null, off: null as (() => void) | null },
   });
   const blob = useRef<THREE.Mesh>(null);
   const blobMat = useMemo(
@@ -123,20 +167,94 @@ export default function Player({ characters, reducedMotion }: { characters: Char
   );
 
   // Showcase: ease the camera in on a pick and on the Dance emote (not under reduced motion).
+  // While the fly-in plays the showcase waits: it starts when the fly-in lands (endFly below).
   useEffect(
     () =>
       useWorld.subscribe((w, prev) => {
         if (reducedMotion) return;
         if (w.spawnSeq !== prev.spawnSeq || w.danceSeq !== prev.danceSeq) {
+          if (s.current.fly.on) return;
           s.current.showcaseUntil = performance.now() / 1000 + SHOWCASE_SECS;
         }
       }),
     [reducedMotion],
   );
 
+  /** End the fly-in (landed, skipped, or cinema took the camera): the follow camera takes over. */
+  const endFly = (land: boolean) => {
+    const f = s.current.fly;
+    if (!f.on) return;
+    f.on = false;
+    f.off?.();
+    f.off = null;
+    if (land && !reducedMotion) s.current.showcaseUntil = performance.now() / 1000 + SHOWCASE_SECS;
+  };
+  /** First visit only: the camera starts high above the island and glides down. Any click / key / touch skips it. */
+  const startFly = () => {
+    const search = window.location.search;
+    let seen = false;
+    try {
+      seen = window.localStorage.getItem(FLY_IN_KEY) === "1";
+    } catch {
+      /* storage blocked: treat as seen, so a visitor without storage doesn't get it on every load */
+      seen = true;
+    }
+    if (!shouldFlyIn({ reducedMotion, search, seen })) return;
+    try {
+      window.localStorage.setItem(FLY_IN_KEY, "1");
+    } catch {
+      /* ignore */
+    }
+    const f = s.current.fly;
+    f.on = true;
+    f.t0 = performance.now();
+    f.frozen = frozenFlyT(search);
+    s.current.showcaseUntil = 0;
+    const skip = () => endFly(false);
+    const opts = { capture: true } as const;
+    for (const ev of ["pointerdown", "keydown", "touchstart", "wheel"] as const) window.addEventListener(ev, skip, opts);
+    f.off = () => {
+      for (const ev of ["pointerdown", "keydown", "touchstart", "wheel"] as const) window.removeEventListener(ev, skip, opts);
+    };
+  };
+  useEffect(() => () => s.current.fly.off?.(), []);
+
+  // Eagle view on / off (button, V, R, or cinema taking over). The glide starts from wherever the camera is now.
+  useEffect(
+    () =>
+      useWorld.subscribe((w, prev) => {
+        if (w.cameraMode === prev.cameraMode) return;
+        const e = s.current.eagle;
+        const here = (): Pose => ({
+          pos: [camera.position.x, camera.position.y, camera.position.z],
+          look: [camRig.look.x, camRig.look.y, camRig.look.z],
+        });
+        if (w.cameraMode === "eagle") {
+          endFly(false);
+          e.from = here();
+          e.on = true;
+          e.out = false;
+          e.t = reducedMotion ? 1 : 0;
+        } else if (prev.cameraMode === "eagle") {
+          // Back down (to follow), or cinema took over (it flies from the live camera by itself).
+          if (w.cameraMode === "follow" && e.on && !reducedMotion) {
+            e.from = here();
+            e.out = true;
+            e.t = 0;
+          } else {
+            e.on = false;
+            e.out = false;
+          }
+        }
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [camera, reducedMotion],
+  );
+
   /** `auto`: robot-led walk (not visitor input, so it doesn't cancel a tour). */
   const walkTo = (x: number, z: number, auto = false): boolean => {
     const st = s.current;
+    if (useWorld.getState().cameraMode === "eagle") return false;
     const path = findPath([st.x, st.z], [x, z]);
     if (!path) return false;
     if (!auto) useWorld.getState().interrupt();
@@ -199,26 +317,52 @@ export default function Player({ characters, reducedMotion }: { characters: Char
     const raycaster = new THREE.Raycaster();
     const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
     const hit = new THREE.Vector3();
-    const active = new Set<number>();
-    let down: { x: number; y: number } | null = null;
+    const gesture = new GestureTracker();
+    const manual = () => noteManual(s.current.frame);
 
     const onDown = (e: PointerEvent) => {
       pointerClaim.reset();
-      active.add(e.pointerId);
-      down = active.size === 1 ? { x: e.clientX, y: e.clientY } : null; // ignore multi-touch
+      gesture.down(e.pointerId, e.clientX, e.clientY, e.pointerType, e.button);
+    };
+    const onMove = (e: PointerEvent) => {
+      const d = gesture.move(e.pointerId, e.clientX, e.clientY, pointerClaim.claimed(e.pointerId));
+      if (!d) return;
+      const st = s.current;
+      if (useWorld.getState().cameraMode === "eagle") {
+        if (d.dx || d.dy) {
+          const o = eagleOrbitBy(st.eagle.yawT, st.eagle.pitchT, d.dx, d.dy);
+          st.eagle.yawT = o.yaw;
+          st.eagle.pitchT = o.pitch;
+        }
+        if (d.pinch !== 1) st.eagle.distT = clampEagleDist(st.eagle.distT / d.pinch);
+        return;
+      }
+      if (movementLocked(useWorld.getState())) return;
+      if (d.dx || d.dy) {
+        const o = orbitBy(st.yawTarget, st.pitchTarget, d.dx, d.dy);
+        st.yawTarget = o.yaw;
+        st.pitchTarget = o.pitch;
+        manual();
+        if (e.pointerType === "mouse") {
+          try {
+            el.setPointerCapture(e.pointerId);
+          } catch {
+            /* not capturable: the drag just stops at the canvas edge */
+          }
+        }
+      }
+      if (d.pinch !== 1) {
+        st.zoomTarget = clampDist(st.zoomTarget / d.pinch);
+        manual();
+      }
     };
     const onUp = (e: PointerEvent) => {
-      active.delete(e.pointerId);
-      const start = down;
-      down = null;
-      if (!start) return;
-      if (e.pointerType === "mouse" && e.button !== 0) return;
+      // Only a short single-pointer press is a tap; a drag (orbit) or two-finger gesture is not.
+      if (!gesture.up(e.pointerId).tap) return;
       // The press landed on a clickable 3D object (stand, book, sign): it handles the walk itself.
       if (pointerClaim.claimed(e.pointerId)) return;
       // A case study is open (or the camera is flying): no walking.
       if (movementLocked(useWorld.getState())) return;
-      // A drag or scroll must not trigger a walk.
-      if (Math.hypot(e.clientX - start.x, e.clientY - start.y) >= TAP_SLOP_PX) return;
       const rect = el.getBoundingClientRect();
       const ndc = new THREE.Vector2(
         ((e.clientX - rect.left) / rect.width) * 2 - 1,
@@ -227,27 +371,69 @@ export default function Player({ characters, reducedMotion }: { characters: Char
       raycaster.setFromCamera(ndc, camera);
       if (raycaster.ray.intersectPlane(plane, hit)) walkToRef.current(hit.x, hit.z);
     };
-    const onCancel = (e: PointerEvent) => {
-      active.delete(e.pointerId);
-      down = null;
-    };
+    const onCancel = (e: PointerEvent) => gesture.cancel(e.pointerId);
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       const st = s.current;
-      st.zoomTarget = THREE.MathUtils.clamp(st.zoomTarget + e.deltaY * 0.012, ZOOM_MIN, ZOOM_MAX);
+      if (useWorld.getState().cameraMode === "eagle") {
+        st.eagle.distT = clampEagleDist(st.eagle.distT + e.deltaY * WHEEL_ZOOM * 3);
+        return;
+      }
+      st.zoomTarget = clampDist(st.zoomTarget + e.deltaY * WHEEL_ZOOM);
+      manual();
     };
+    const onContext = (e: Event) => e.preventDefault(); // right-drag orbits
 
     el.addEventListener("pointerdown", onDown);
+    el.addEventListener("pointermove", onMove);
     el.addEventListener("pointerup", onUp);
     el.addEventListener("pointercancel", onCancel);
     el.addEventListener("wheel", onWheel, { passive: false });
+    el.addEventListener("contextmenu", onContext);
     return () => {
       el.removeEventListener("pointerdown", onDown);
+      el.removeEventListener("pointermove", onMove);
       el.removeEventListener("pointerup", onUp);
       el.removeEventListener("pointercancel", onCancel);
       el.removeEventListener("wheel", onWheel);
+      el.removeEventListener("contextmenu", onContext);
     };
   }, [camera, gl]);
+
+  // Camera keys: Z / C turn, + / - zoom (held), R resets the view. (E = interact, G = dance, N = night.)
+  const camKeys = useRef(new Set<string>());
+  useEffect(() => {
+    const held = camKeys.current;
+    const resetView = () => {
+      const st = s.current;
+      if (useWorld.getState().cameraMode === "eagle") useWorld.getState().toggleEagle(); // back down first
+      st.yawTarget = DEFAULT_VIEW.yaw;
+      st.pitchTarget = DEFAULT_VIEW.pitch;
+      st.zoomTarget = DEFAULT_VIEW.dist;
+      noteManual(st.frame); // stays on the default view until the next zone
+    };
+    worldControl.resetView = resetView;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey || isTypingTarget(e)) return;
+      if (e.code === "KeyV") {
+        if (!e.repeat && !useWorld.getState().pickerOpen) useWorld.getState().toggleEagle();
+      } else if (e.code === "KeyR") {
+        const w = useWorld.getState();
+        if (!e.repeat && !w.pickerOpen && (w.cameraMode === "eagle" || !movementLocked(w))) resetView();
+      } else if (CAM_KEYS.has(e.code)) held.add(e.code);
+    };
+    const onKeyUp = (e: KeyboardEvent) => held.delete(e.code);
+    const clear = () => held.clear();
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("keyup", onKeyUp);
+    window.addEventListener("blur", clear);
+    return () => {
+      worldControl.resetView = null;
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("keyup", onKeyUp);
+      window.removeEventListener("blur", clear);
+    };
+  }, []);
 
   // Hook for automated checks (dev, or ?debug in production).
   useEffect(() => {
@@ -261,6 +447,17 @@ export default function Player({ characters, reducedMotion }: { characters: Char
         s.current.zoomTarget = d;
         s.current.camDist = d;
       },
+      orbit: (yaw, pitch, snap) => {
+        const st = s.current;
+        st.yawTarget = clampYaw(yaw);
+        st.pitchTarget = clampPitch(pitch);
+        noteManual(st.frame);
+        if (snap) {
+          st.yaw = st.yawTarget;
+          st.pitch = st.pitchTarget;
+        }
+      },
+      camState: () => ({ yaw: s.current.yaw, pitch: s.current.pitch, dist: s.current.camDist, zone: s.current.frame.zone, manual: s.current.frame.manual }),
       cam: (view) => {
         debugCamView = view;
       },
@@ -286,8 +483,12 @@ export default function Player({ characters, reducedMotion }: { characters: Char
     const px = st.x;
     const pz = st.z;
 
-    let ix = (keys.right ? 1 : 0) - (keys.left ? 1 : 0) + (locked ? 0 : joystick.x);
-    let iz = (keys.back ? 1 : 0) - (keys.forward ? 1 : 0) + (locked ? 0 : joystick.y);
+    // Keys / joystick are relative to the camera ("up" = away from it); click-to-walk is world-space.
+    let [ix, iz] = moveVector(
+      (keys.right ? 1 : 0) - (keys.left ? 1 : 0) + (locked ? 0 : joystick.x),
+      (keys.back ? 1 : 0) - (keys.forward ? 1 : 0) + (locked ? 0 : joystick.y),
+      st.yaw,
+    );
     const mag = Math.hypot(ix, iz);
     let targetHeading = st.heading;
     // Wanted speed this frame; curSpeed eases toward it (critically damped).
@@ -427,9 +628,40 @@ export default function Player({ characters, reducedMotion }: { characters: Char
       store.setPosition([st.x, st.z]);
     }
 
-    // Third-person follow camera (45° down, slight lag).
+    // Camera keys (Z / C turn, + / - zoom) while the world has the keyboard.
+    if (!locked && !world.pickerOpen && camKeys.current.size) {
+      const h = camKeys.current;
+      const turn = (h.has("KeyC") ? 1 : 0) - (h.has("KeyZ") ? 1 : 0);
+      const zoomIn = (h.has("Equal") || h.has("NumpadAdd") ? 1 : 0) - (h.has("Minus") || h.has("NumpadSubtract") ? 1 : 0);
+      if (turn) st.yawTarget = clampYaw(st.yawTarget + turn * KEY_ORBIT * dt);
+      if (zoomIn) st.zoomTarget = clampDist(st.zoomTarget - zoomIn * KEY_ZOOM * dt);
+      if (turn || zoomIn) noteManual(st.frame);
+    }
+    // Auto-frame: in a section the camera eases closer and turns to face its content; back in the
+    // centre it returns to the wide view. A visitor who has taken the camera is left alone (cameraRig.ts).
+    if (!locked) {
+      const view = updateFrame(st.frame, st.x, st.z, Math.min(dtRaw, 0.25), RINGS); // real time: the dwell must not stretch at a low frame rate
+      if (view) {
+        st.zoomTarget = view.dist;
+        st.yawTarget = view.yaw;
+        st.pitchTarget = view.pitch;
+      }
+    }
+
+    // Third-person follow camera (orbit + distance around the avatar, slight lag).
     const follow = reducedMotion ? 1 : 1 - Math.exp(-dt * 3.5);
-    const zoom = reducedMotion ? 1 : 1 - Math.exp(-dt * 8);
+    const zoom = reducedMotion ? 1 : 1 - Math.exp(-dt * 6);
+    const turnK = reducedMotion ? 1 : 1 - Math.exp(-dt * 5);
+    st.yaw += (st.yawTarget - st.yaw) * turnK;
+    st.pitch += (st.pitchTarget - st.pitch) * turnK;
+    const custom =
+      Math.abs(st.yawTarget - DEFAULT_VIEW.yaw) > 0.02 ||
+      Math.abs(st.pitchTarget - DEFAULT_VIEW.pitch) > 0.02 ||
+      Math.abs(st.zoomTarget - DEFAULT_VIEW.dist) > 0.5;
+    if (custom !== st.viewCustom) {
+      st.viewCustom = custom;
+      world.setViewCustom(custom);
+    }
     const showcase = performance.now() / 1000 < st.showcaseUntil;
     // Pull back a little while running (damped; static under reduced motion).
     st.camSpeed += (avatarMotion.speed - st.camSpeed) * (1 - Math.exp(-dt * 1.5));
@@ -441,16 +673,61 @@ export default function Player({ characters, reducedMotion }: { characters: Char
     blobMat.opacity = 0.45 * (1 - 0.35 * themeState.t);
     st.camTarget.x += (st.x - st.camTarget.x) * follow;
     st.camTarget.z += (st.z - st.camTarget.z) * follow;
-    camRig.pos.x = st.camTarget.x;
-    camRig.pos.y = st.camTarget.y + Math.sin(CAM_ANGLE) * st.camDist;
-    camRig.pos.z = st.camTarget.z + Math.cos(CAM_ANGLE) * st.camDist;
+    const flat = Math.cos(st.pitch) * st.camDist;
+    camRig.pos.x = st.camTarget.x + Math.sin(st.yaw) * flat;
+    camRig.pos.y = st.camTarget.y + Math.sin(st.pitch) * st.camDist;
+    camRig.pos.z = st.camTarget.z + Math.cos(st.yaw) * flat;
     camRig.look.x = st.camTarget.x;
     camRig.look.y = st.camTarget.y;
     camRig.look.z = st.camTarget.z;
+    // First visit: start the fly-in once the world has loaded.
+    if (!st.fly.checked && world.loaded) {
+      st.fly.checked = true;
+      startFly();
+    }
     // Cinema mode (halls/CinemaCamera.tsx) owns the camera while it flies in, is parked, or flies back.
-    if (world.cameraMode !== "follow") return;
+    const eg = st.eagle;
+    if (world.cameraMode === "eagle" || (eg.on && eg.out && world.cameraMode === "follow")) {
+      endFly(false);
+      // Orbit targets ease in; the glide up / down only blends the camera write (camRig keeps the follow pose).
+      const ek = reducedMotion ? 1 : 1 - Math.exp(-dt * 6);
+      eg.yawT = wrapEagleYaw(eg.yawT);
+      eg.yaw += (eg.yawT - eg.yaw) * ek;
+      eg.pitch += (eg.pitchT - eg.pitch) * ek;
+      eg.dist += (eg.distT - eg.dist) * ek;
+      const sky = eaglePose(eg.yaw, eg.pitch, eg.dist);
+      const followPose: Pose = { pos: [camRig.pos.x, camRig.pos.y, camRig.pos.z], look: [camRig.look.x, camRig.look.y, camRig.look.z] };
+      if (reducedMotion) eg.t = 1;
+      else eg.t = Math.min(1, eg.t + dt / EAGLE_SECS);
+      const start = eg.from ?? followPose;
+      const pose = eg.out ? flyBetween(eg.t, start, followPose) : flyBetween(eg.t, start, sky);
+      if (eg.out && eg.t >= 1) {
+        eg.on = false;
+        eg.out = false;
+      }
+      camera.position.set(...pose.pos);
+      camera.lookAt(...pose.look);
+      return;
+    }
+    if (world.cameraMode !== "follow") {
+      endFly(false);
+      eg.on = false;
+      eg.out = false;
+      return;
+    }
     camera.position.set(camRig.pos.x, camRig.pos.y, camRig.pos.z);
     camera.lookAt(st.camTarget);
+    if (st.fly.on) {
+      // Only the camera write is blended: camRig keeps the normal pose (cinema flies back to it), and the
+      // fly pose ends exactly on it, so landing has no jump.
+      const t = st.fly.frozen ?? (performance.now() - st.fly.t0) / 1000 / FLY_IN_SECS;
+      if (t >= 1) endFly(true);
+      else {
+        const pose = flyInPose(t, { pos: [camRig.pos.x, camRig.pos.y, camRig.pos.z], look: [camRig.look.x, camRig.look.y, camRig.look.z] });
+        camera.position.set(...pose.pos);
+        camera.lookAt(...pose.look);
+      }
+    }
     if (debugCamView) {
       camera.position.set(...debugCamView.pos);
       camera.lookAt(...debugCamView.look);

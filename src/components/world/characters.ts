@@ -1,8 +1,8 @@
-// Pickable characters. All share one Mixamo-style rig, are auto-scaled to
-// 1.7 m and use the same clip names (Idle, Dance).
-// Pure data: imported by the server page (existence check) and the client.
+// The playable character: Lakhey, the masked Newar festival dancer. One Mixamo-style rig, auto-scaled to
+// 1.7 m, clips Idle / Walk / Run / Dance (built in Blender: blender/scripts/clips.py).
+// Pure data and helpers: imported by the server page (existence check), the client and the tests.
 
-export type CharacterId = "clay" | "astro" | "lakhey";
+export type CharacterId = "lakhey";
 
 export type Character = {
   id: CharacterId;
@@ -10,13 +10,7 @@ export type Character = {
   file: string;
   label: string;
   labelNe: string;
-  /** Picker card title (English part). */
-  title: string;
-  /** One-line picker description. */
-  blurb: string;
-  /** Small static picker preview under /public. */
-  preview: string;
-  /** Procedural gait amplitude scales (skirts and suits swing less). */
+  /** Procedural gait amplitude scales: only used if the Walk / Run clips are missing from the model. */
   gait: { thigh: number; knee: number; arm: number };
   /** 0..1: how much of the procedural relaxed standing pose replaces the stiff Idle clip. */
   idleRelax: number;
@@ -24,47 +18,48 @@ export type Character = {
   idleArmDown: number;
 };
 
-/** Picker order: Lakhey first. */
 export const CHARACTERS: Character[] = [
   {
     id: "lakhey",
     file: "/models/lakhey.glb",
     label: "Lakhey",
     labelNe: "लाखे",
-    title: "Lakhey, guardian dancer",
-    blurb: "A masked Newar festival dancer who guards the town.",
-    preview: "/characters/lakhey.webp",
     // The robe would push through itself at full stride.
     gait: { thigh: 0.7, knee: 0.8, arm: 1 },
     // Flared robe: keep the hands clear of it.
     idleRelax: 1,
     idleArmDown: 55,
   },
-  {
-    id: "clay",
-    file: "/models/clay.glb",
-    label: "Clay",
-    labelNe: "माटो",
-    title: "Clay",
-    blurb: "A terracotta figure fresh off the Bhaktapur potter's wheel.",
-    preview: "/characters/clay.webp",
-    gait: { thigh: 1, knee: 1, arm: 1 },
-    idleRelax: 1,
-    idleArmDown: 62,
-  },
-  {
-    id: "astro",
-    file: "/models/astro.glb",
-    label: "Astro",
-    labelNe: "अन्तरिक्षयात्री",
-    title: "Astro",
-    blurb: "A space explorer who landed in the square to look around.",
-    preview: "/characters/astro.webp",
-    gait: { thigh: 0.9, knee: 0.9, arm: 0.9 },
-    // Bulky suit: arms a little further out.
-    idleRelax: 1,
-    idleArmDown: 58,
-  },
 ];
 
 export const characterById = (id: string | null | undefined) => CHARACTERS.find((c) => c.id === id);
+
+/**
+ * Walk / Run loops as authored in Blender (in place). `speed` is the ground speed the legs cover at
+ * playback rate 1, measured from the planted foot, in the MODEL's own metres per second (the avatar is
+ * scaled to 1.7 m afterwards, so multiply by that scale to get world speed). Re-measure with
+ * `blender --python blender/scripts/make_lakhey.py -- --stage clips` (it logs `ground_speed`) after
+ * changing the clips.
+ */
+export const GAIT_CLIPS = {
+  walk: { name: "Walk", duration: 32 / 30, speed: 1.2438 },
+  run: { name: "Run", duration: 21 / 30, speed: 4.2811 },
+} as const;
+
+/** Playback rate that makes a clip's feet travel at `speed` world m/s (no sliding). */
+export function clipTimeScale(speed: number, clipSpeed: number, scale: number): number {
+  const v = clipSpeed * scale;
+  return v > 1e-6 ? Math.max(0, speed) / v : 0;
+}
+
+/**
+ * Gait cycles per second for a Walk <-> Run blend (`run` 0..1). Walk and Run are phase-locked, so both
+ * clips share one phase; the stride (model metres per cycle) is blended with the weights.
+ */
+export function gaitCycleRate(speed: number, scale: number, run: number): number {
+  const r = Math.min(1, Math.max(0, run));
+  const walk = GAIT_CLIPS.walk.speed * GAIT_CLIPS.walk.duration;
+  const runStride = GAIT_CLIPS.run.speed * GAIT_CLIPS.run.duration;
+  const stride = walk + (runStride - walk) * r;
+  return stride * scale > 1e-6 ? Math.max(0, speed) / (stride * scale) : 0;
+}

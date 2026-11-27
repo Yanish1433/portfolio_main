@@ -1,45 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { blockKind, BLOCK_SIZE, dioramaBlocks, MAX_BLOCKS, flowSentence, formatMetric, groupStack, parseMetric, posterUrl, screenPose, videoStateFor, videoUrl } from "./showcaseView";
-
-test("parseMetric splits prefix, number and suffix and formats back to the original", () => {
-  for (const v of ["40", "1.2k", "-30%", "$4,000", "99.95%", "+12", "3x", "2,500+"]) {
-    const p = parseMetric(v);
-    assert.ok(p, v);
-    assert.equal(formatMetric(p, p.num), v, v);
-  }
-  assert.deepEqual(parseMetric("1.2k"), { prefix: "", num: 1.2, decimals: 1, suffix: "k", grouped: false });
-  assert.deepEqual(parseMetric("-30%"), { prefix: "-", num: 30, decimals: 0, suffix: "%", grouped: false });
-  assert.equal(formatMetric(parseMetric("$4,000")!, 1234.4), "$1,234");
-  assert.equal(parseMetric("n/a"), null);
-  assert.equal(parseMetric(""), null);
-});
-
-test("groupStack groups the stack in plain words, languages last-seen as Languages", () => {
-  assert.deepEqual(groupStack(["Next.js", "TypeScript", "PostgreSQL", "Stripe"]), [
-    { group: "Website", items: ["Next.js"] },
-    { group: "Languages", items: ["TypeScript"] },
-    { group: "Database", items: ["PostgreSQL"] },
-    { group: "Payments", items: ["Stripe"] },
-  ]);
-  assert.deepEqual(groupStack(["React", "Tailwind CSS"]), [{ group: "Website", items: ["React", "Tailwind CSS"] }]);
-  assert.deepEqual(groupStack(["Kafka"]), [{ group: "Other", items: ["Kafka"] }]);
-  assert.deepEqual(groupStack([]), []);
-});
-
-test("flowSentence reads the diagram in plain words", () => {
-  assert.equal(
-    flowSentence([{ label: "Website" }, { label: "Server" }, { label: "Database" }]),
-    "A visitor's click on the website travels to the server, then the database.",
-  );
-  assert.equal(flowSentence([{ label: "Server" }, { label: "Database" }]), "A visitor's request starts at the server, then travels to the database.");
-  assert.equal(
-    flowSentence([{ label: "Website" }, { label: "Server" }, { label: "Database" }, { label: "Payments" }]),
-    "A visitor's click on the website travels to the server, then the database, then payments.",
-  );
-  assert.equal(flowSentence([{ label: "Website" }]), "Everything runs in one place: the website.");
-  assert.equal(flowSentence([]), "");
-});
+import { blockKind, BLOCK_SIZE, dioramaBlocks, MAX_BLOCKS, posterUrl, screenPose, videoStateFor, videoUrl } from "./showcaseView";
 
 test("posterUrl follows the documented fallback order", () => {
   const files = { showcasePosters: new Set(["b"]), thumbs: new Set(["b", "c"]) };

@@ -31,6 +31,8 @@ export const worldControl = {
   walkTo: null as null | ((x: number, z: number) => boolean),
   /** Turn (while standing) to face a ground point; any movement clears it. */
   face: null as null | ((x: number, z: number) => void),
+  /** Camera back to the default wide view (button / R key). */
+  resetView: null as null | (() => void),
 };
 
 /**

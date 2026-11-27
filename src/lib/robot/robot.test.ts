@@ -453,6 +453,7 @@ test("every suggestion message is understood by the robot (no dead ends)", async
 test("greet works in both modes and offers suggestions", () => {
   const brain = createLocalBrain(profile, { seed: SEED });
   assert.equal(brain.greet().intent, "greeting");
+  assert.match(brain.greet().text, /^Start here: .+'s home is right in front of you/);
   const rec = brain.greet(recruiter);
   assert.ok(rec.suggestions.every((s) => s.action?.type !== "startTour"));
 });
@@ -466,7 +467,7 @@ test("same seed gives the same replies; different seeds give variety", async () 
   };
   assert.deepEqual(await run(5), await run(5));
   const greetings = new Set<string>();
-  for (let s = 0; s < 30; s++) greetings.add(createLocalBrain(profile, { seed: s }).greet().text);
+  for (let s = 0; s < 30; s++) greetings.add(createLocalBrain(profile, { seed: s }).greet(recruiter).text);
   assert.ok(greetings.size >= 2, "phrasing variants exist");
 });
 
