@@ -1,0 +1,77 @@
+/* Lokta paper & wood: one look for every panel and form in the town.
+   Paper stays light (ink #2b1d14 on cream, >= 9:1 even on the darkest fibre); night only dims it and adds a lamp glow.
+   Motion is transform/clip-path/opacity only; textures are tiny PNG tiles (no live SVG filters). */
+.frame {
+  --paper: #f6ead0; --ink: #2b1d14; --red: #8f3320; --gold: #c9a227; --wood: #3e2416;
+  position: relative; box-sizing: border-box; color: var(--ink); font-family: Mukta, system-ui, sans-serif;
+  background: var(--wood) url(/textures/ui/lokta-wood.png) repeat; padding: 7px; border-radius: 12px;
+  box-shadow: 0 0 0 1.5px #1f120a, inset 0 0 0 1.5px rgba(229, 193, 88, 0.55), 0 10px 26px rgba(0, 0, 0, 0.35);
+  animation: unroll 360ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards;
+}
+.frame[data-night="true"] { --paper: #e6d6b2; box-shadow: 0 0 0 1.5px #1f120a, inset 0 0 0 1.5px rgba(229, 193, 88, 0.55), 0 0 34px rgba(255, 183, 77, 0.45), 0 10px 26px rgba(0, 0, 0, 0.45); }
+.paper {
+  position: relative; display: flex; flex-direction: column; min-height: 0; max-height: inherit; height: 100%;
+  background: var(--paper) url(/textures/ui/lokta-paper.png) repeat; border-radius: 6px; overflow: hidden;
+  box-shadow: inset 0 0 0 2px var(--red), inset 0 0 0 4px var(--paper), inset 0 0 0 5px var(--gold);
+}
+.scroll { position: relative; min-height: 0; flex: 1 1 auto; overflow-y: auto; overscroll-behavior: contain; padding: 14px 18px 16px; font-size: 16px; line-height: 1.55; overflow-wrap: anywhere; }
+@media (min-width: 768px) { .scroll { font-size: 15px; } }
+.scroll > * { animation: lineUp 320ms ease-out both; }
+.scroll > *:nth-child(1) { animation-delay: 220ms; } .scroll > *:nth-child(2) { animation-delay: 270ms; }
+.scroll > *:nth-child(3) { animation-delay: 320ms; } .scroll > *:nth-child(4) { animation-delay: 370ms; }
+.scroll > *:nth-child(n + 5) { animation-delay: 420ms; }
+.eyebrow { margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--red); }
+.eyebrow [lang="ne"] { font-size: 15px; letter-spacing: 0; text-transform: none; margin-right: 6px; }
+.close { position: absolute; right: 9px; top: 9px; z-index: 2; width: 34px; height: 34px; border-radius: 50%; border: 1.5px solid var(--red); background: transparent; color: var(--red); font-size: 20px; line-height: 1; cursor: pointer; }
+.close:hover { background: rgba(143, 51, 32, 0.12); }
+.close:focus-visible, .btn:focus-visible, .chip:focus-visible, .field:focus-visible, .pill:focus-visible { outline: 3px solid #a67c00; outline-offset: 2px; }
+.frame:focus-visible { outline: 3px solid var(--gold); outline-offset: 2px; }
+.muted { opacity: 0.82; }
+.well { border-radius: 8px; padding: 8px 12px; background: rgba(143, 51, 32, 0.08); border: 1px dashed rgba(143, 51, 32, 0.4); }
+
+.btn { pointer-events: auto; display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 40px; padding: 8px 18px; border-radius: 8px; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer; text-decoration: none; transition: filter 0.15s; }
+.primary { background: var(--wood) url(/textures/ui/lokta-wood.png); color: #fbe9b7; border: 2px solid var(--gold); box-shadow: 0 2px 0 #1f120a; }
+.primary:hover { filter: brightness(1.25); }
+.ghost { background: transparent; color: var(--red); border: 2px solid var(--red); }
+.ghost:hover { background: rgba(143, 51, 32, 0.1); }
+.btn:disabled { opacity: 0.6; cursor: not-allowed; }
+.chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 11px; border-radius: 999px; font: inherit; font-size: 13px; font-weight: 600; color: var(--ink); background: rgba(143, 51, 32, 0.1); border: 1px solid rgba(143, 51, 32, 0.45); cursor: default; }
+button.chip { cursor: pointer; }
+button.chip:hover { background: rgba(143, 51, 32, 0.2); }
+.field { width: 100%; box-sizing: border-box; font: inherit; font-size: 16px; color: var(--ink); background-color: rgba(255, 252, 240, 0.55); border: 0; border-bottom: 2px solid var(--red); border-radius: 3px 3px 0 0; padding: 6px 8px; }
+textarea.field { resize: none; line-height: 26px; background-image: repeating-linear-gradient(transparent 0 25px, rgba(143, 51, 32, 0.28) 25px 26px); background-attachment: local; }
+.field:disabled { opacity: 0.7; }
+.label { display: block; font-size: 14px; font-weight: 600; margin-bottom: 2px; }
+.err { color: #8a1c10; font-weight: 600; font-size: 13px; }
+.pill { pointer-events: auto; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 4px 14px; border-radius: 8px; font: inherit; font-size: 14px; font-weight: 600; color: #fbe9b7; cursor: pointer; background: #3e2416 url(/textures/ui/lokta-wood.png); border: 1.5px solid var(--gold); box-shadow: 0 2px 0 #1f120a; }
+.pill:hover { filter: brightness(1.25); }
+
+.pager { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: 10px; }
+.pager .btn { min-height: 36px; padding: 4px 14px; }
+
+/* wax seal stamped on a successful send */
+.seal { width: 64px; height: 64px; margin: 4px auto 0; border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #f4c9a8; font-size: 28px; font-weight: 600;
+  background: radial-gradient(circle at 35% 30%, #c8462b, #8f1d12 70%); box-shadow: inset 0 0 0 3px rgba(0, 0, 0, 0.18), 0 3px 6px rgba(0, 0, 0, 0.4); animation: stamp 480ms cubic-bezier(0.3, 1.4, 0.5, 1) both 120ms; }
+.thanks { animation: fold 420ms ease-out both; transform-origin: 50% 0; }
+.float { animation: floatUp 520ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
+
+@keyframes unroll { from { clip-path: inset(0 0 100% 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes unrollUp { from { clip-path: inset(100% 0 0 0); } to { clip-path: inset(0 0 0 0); } }
+@keyframes lineUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@keyframes stamp { from { opacity: 0; transform: scale(2.2) rotate(-14deg); } to { opacity: 1; transform: none; } }
+@keyframes fold { from { transform: perspective(500px) rotateX(-40deg); opacity: 0.2; } to { transform: none; opacity: 1; } }
+@keyframes floatUp { from { opacity: 0; transform: translateY(28px); } to { opacity: 1; transform: none; } }
+@media (max-width: 767px), (pointer: coarse) { .frame { animation-name: unrollUp; } }
+@media (prefers-reduced-motion: reduce) { .frame, .scroll > *, .seal, .thanks, .float { animation: none !important; } }
+
+/* single-element card (wheel card, notes, bubble, menus): paper inside a wood border */
+.card { --wood: #3e2416; --paper: #f6ead0; --ink: #2b1d14; --red: #8f3320; --gold: #c9a227; color: var(--ink); font-family: Mukta, system-ui, sans-serif; border: 6px solid transparent; border-radius: 10px; box-sizing: border-box;
+  background: url(/textures/ui/lokta-paper.png) padding-box, linear-gradient(var(--paper), var(--paper)) padding-box, #3e2416 url(/textures/ui/lokta-wood.png) border-box;
+  box-shadow: inset 0 0 0 2px var(--red), 0 0 0 1.5px #1f120a, 0 8px 22px rgba(0, 0, 0, 0.35); }
+.card[data-night="true"] { --paper: #e6d6b2; box-shadow: inset 0 0 0 2px var(--red), 0 0 0 1.5px #1f120a, 0 0 28px rgba(255, 183, 77, 0.45), 0 8px 22px rgba(0, 0, 0, 0.45); }
+.card:focus-visible, .card :focus-visible { outline: 3px solid #a67c00; outline-offset: 2px; }
+.cardIn { animation: unroll 320ms cubic-bezier(0.2, 0.8, 0.2, 1) backwards; }
+.row { display: block; border-radius: 6px; padding: 4px 10px; background: rgba(143, 51, 32, 0.08); border: 1px solid rgba(143, 51, 32, 0.3); color: var(--ink); font: inherit; }
+button.row { cursor: pointer; }
+button.row:hover { background: rgba(201, 162, 39, 0.3); }
+@media (prefers-reduced-motion: reduce) { .cardIn { animation: none !important; } }

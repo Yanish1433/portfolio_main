@@ -8,6 +8,7 @@
 //   whatever opened it. Any other <video> on the page is paused while it is open.
 // Pure: no store, no content imports (so Recruiter Mode loads it lazily without the 3D bundle).
 import { useEffect, useId, useRef, useState } from "react";
+import { btnClass, cardClass, pillClass, wellClass } from "../ui/lokta";
 import { isRealLink } from "@/components/recruiter/links";
 
 export type VideoProject = {
@@ -25,12 +26,7 @@ export type VideoProject = {
 
 const FOCUSABLE = 'a[href], button:not([disabled]), video[controls], [tabindex]:not([tabindex="-1"])';
 
-const btn = (primary: boolean) =>
-  `inline-flex items-center gap-1.5 rounded-full px-5 py-2.5 text-sm font-semibold shadow-sm transition focus:outline-none focus-visible:ring-2 ${
-    primary
-      ? "bg-[#c9a227] text-[#2a1c22] hover:bg-[#e0b83a] focus-visible:ring-[#f3d98a]"
-      : "border border-[#c9a227]/60 text-[#f8e9cc] hover:bg-white/10 focus-visible:ring-[#e5c158]"
-  }`;
+const btn = (primary: boolean) => (primary ? btnClass(true) : pillClass("!min-h-10 !px-5 !py-2.5 !text-[15px]"));
 
 function ExtLink({ href, label, primary }: { href: string | null; label: string; primary?: boolean }) {
   if (!href || !isRealLink(href)) return null;
@@ -141,7 +137,7 @@ export default function ProjectVideo({ project: p, onClose }: { project: VideoPr
           onClick={onClose}
           aria-label="Close video (Esc)"
           title="Close (Esc)"
-          className="flex h-10 shrink-0 items-center gap-2 rounded-full bg-white/10 px-4 text-sm font-semibold transition hover:bg-white/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#e5c158]"
+          className={pillClass("shrink-0")}
         >
           <span aria-hidden="true" className="text-lg leading-none">✕</span>
           <span>Close</span>
@@ -170,16 +166,16 @@ export default function ProjectVideo({ project: p, onClose }: { project: VideoPr
         </div>
       </div>
 
-      <div className="mx-auto w-full max-w-4xl shrink-0 px-4 pb-6 sm:px-8 [overflow-wrap:anywhere]">
-        <div className="flex flex-wrap items-end justify-between gap-x-6 gap-y-3">
+      <div className="mx-auto mb-6 w-full max-w-4xl shrink-0 [overflow-wrap:anywhere] sm:px-0">
+        <div className={cardClass("flex flex-wrap items-end justify-between gap-x-6 gap-y-3 px-4 py-3")}>
           <div className="min-w-0">
-            <h2 id={headingId} className="flex items-center gap-2.5 text-2xl font-semibold leading-tight sm:text-3xl">
+            <h2 id={headingId} className="flex items-center gap-2.5 text-2xl font-semibold leading-tight text-[#8f3320] sm:text-3xl">
               <span className="h-2.5 w-2.5 shrink-0 rotate-45" style={{ background: p.accent }} aria-hidden="true" />
               {p.name}
             </h2>
-            <p className="mt-1 text-base leading-snug opacity-90">{p.tagline}</p>
+            <p className="mt-1 text-base leading-snug">{p.tagline}</p>
             {p.disclaimer && (
-              <p className="mt-1.5 inline-block rounded-md bg-white/10 px-2.5 py-0.5 text-sm font-semibold text-[#f1d98a]" data-disclaimer>
+              <p className={wellClass("mt-1.5 inline-block !px-2.5 !py-0.5 text-sm font-semibold")} data-disclaimer>
                 {p.disclaimer}
               </p>
             )}

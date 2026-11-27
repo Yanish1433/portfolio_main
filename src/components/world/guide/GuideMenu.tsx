@@ -6,10 +6,10 @@ import { useWorld } from "@/store/world";
 import { playerPos, worldControl } from "../input";
 import { startQuickTour } from "../robot/actions";
 import { arrivedAt } from "./footprints";
+import { cardClass, pillClass } from "../ui/lokta";
 import { SECTIONS, sectionTarget, type Section } from "./sections";
 
-const pill =
-  "pointer-events-auto flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-full bg-white/80 px-3 text-sm font-medium text-[#4a3228] shadow backdrop-blur transition hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#c9a227] sm:h-10";
+const pill = pillClass("h-11 min-w-11 justify-center sm:h-10");
 
 export default function GuideMenu() {
   const [open, setOpen] = useState(false);
@@ -68,7 +68,7 @@ export default function GuideMenu() {
         <span className="hidden sm:inline">Go to…</span>
       </button>
       {tourActive ? (
-        <button type="button" className={`${pill} !bg-[#9c3b22] !text-white hover:!brightness-110`} onClick={() => useWorld.getState().interrupt()} aria-label="Stop tour">
+        <button type="button" className={`${pill} !bg-none !bg-[#8f3320]`} onClick={() => useWorld.getState().interrupt()} aria-label="Stop tour">
           <span aria-hidden="true">■</span>
           <span className="hidden sm:inline">Stop tour</span>
         </button>
@@ -79,10 +79,10 @@ export default function GuideMenu() {
         </button>
       )}
       {open && (
-        <ul role="menu" aria-label="Go to" className="pointer-events-auto absolute left-0 top-12 z-30 min-w-44 rounded-2xl border border-white/60 bg-[#fff8ec]/95 p-1.5 text-sm text-[#4a3228] shadow-xl backdrop-blur">
+        <ul role="menu" aria-label="Go to" className={cardClass("pointer-events-auto absolute left-0 top-12 z-30 min-w-44 !border-4 p-1 text-sm")}>
           {SECTIONS.filter((s) => sectionTarget(s)).map((s) => (
             <li key={s.id} role="none">
-              <button type="button" role="menuitem" onClick={() => pick(s)} className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left transition hover:bg-[#c9a227]/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#9c3b22]">
+              <button type="button" role="menuitem" onClick={() => pick(s)} className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-left transition hover:bg-[#c9a227]/30">
                 <span aria-hidden="true">{s.icon}</span>
                 {s.label}
               </button>
@@ -91,7 +91,7 @@ export default function GuideMenu() {
         </ul>
       )}
       {guide && !open && (
-        <div role="status" className="pointer-events-auto absolute left-0 top-12 flex items-center gap-1.5 whitespace-nowrap rounded-full bg-[#5a3d33]/90 py-1 pl-3 pr-1 text-sm text-white shadow">
+        <div role="status" className="pointer-events-auto absolute left-0 top-12 flex items-center gap-1.5 whitespace-nowrap rounded-lg border-2 border-[#c9a227] bg-[#3e2416] py-1 pl-3 pr-1 text-sm text-[#fbe9b7] shadow">
           <span>Path to {guide.label}</span>
           <button type="button" onClick={walk} className="rounded-full bg-[#c9a227] px-3 py-1 text-xs font-semibold text-[#3a2419] transition hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-white">
             Walk me there

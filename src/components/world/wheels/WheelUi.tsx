@@ -13,6 +13,7 @@ import { WHEEL_PROJECTS, WHEELS } from "./wheelData";
 import { FILTERS, plainGroupName, strengthWord, wheelSummary } from "./wheelLayout";
 import { NO_PROJECT_LINE, WHEEL_HINT } from "./wheelCopy";
 import { THREAD_SECONDS } from "./threads";
+import { btnClass, cardClass, chipClass, rowClass } from "../ui/lokta";
 
 /** The avatar is "in the skills zone" within this distance of the gallery's middle. */
 const ZONE_R = 9;
@@ -27,10 +28,10 @@ const STRENGTH_STYLE: Record<string, string> = {
   Learning: "bg-[#8aa7c9] text-[#1d2e45]",
 };
 
-const button =
-  "pointer-events-auto rounded-full px-4 py-1.5 text-sm font-semibold text-white shadow transition hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#9c3b22]";
+const button = btnClass(true, "pointer-events-auto !min-h-9 !px-4 !py-1");
 
 export function WheelCard() {
+  const night = useWorld((s) => s.theme === "night");
   const hover = useWorld((s) => s.wheelHover);
   const near = useWorld((s) => s.wheelNear);
   const selected = useWorld((s) => s.wheelSelected);
@@ -56,7 +57,8 @@ export function WheelCard() {
   return (
     <div className="pointer-events-none flex w-full justify-center">
       <div
-        className="pointer-events-auto box-border max-h-[58vh] w-full max-w-[min(26rem,calc(100vw-32px))] min-w-0 overflow-y-auto [overflow-wrap:anywhere] rounded-2xl border border-white/60 bg-[#fff8ec]/95 p-4 text-[#4a3228] shadow-xl backdrop-blur"
+        className={cardClass("pointer-events-auto box-border max-h-[58vh] w-full max-w-[min(26rem,calc(100vw-32px))] min-w-0 overflow-y-auto [overflow-wrap:anywhere] p-4")}
+        data-night={night}
         role="region"
         aria-label={`Skills: ${name}`}
         data-wheel-card={chosen ? "chosen" : pointing ? "hover" : "near"}
@@ -64,7 +66,7 @@ export function WheelCard() {
         <div className="flex items-start gap-3">
           <span className="mt-1 h-3.5 w-3.5 shrink-0 rounded-full ring-2 ring-white" style={{ background: wheel.colour }} />
           <div className="min-w-0 flex-1">
-            <p className="text-base font-semibold leading-snug">{name}</p>
+            <p className="text-base font-semibold leading-snug text-[#8f3320]">{name}</p>
             <p className="mt-1 text-xs opacity-75">{wheelSummary(wheel.skills.length, projects.length)}</p>
           </div>
           {chosen && (
@@ -107,7 +109,7 @@ export function WheelCard() {
                           <button
                             type="button"
                             disabled={!ref}
-                            className="pointer-events-auto w-full rounded-lg bg-black/5 px-3 py-1.5 text-left text-sm transition hover:bg-[#c9a227]/25 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#9c3b22] disabled:opacity-60"
+                            className={rowClass("pointer-events-auto w-full text-left text-sm disabled:opacity-60")}
                             onClick={() => ref && visitByVisitor(ref)}
                           >
                             <span className="font-semibold">{p.name}</span>
@@ -118,7 +120,7 @@ export function WheelCard() {
                     })}
                   </ul>
                   {!threadsOn && (
-                    <button type="button" className={`${button} mt-2`} style={{ background: "#d9775b" }} onClick={() => chooseWheel(shown)}>
+                    <button type="button" className={`${button} mt-2`} onClick={() => chooseWheel(shown)}>
                       Show the threads again
                     </button>
                   )}
@@ -130,7 +132,7 @@ export function WheelCard() {
           <p className="mt-2 text-xs opacity-75">Click to spin it and see the skills.</p>
         ) : (
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <button type="button" className={button} style={{ background: "#d9775b" }} onClick={() => chooseWheel(shown)}>
+            <button type="button" className={button} onClick={() => chooseWheel(shown)}>
               Spin it
             </button>
             <span className="text-xs opacity-70 [@media(pointer:coarse)]:hidden">
@@ -166,9 +168,7 @@ export function SkillFilterBar() {
               tabIndex={here ? 0 : -1}
               aria-pressed={on}
               onClick={() => set(f.id)}
-              className={`${here ? "pointer-events-auto" : ""} rounded-full px-3 py-1 text-xs font-semibold shadow backdrop-blur transition focus:outline-none focus-visible:ring-2 focus-visible:ring-[#c9a227] ${
-                on ? "bg-[#5a3d33] text-white" : "bg-white/85 text-[#4a3228] hover:bg-white"
-              }`}
+              className={chipClass(`${here ? "pointer-events-auto" : ""} cursor-pointer shadow ${on ? "!bg-[#3e2416] !text-[#fbe9b7] !border-[#c9a227]" : ""}`)}
             >
               {f.label}
             </button>

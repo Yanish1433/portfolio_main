@@ -17,6 +17,8 @@ import { ContactForm } from "@/components/recruiter/ContactForm";
 import { profile } from "@/content/profile";
 import { ctaState } from "../about/aboutView";
 import { WORKSHOP } from "./workshopLayout";
+import { LABELS } from "../nepal/labels";
+import { btnClass, chipClass, LoktaPanel, wellClass } from "../ui/lokta";
 
 function useClose() {
   return () => useWorld.getState().closeInfo(true);
@@ -46,16 +48,7 @@ function Bullets({ items }: { items: string[] }) {
 }
 
 type Theme = { night: boolean };
-const linkBtn = ({ night }: Theme, primary: boolean) =>
-  `pointer-events-auto inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-semibold shadow-sm transition focus:outline-none focus-visible:ring-2 ${
-    primary
-      ? night
-        ? "bg-[#c9a227] text-[#2a1c22] hover:bg-[#e0b83a] focus-visible:ring-[#f3d98a]"
-        : "bg-[#9c3b22] text-white hover:bg-[#b5482c] focus-visible:ring-[#c9a227]"
-      : night
-        ? "border border-[#c9a227]/60 text-[#f8e9cc] hover:bg-white/10 focus-visible:ring-[#e5c158]"
-        : "border border-[#9c3b22]/40 text-[#5a2a18] hover:bg-[#9c3b22]/10 focus-visible:ring-[#9c3b22]"
-  }`;
+const linkBtn = (_theme: Theme, primary: boolean) => btnClass(primary);
 
 function ExtLink({ href, label, primary, theme }: { href: string | null | undefined; label: string; primary?: boolean; theme: Theme }) {
   if (!realUrl(href)) return null;
@@ -89,7 +82,7 @@ function Body({ info, theme, headingId, aboutPhoto }: { info: InfoRef; theme: Th
               <p className="mt-3 text-base leading-relaxed">{w.blurb}</p>
               <ul className="mt-3 flex flex-wrap gap-1.5" aria-label="Tech used">
                 {w.stack.map((t) => (
-                  <li key={t} className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${theme.night ? "bg-white/10" : "bg-[#9c3b22]/10"}`}>
+                  <li key={t} className={chipClass()}>
                     {t}
                   </li>
                 ))}
@@ -105,9 +98,7 @@ function Body({ info, theme, headingId, aboutPhoto }: { info: InfoRef; theme: Th
                 <li key={o.id}>
                   <button
                     type="button"
-                    className={`rounded-full px-3 py-1 text-xs font-semibold transition focus:outline-none focus-visible:ring-2 ${
-                      theme.night ? "bg-white/5 hover:bg-white/10 focus-visible:ring-[#e5c158]" : "bg-[#9c3b22]/5 hover:bg-[#9c3b22]/10 focus-visible:ring-[#9c3b22]"
-                    }`}
+                    className={chipClass()}
                     onClick={() => useWorld.getState().openInfo({ kind: "workshop", id: o.id, spot: "workshop" })}
                   >
                     {o.name}
@@ -158,7 +149,7 @@ function Body({ info, theme, headingId, aboutPhoto }: { info: InfoRef; theme: Th
                 {taglineOf(p)} <span className="whitespace-nowrap opacity-80">· {p.year}</span>
               </p>
               {p.disclaimer && (
-                <p className={`mt-1 inline-block rounded-md px-2 py-0.5 text-xs font-semibold ${theme.night ? "bg-white/10 text-[#f1d98a]" : "bg-[#9c3b22]/10 text-[#7a2d18]"}`} data-disclaimer>
+                <p className={wellClass("mt-1 inline-block !px-2 !py-0.5 text-xs font-semibold")} data-disclaimer>
                   {p.disclaimer}
                 </p>
               )}
@@ -166,7 +157,7 @@ function Body({ info, theme, headingId, aboutPhoto }: { info: InfoRef; theme: Th
           </div>
           <p className="mt-3 text-base leading-relaxed">{p.pitch ?? p.description}</p>
           {!top && p.highlights.length > 0 && (
-            <ul className={`mt-3 space-y-1.5 rounded-xl px-3 py-2 text-sm leading-snug ${theme.night ? "bg-white/5" : "bg-[#9c3b22]/[0.06]"}`} aria-label="Highlights">
+            <ul className={wellClass("mt-3 space-y-1.5 text-sm leading-snug")} aria-label="Highlights">
               {p.highlights.slice(0, 2).map((h) => (
                 <li key={h} className="flex gap-2">
                   <span aria-hidden="true" className="mt-[0.5em] h-1.5 w-1.5 shrink-0 rotate-45" style={{ background: accent }} />
@@ -176,8 +167,8 @@ function Body({ info, theme, headingId, aboutPhoto }: { info: InfoRef; theme: Th
             </ul>
           )}
           {top && (
-            <div className={`mt-3 flex items-baseline gap-3 rounded-xl px-3 py-2 ${theme.night ? "bg-white/5" : "bg-[#9c3b22]/[0.06]"}`}>
-              <span className="min-w-[3ch] shrink-0 whitespace-nowrap text-3xl font-semibold leading-none tabular-nums" style={{ color: theme.night ? "#e5c158" : "#9c3b22" }}>
+            <div className={wellClass("mt-3 flex items-baseline gap-3")}>
+              <span className="min-w-[3ch] shrink-0 whitespace-nowrap text-3xl font-semibold leading-none tabular-nums" style={{ color: "#8f3320" }}>
                 {top.value}
               </span>
               <span className="min-w-0 text-sm leading-snug">
@@ -208,9 +199,7 @@ function Body({ info, theme, headingId, aboutPhoto }: { info: InfoRef; theme: Th
               <li key={p.id}>
                 <button
                   type="button"
-                  className={`w-full rounded-lg px-3 py-2 text-left text-sm transition focus:outline-none focus-visible:ring-2 ${
-                    theme.night ? "bg-white/5 hover:bg-white/10 focus-visible:ring-[#e5c158]" : "bg-[#9c3b22]/5 hover:bg-[#9c3b22]/10 focus-visible:ring-[#9c3b22]"
-                  }`}
+                  className={chipClass("w-full !rounded-lg !px-3 !py-2 text-left !text-sm !font-normal")}
                   onClick={() => useWorld.getState().openInfo({ kind: "project", id: p.id, spot: info.spot })}
                 >
                   <span className="font-semibold">{p.name}</span>
@@ -289,6 +278,17 @@ const KIND_LABEL: Record<InfoRef["kind"], string> = {
   workshop: "Workshop · Project Hall",
 };
 
+const KIND_NE: Record<InfoRef["kind"], string> = {
+  project: LABELS.zones["project-hall"].ne,
+  more: LABELS.zones["project-hall"].ne,
+  education: LABELS.zones.education.ne,
+  certificate: LABELS.zones.education.ne,
+  course: LABELS.zones.education.ne,
+  about: LABELS.zones.about.ne,
+  contact: LABELS.zones.mailbox.ne,
+  workshop: LABELS.zones["project-hall"].ne,
+};
+
 export default function InfoPanel({ aboutPhoto = null }: { aboutPhoto?: string | null }) {
   const info = useWorld((s) => s.info);
   const night = useWorld((s) => s.theme === "night");
@@ -330,43 +330,21 @@ export default function InfoPanel({ aboutPhoto = null }: { aboutPhoto?: string |
 
   if (!info) return null;
   const theme = { night };
-  const palette = night ? "border-[#c9a227] bg-[#2a1c22]/95 text-[#f8e9cc]" : "border-[#9c3b22] bg-[#fff8ec]/97 text-[#3a2419]";
   return (
-    <div
+    <LoktaPanel
       ref={panel}
       key={key}
+      night={night}
+      ne={KIND_NE[info.kind]}
+      kind={KIND_LABEL[info.kind]}
+      onClose={close}
       role="dialog"
       aria-modal="false"
       aria-labelledby={headingId}
       tabIndex={-1}
-      className={`info-panel panel-in pointer-events-auto box-border min-w-0 overflow-hidden rounded-2xl border-2 shadow-xl backdrop-blur focus:outline-none focus-visible:ring-2 focus-visible:ring-[#c9a227] ${palette}`}
-      style={{ fontFamily: "Mukta, system-ui, sans-serif" }}
+      className="info-panel pointer-events-auto min-w-0"
     >
-      {/* brick + gold lattice band (Newari jhyal motif) */}
-      <div
-        aria-hidden="true"
-        className="h-2 w-full"
-        style={{
-          background: night
-            ? "repeating-linear-gradient(45deg,#c9a227 0 3px,transparent 3px 8px),repeating-linear-gradient(-45deg,#c9a227 0 3px,#3a2418 3px 8px)"
-            : "repeating-linear-gradient(45deg,#c9a227 0 3px,transparent 3px 8px),repeating-linear-gradient(-45deg,#c9a227 0 3px,#9c3b22 3px 8px)",
-        }}
-      />
-      <div className="info-panel-scroll relative overflow-y-auto overscroll-contain px-4 pb-4 pt-3 [overflow-wrap:anywhere]">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.16em] opacity-60">{KIND_LABEL[info.kind]}</p>
-        <button
-          type="button"
-          onClick={close}
-          aria-label="Close (Esc)"
-          title="Close (Esc)"
-          className={`absolute right-2.5 top-2.5 flex h-8 w-8 items-center justify-center rounded-full text-lg leading-none transition focus:outline-none focus-visible:ring-2 ${
-            night ? "hover:bg-white/10 focus-visible:ring-[#e5c158]" : "hover:bg-[#9c3b22]/10 focus-visible:ring-[#9c3b22]"
-          }`}
-        >
-          <span aria-hidden="true">×</span>
-        </button>
-        <Body info={info} theme={theme} headingId={headingId} aboutPhoto={aboutPhoto} />
-      </div>
-    </div>
+      <Body info={info} theme={theme} headingId={headingId} aboutPhoto={aboutPhoto} />
+    </LoktaPanel>
   );
 }

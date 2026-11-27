@@ -1,5 +1,6 @@
 "use client";
 
+import { cardClass, chipClass } from "../ui/lokta";
 import { useEffect, useRef, useState } from "react";
 import { useWorld } from "@/store/world";
 import { occlusion } from "../nepal/materials";
@@ -131,19 +132,14 @@ export default function RobotBubble({ reducedMotion }: { reducedMotion: boolean 
 
   if (hidden || (!line && !thinking)) return null;
   const done = !line || shown >= line.text.length;
-  const palette = night
-    ? "border-[#c9a227] bg-[#2a1c22]/95 text-[#f8e9cc]"
-    : "border-[#9c3b22] bg-[#fff8ec]/95 text-[#3a2419]";
-  const chip = night
-    ? "border-[#c9a227]/60 bg-[#3a2a2e] text-[#f8e9cc] hover:bg-[#4a3438] focus-visible:ring-[#e5c158]"
-    : "border-[#9c3b22]/40 bg-[#fbe6cc] text-[#5a2a18] hover:bg-[#f6d6ae] focus-visible:ring-[#9c3b22]";
+  const tailClass = night ? "border-[#3e2416] bg-[#e6d6b2]" : "border-[#3e2416] bg-[#f6ead0]";
 
   return (
     <div
       className="flex w-max max-w-[280px] flex-col items-center"
       style={{ transform: "translate(-50%, calc(-100% - 6px))", fontFamily: "Mukta, system-ui, sans-serif" }}
     >
-      <div ref={fit} className={`relative w-max max-w-[280px] rounded-2xl border-2 px-3.5 py-2.5 text-[14px] leading-snug shadow-lg ${palette}`}>
+      <div ref={fit} data-night={night} className={cardClass("relative w-max max-w-[280px] px-3 py-2 text-[15px] leading-snug")}>
         {thinking || !line ? (
           <span className="tracking-widest" aria-hidden="true">…</span>
         ) : (
@@ -161,7 +157,7 @@ export default function RobotBubble({ reducedMotion }: { reducedMotion: boolean 
                 key={`${line.id}-${i}`}
                 type="button"
                 onClick={() => pickSuggestion(sg)}
-                className={`pointer-events-auto rounded-full border px-2.5 py-1 text-[12px] font-medium transition focus:outline-none focus-visible:ring-2 ${chip}`}
+                className={chipClass("pointer-events-auto cursor-pointer")}
               >
                 {sg.label}
               </button>
@@ -171,7 +167,7 @@ export default function RobotBubble({ reducedMotion }: { reducedMotion: boolean 
         {/* tail */}
         <span
           ref={tail}
-          className={`absolute left-1/2 top-full h-3 w-3 -translate-x-1/2 -translate-y-[6px] rotate-45 border-b-2 border-r-2 ${palette}`}
+          className={`absolute left-1/2 top-full h-3 w-3 -translate-x-1/2 -translate-y-[6px] rotate-45 border-b-[3px] border-r-[3px] ${tailClass}`}
           aria-hidden="true"
         />
       </div>

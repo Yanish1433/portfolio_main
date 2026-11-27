@@ -29,6 +29,7 @@ import { EASELS, SCROLL } from "./halls/layout";
 import type { InfoRef } from "@/store/world";
 import GuideMenu from "./guide/GuideMenu";
 import GuestbookButton from "./guestbook/GuestbookUi";
+import { btnClass, cardClass, pillClass, rowClass } from "./ui/lokta";
 import { WheelCard, SkillFilterBar, WheelHint } from "./wheels/WheelUi";
 
 const RECRUITER_HREF = "/recruiter";
@@ -173,12 +174,12 @@ function ZoneCard() {
   const isKiosk = zone.id === "kiosk";
   const isAbout = zone.id === "about";
   const button =
-    "pointer-events-auto rounded-full px-5 py-2 text-sm font-semibold text-white shadow transition hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-white";
+    btnClass(true, "pointer-events-auto");
 
   return (
     <div className="pointer-events-none flex w-full justify-center">
       <div
-        className="pointer-events-auto box-border w-full max-w-[min(28rem,calc(100vw-32px))] min-w-0 [overflow-wrap:anywhere] rounded-2xl border border-white/60 bg-[#fff8ec]/95 p-4 text-[#4a3228] shadow-xl backdrop-blur"
+        className={cardClass("pointer-events-auto box-border w-full max-w-[min(28rem,calc(100vw-32px))] min-w-0 [overflow-wrap:anywhere] p-4")}
         role="dialog"
         aria-label={zone.label}
       >
@@ -196,7 +197,7 @@ function ZoneCard() {
           <button
             type="button"
             data-next-milestone
-            className="pointer-events-auto mt-3 w-full rounded-xl bg-[#9c3b22] px-3 py-2 text-left text-sm font-semibold text-white shadow transition hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#c9a227]"
+            className={btnClass(true, "pointer-events-auto mt-3 w-full !justify-start !text-left")}
             onClick={() => runAction({ type: "walkTo", zone: "mailbox" })}
           >
             {NEXT_MILESTONE_TEXT}
@@ -208,12 +209,12 @@ function ZoneCard() {
             {content.lines.map((l, i) => {
               const focused = !!focusProject && content.ids?.[i] === focusProject;
               const ref = content.refs?.[i];
-              const look = `rounded px-2 py-1 ${focused ? "bg-[#c9a227]/30 font-semibold ring-2 ring-[#c9a227]" : "bg-black/5"}`;
+              const look = rowClass(focused ? "!bg-[#c9a227]/30 font-semibold ring-2 ring-[#c9a227]" : "");
               return ref ? (
                 <li key={i}>
                   <button
                     type="button"
-                    className={`${look} w-full text-left transition hover:bg-[#c9a227]/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#9c3b22]`}
+                    className={`${look} w-full text-left transition`}
                     aria-current={focused ? "true" : undefined}
                     onClick={() => visitByVisitor(ref)}
                   >
@@ -231,15 +232,15 @@ function ZoneCard() {
         <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <span className="text-xs opacity-70">{zone.prompt}</span>
           {isKiosk ? (
-            <Link href={RECRUITER_HREF} className={button} style={{ background: "#2f8f7a" }}>
+            <Link href={RECRUITER_HREF} className={button}>
               Open Recruiter mode
             </Link>
           ) : isAbout ? (
-            <button type="button" className={button} style={{ background: "#d9775b" }} onClick={() => { useWorld.getState().clearInfoDismissed(); useWorld.getState().openInfo(ABOUT_INFO); }}>
+            <button type="button" className={button} onClick={() => { useWorld.getState().clearInfoDismissed(); useWorld.getState().openInfo(ABOUT_INFO); }}>
               Meet {profile.name.split(" ")[0]}
             </button>
           ) : content.lines.length > 0 ? (
-            <button type="button" className={button} style={{ background: "#d9775b" }} onClick={() => setPanelOpen(!panelOpen)}>
+            <button type="button" className={button} onClick={() => setPanelOpen(!panelOpen)}>
               {panelOpen ? "Close" : "Enter"}
             </button>
           ) : null}
@@ -259,7 +260,7 @@ function Hint() {
         loaded && !moved && !gharHint ? "opacity-100" : "opacity-0"
       }`}
     >
-      <p className="rounded-full bg-[#5a3d33]/80 px-4 py-2 text-sm text-white shadow">
+      <p className="rounded-lg border-2 border-[#c9a227] bg-[#3e2416] px-4 py-2 text-sm text-[#fbe9b7] shadow">
         Click anywhere to walk
         <span className="hidden [@media(pointer:coarse)]:inline"> · or use the joystick</span>
         <span className="[@media(pointer:coarse)]:hidden"> · WASD / arrows to run, Shift to walk</span>
@@ -298,7 +299,7 @@ function CameraHint() {
       className={`pointer-events-none absolute inset-x-0 top-[7.5rem] z-10 flex justify-center px-4 transition-opacity duration-700 sm:top-16 ${show ? "opacity-100" : "opacity-0"}`}
       aria-hidden={!show}
     >
-      <p className="rounded-full bg-[#5a3d33]/80 px-4 py-2 text-sm text-white shadow" role="status">
+      <p className="rounded-lg border-2 border-[#c9a227] bg-[#3e2416] px-4 py-2 text-sm text-[#fbe9b7] shadow" role="status">
         <span className="hidden [@media(pointer:coarse)]:inline">Two fingers to turn and zoom</span>
         <span className="[@media(pointer:coarse)]:hidden">Drag to look around · scroll to zoom</span>
       </p>
@@ -317,7 +318,7 @@ function ResetViewButton() {
       onClick={() => worldControl.resetView?.()}
       aria-label="Reset view (R)"
       title="Reset view (R)"
-      className="pointer-events-auto flex h-10 items-center gap-1.5 rounded-full bg-white/80 px-3 text-sm font-medium text-[#4a3228] shadow backdrop-blur transition hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#c9a227]"
+      className={pillClass("h-10")}
     >
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M4 12a8 8 0 1 0 2.5-5.8" />
@@ -339,7 +340,7 @@ function EagleViewButton() {
       aria-label="Eagle view (V)"
       aria-pressed={eagle}
       title="Eagle view (V)"
-      className={`pointer-events-auto flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-full px-3 text-sm font-medium text-[#4a3228] shadow backdrop-blur transition hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#c9a227] sm:h-10 ${eagle ? "bg-[#ffe9a8]" : "bg-white/80"}`}
+      className={pillClass(`h-11 min-w-11 justify-center sm:h-10 ${eagle ? "!brightness-150" : ""}`)}
     >
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <path d="M2 9c3-1 6 0 10 5 4-5 7-6 10-5-1 5-4 8-10 9-6-1-9-4-10-9z" />
@@ -379,7 +380,7 @@ function HallHint() {
       className={`pointer-events-none absolute inset-x-0 top-16 z-10 flex justify-center px-4 transition-opacity duration-500 sm:top-4 ${show && !hidden ? "opacity-100" : "opacity-0"}`}
       aria-hidden={!show || hidden}
     >
-      <p className="max-w-[min(34rem,calc(100vw-32px))] rounded-2xl bg-[#5a3d33]/85 px-4 py-2 text-center text-sm text-white shadow" role="status">
+      <p className="max-w-[min(34rem,calc(100vw-32px))] rounded-lg border-2 border-[#c9a227] bg-[#3e2416] px-4 py-2 text-center text-sm text-[#fbe9b7] shadow" role="status">
         Walk up to a screen to see a project. Tap <strong className="font-semibold text-[#ffe08a]">Watch demo</strong> to see it full screen.
       </p>
     </div>
@@ -406,7 +407,7 @@ function ThemeToggle() {
       onClick={toggle}
       aria-label={`${label} (N)`}
       title={`${label} (N)`}
-      className="pointer-events-auto flex h-10 w-10 items-center justify-center rounded-full bg-white/80 text-[#4a3228] shadow backdrop-blur transition hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#c9a227]"
+      className={pillClass("h-10 w-10 !px-0 justify-center")}
     >
       {night ? (
         <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
@@ -423,7 +424,7 @@ function ThemeToggle() {
 }
 
 const pill =
-  "pointer-events-auto flex h-10 items-center gap-2 rounded-full bg-white/80 px-3 text-sm font-medium text-[#4a3228] shadow backdrop-blur transition hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#c9a227]";
+  pillClass("h-10");
 
 /** Dance emote (also the G key). */
 function AvatarControls() {
@@ -489,7 +490,7 @@ export default function Overlay({ characters, thumbs = [], posters = [], aboutPh
         <ThemeToggle />
         <Link
           href={RECRUITER_HREF}
-          className="pointer-events-auto rounded-full bg-white/80 px-4 py-2 text-sm font-medium text-[#4a3228] shadow backdrop-blur transition hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#c9a227]"
+          className={pillClass()}
         >
           Recruiter mode
         </Link>

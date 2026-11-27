@@ -4,11 +4,11 @@
 // Everything a visitor typed is rendered as React text nodes (never innerHTML).
 import { useEffect, useRef, useState } from "react";
 import { cooldownLeft, MESSAGE_MAX, minutes, NAME_MAX, postNote, readLast, validate, writeLast } from "@/lib/guestbook";
+import { WaxSeal, btnClass, cardClass, fieldClass, floatClass, pillClass } from "../ui/lokta";
 import { guestbookEnabled, loadNotes, useGuestbook } from "./store";
 
-const pill =
-  "pointer-events-auto flex h-11 items-center gap-1.5 rounded-full bg-white/80 px-3 text-sm font-medium text-[#4a3228] shadow backdrop-blur transition hover:bg-white focus:outline-none focus-visible:ring-2 focus-visible:ring-[#c9a227] sm:h-10";
-const field = "w-full rounded-lg border border-[#5a3d33]/25 bg-white px-3 py-2 text-sm text-[#4a3228] focus:outline-none focus-visible:ring-2 focus-visible:ring-[#c9a227]";
+const pill = pillClass("h-11 sm:h-10");
+const field = fieldClass();
 
 function Form() {
   const close = useGuestbook((s) => s.closeForm);
@@ -44,19 +44,20 @@ function Form() {
 
   return (
     <div className="pointer-events-auto fixed inset-0 z-40 flex items-center justify-center bg-black/30 p-4" onKeyDown={(e) => e.nativeEvent.stopPropagation()} onKeyUp={(e) => e.nativeEvent.stopPropagation()}>
-      <div className="box-border w-full max-w-[min(26rem,calc(100vw-32px))] rounded-2xl border border-white/60 bg-[#fff8ec] p-4 text-[#4a3228] shadow-xl" role="dialog" aria-modal="true" aria-label="Leave a note">
+      <div className={cardClass(`box-border w-full max-w-[min(26rem,calc(100vw-32px))] p-4 ${floatClass}`)} role="dialog" aria-modal="true" aria-label="Leave a note">
         <div className="flex items-start justify-between gap-3">
-          <h2 className="text-lg font-semibold">
+          <h2 className="text-lg font-semibold text-[#8f3320]">
             Leave a note <span lang="ne" className="font-medium opacity-70" style={{ fontFamily: "Mukta, sans-serif" }}>सन्देश</span>
           </h2>
-          <button type="button" onClick={close} aria-label="Close" className="rounded-full px-2 text-xl leading-none opacity-70 hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#c9a227]">
+          <button type="button" onClick={close} aria-label="Close" className="rounded-full px-2 text-xl leading-none text-[#8f3320] hover:opacity-70">
             ×
           </button>
         </div>
         {done ? (
           <div className="mt-3 text-sm" role="status">
-            <p>Thank you! Your flag will fly once Yanish approves it.</p>
-            <button type="button" onClick={close} className="mt-3 rounded-full bg-[#d9775b] px-5 py-2 text-sm font-semibold text-white shadow hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#c9a227]">
+            <WaxSeal />
+            <p className="mt-2 text-center">Thank you! Your flag will fly once Yanish approves it.</p>
+            <button type="button" onClick={close} className={btnClass(true, "mt-3")}>
               Close
             </button>
           </div>
@@ -79,15 +80,15 @@ function Form() {
             </div>
             <p className="text-xs opacity-75">Your name and note will be public after approval. No links, please.</p>
             {error && (
-              <p className="text-sm font-medium text-[#9c2b1a]" role="alert">
+              <p className="text-sm font-semibold text-[#8a1c10]" role="alert">
                 {error}
               </p>
             )}
             <div className="flex justify-end gap-2">
-              <button type="button" onClick={close} className="rounded-full px-4 py-2 text-sm font-medium opacity-80 hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#c9a227]">
+              <button type="button" onClick={close} className={btnClass(false)}>
                 Cancel
               </button>
-              <button type="submit" disabled={busy} className="rounded-full bg-[#d9775b] px-5 py-2 text-sm font-semibold text-white shadow hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#c9a227] disabled:opacity-60">
+              <button type="submit" disabled={busy} className={btnClass(true)}>
                 {busy ? "Sending…" : "Hang my flag"}
               </button>
             </div>
@@ -104,10 +105,10 @@ function Card() {
   if (!card) return null;
   return (
     <div className="pointer-events-none fixed inset-x-0 top-20 z-30 flex justify-center px-4">
-      <div className="pointer-events-auto box-border w-full max-w-[min(24rem,calc(100vw-32px))] [overflow-wrap:anywhere] rounded-2xl border border-white/60 bg-[#fff8ec]/95 p-4 text-[#4a3228] shadow-xl backdrop-blur" role="dialog" aria-label={`Note from ${card.name}`}>
+      <div className={cardClass(`pointer-events-auto box-border w-full max-w-[min(24rem,calc(100vw-32px))] [overflow-wrap:anywhere] p-4 ${floatClass}`)} role="dialog" aria-label={`Note from ${card.name}`}>
         <div className="flex items-start justify-between gap-3">
-          <p className="text-base font-semibold">{card.name}</p>
-          <button type="button" onClick={() => setCard(null)} aria-label="Close note" className="rounded-full px-2 text-xl leading-none opacity-70 hover:opacity-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#c9a227]">
+          <p className="text-base font-semibold text-[#8f3320]">{card.name}</p>
+          <button type="button" onClick={() => setCard(null)} aria-label="Close note" className="rounded-full px-2 text-xl leading-none text-[#8f3320] hover:opacity-70">
             ×
           </button>
         </div>

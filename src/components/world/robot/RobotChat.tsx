@@ -1,5 +1,6 @@
 "use client";
 
+import { btnClass, cardClass, pillClass } from "../ui/lokta";
 import { useEffect, useRef, useState } from "react";
 import { useWorld } from "@/store/world";
 import { characterById } from "../characters";
@@ -87,13 +88,13 @@ export default function RobotChat() {
             <button
               type="button"
               onClick={() => useWorld.getState().interrupt()}
-              className="rounded-full border-2 border-[#c9a227] bg-[#9c3b22] px-4 py-1.5 text-sm font-semibold text-white shadow-lg transition hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-white"
+              className={pillClass("shadow-lg")}
             >
               ■ {LABELS.ui.stopTour}
             </button>
           )}
           <form
-            className="flex w-full items-center gap-2 rounded-full border-2 border-[#9c3b22]/50 bg-[#fff8ec]/95 p-1.5 pl-4 shadow-xl backdrop-blur [[data-theme=dark]_&]:border-[#c9a227]/60 [[data-theme=dark]_&]:bg-[#2a1c22]/95"
+            className={cardClass("flex w-full items-center gap-2 !rounded-xl !border-4 p-1 pl-3")}
             onSubmit={(e) => {
               e.preventDefault();
               send();
@@ -119,13 +120,13 @@ export default function RobotChat() {
               autoComplete="off"
               enterKeyHint="send"
               maxLength={200}
-              className="min-w-0 flex-1 bg-transparent py-1.5 text-[15px] text-[#3a2419] placeholder:text-[#3a2419]/55 focus:outline-none [[data-theme=dark]_&]:text-[#f8e9cc] [[data-theme=dark]_&]:placeholder:text-[#f8e9cc]/55"
+              className="min-w-0 flex-1 bg-transparent py-1.5 text-[15px] text-[#2b1d14] placeholder:text-[#2b1d14]/60 focus:outline-none"
               style={{ fontFamily: "Mukta, system-ui, sans-serif" }}
             />
             <button
               type="submit"
               disabled={!text.trim() || thinking}
-              className="shrink-0 rounded-full bg-[#9c3b22] px-4 py-2 text-sm font-semibold text-white transition hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#c9a227] disabled:opacity-50"
+              className={btnClass(true, "shrink-0 !min-h-9 !px-4 !py-1")}
             >
               {LABELS.robot.send}
             </button>
@@ -150,7 +151,7 @@ export function Toast() {
     <div className="pointer-events-none absolute inset-x-0 top-16 z-30 flex justify-center px-4" role="status" aria-live="polite">
       {toast && (
         <p
-          className={`rounded-full border-2 border-[#c9a227] bg-[#2a1c22]/90 px-4 py-2 text-sm font-medium text-[#f8e9cc] shadow-lg transition-opacity duration-300 ${
+          className={`${pillClass("shadow-lg")} transition-opacity duration-300 ${
             visible ? "opacity-100" : "opacity-0"
           }`}
         >

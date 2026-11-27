@@ -1,23 +1,18 @@
 "use client";
 
 import { useId, useState } from "react";
-import type { CSSProperties } from "react";
 import styles from "./recruiter.module.css";
+import { btnClass, errClass, fieldClass, labelClass, WaxSeal } from "@/components/world/ui/lokta";
 import { buildPayload, isSuccess, validateContact, WEB3FORMS_URL, type ContactErrors } from "./contactSubmit";
 
 type Status = "idle" | "sending" | "success" | "error";
-
-// The form is also used inside the 3D world, outside the Recruiter Mode theme variables.
-const panelVars = (night: boolean): CSSProperties =>
-  (night
-    ? { "--text": "#f8e9cc", "--card": "rgba(255,255,255,0.08)", "--line": "rgba(229,193,88,0.4)", "--accent": "#e5c158", "--accent-ink": "#2a1c22", "--accent-hover": "#f3d98a", "--muted": "#d9c9a6" }
-    : { "--text": "#3a2419", "--card": "#fffdf7", "--line": "rgba(156,59,34,0.35)", "--accent": "#9c3b22", "--accent-ink": "#ffffff", "--accent-hover": "#b5482c", "--muted": "#6b4a3a" }) as CSSProperties;
 
 /**
  * Contact form (Web3Forms). One component for Recruiter Mode and the world mailbox.
  * The access key is public by design (NEXT_PUBLIC_WEB3FORMS_KEY, needed at build time).
  */
 export function ContactForm({ githubUrl, variant = "page", night = false }: { githubUrl?: string; variant?: "page" | "panel"; night?: boolean }) {
+  void night; // the lokta paper is the same by day and night; the frame glows at night
   const key = process.env.NEXT_PUBLIC_WEB3FORMS_KEY;
   const [status, setStatus] = useState<Status>("idle");
   const [errors, setErrors] = useState<ContactErrors>({});
@@ -68,11 +63,12 @@ export function ContactForm({ githubUrl, variant = "page", night = false }: { gi
     }
   }
 
+  const panel = variant === "panel"; // the world mailbox: lokta paper look (presentation only)
   const locked = status === "sending" || status === "success";
   const err = (k: keyof ContactErrors) => (errors[k] ? { "aria-invalid": true, "aria-describedby": `${uid}-${k}` } : {});
   const fieldError = (k: keyof ContactErrors) =>
     errors[k] ? (
-      <span id={`${uid}-${k}`} style={{ color: "var(--accent)", fontWeight: 500, fontSize: "0.8rem" }}>
+      <span id={`${uid}-${k}`} className={panel ? errClass : undefined} style={panel ? undefined : { color: "var(--accent)", fontWeight: 500, fontSize: "0.8rem" }}>
         {errors[k]}
       </span>
     ) : null;
@@ -87,28 +83,29 @@ export function ContactForm({ githubUrl, variant = "page", night = false }: { gi
           : "";
 
   return (
-    <form className={styles.form} onSubmit={onSubmit} noValidate style={variant === "panel" ? { ...panelVars(night), gap: 10, color: "var(--text)" } : undefined} data-contact-form>
-      <label className={styles.field}>
-        <span>Name</span>
-        <input name="name" type="text" autoComplete="name" required disabled={locked} {...err("name")} />
+    <form className={panel ? "flex flex-col gap-3" : styles.form} onSubmit={onSubmit} noValidate data-contact-form>
+      {panel && status === "success" && <WaxSeal />}
+      <label className={panel ? "block" : styles.field}>
+        <span className={panel ? labelClass : undefined}>Name</span>
+        <input className={panel ? fieldClass() : undefined} name="name" type="text" autoComplete="name" required disabled={locked} {...err("name")} />
         {fieldError("name")}
       </label>
-      <label className={styles.field}>
-        <span>Email</span>
-        <input name="email" type="email" autoComplete="email" required disabled={locked} {...err("email")} />
+      <label className={panel ? "block" : styles.field}>
+        <span className={panel ? labelClass : undefined}>Email</span>
+        <input className={panel ? fieldClass() : undefined} name="email" type="email" autoComplete="email" required disabled={locked} {...err("email")} />
         {fieldError("email")}
       </label>
-      <label className={styles.field}>
-        <span>Message</span>
-        <textarea name="message" rows={variant === "panel" ? 3 : 5} required minLength={10} disabled={locked} {...err("message")} />
+      <label className={panel ? "block" : styles.field}>
+        <span className={panel ? labelClass : undefined}>Message</span>
+        <textarea className={panel ? fieldClass() : undefined} name="message" rows={variant === "panel" ? 3 : 5} required minLength={10} disabled={locked} {...err("message")} />
         {fieldError("message")}
       </label>
       {/* honeypot: bots tick it, people never see it */}
       <input type="checkbox" name="botcheck" tabIndex={-1} autoComplete="off" style={{ display: "none" }} aria-hidden="true" />
-      <button type="submit" className={`${styles.btn} ${styles.btnPrimary}`} disabled={locked}>
+      <button type="submit" className={panel ? btnClass(true) : `${styles.btn} ${styles.btnPrimary}`} disabled={locked}>
         {status === "sending" ? "Sending…" : status === "error" ? "Try again" : "Send message"}
       </button>
-      <p className={styles.formStatus} role="status" aria-live="polite" data-contact-status={status}>
+      <p className={styles.formStatus} role="status" aria-live="polite" data-contact-status={status} style={panel ? { color: "#2b1d14", fontWeight: 600 } : undefined}>
         {statusText}
       </p>
     </form>
