@@ -5,7 +5,9 @@
 import { useEffect, useRef, useState } from "react";
 import { pillClass } from "@/components/book";
 import { QUICK_TIMES, formatTime, timeIcon } from "@/components/world/nepal/timeLook";
-import { applyClock, readMinutes, saveMinutes } from "./clock";
+import { applyClock, saveMinutes } from "./clock";
+import { currentMinutes, initFlow, pick, subscribe } from "./flow";
+import FlowToggle from "./FlowToggle";
 
 export default function TimePill({ className }: { className?: string }) {
   const [minutes, setMinutes] = useState<number | null>(null);
@@ -14,9 +16,15 @@ export default function TimePill({ className }: { className?: string }) {
   const host = () => root.current?.closest<HTMLElement>("[data-time-root]") ?? null;
 
   useEffect(() => {
-    const m = readMinutes();
+    const m = Math.floor(initFlow());
     setMinutes(m);
     applyClock(host(), m);
+    // the flowing clock: one update per game-minute (text, data-theme / data-tod, --glow, the "world-time" event)
+    return subscribe(() => {
+      const r = Math.floor(currentMinutes());
+      setMinutes(r);
+      applyClock(host(), r);
+    });
   }, []);
 
   useEffect(() => {
@@ -38,6 +46,7 @@ export default function TimePill({ className }: { className?: string }) {
   const set = (m: number, persist: boolean | "now" = false) => {
     setMinutes(m);
     applyClock(host(), m);
+    pick(m, true);
     if (persist) saveMinutes(persist === "now" ? null : m);
   };
   const now = () => {
@@ -47,7 +56,8 @@ export default function TimePill({ className }: { className?: string }) {
   const m = minutes ?? 720;
 
   return (
-    <div ref={root} className={`relative ${className ?? ""}`} onKeyDown={(e) => e.stopPropagation()}>
+    <div ref={root} className={`relative flex items-center gap-2 ${className ?? ""}`} onKeyDown={(e) => e.stopPropagation()}>
+      <FlowToggle />
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}

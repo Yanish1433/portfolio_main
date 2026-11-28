@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from "react";
 import { isTypingTarget, useWorld } from "@/store/world";
 import { QUICK_TIMES, formatTime, timeIcon } from "../nepal/timeLook";
 import { pillClass } from "@/components/book";
+import FlowToggle from "@/lib/time/FlowToggle";
 
 const STEP = 15;
 
@@ -47,7 +48,8 @@ export default function TimeDial() {
   };
 
   return (
-    <div ref={root} className="relative">
+    <div ref={root} className="relative flex items-center gap-2">
+      <FlowToggle />
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}

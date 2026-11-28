@@ -14,6 +14,8 @@ import { charMaterials, charRim } from "../lookdev";
 import { timeToLook, DAY_MINUTES } from "./timeLook";
 import { weather } from "../weather/weatherState";
 import { AVATAR_SCALE } from "../characters";
+import { currentMinutes, initFlow, isPaused, subscribe } from "@/lib/time/flow";
+import { useWorld } from "@/store/world";
 
 const POOL = 4;
 
@@ -63,6 +65,11 @@ const RAIN_NIGHT = C("#161e36");
 const _wc = new THREE.Color();
 
 const _col = new THREE.Color();
+const FLAME_DIM = C("#3a2412"); // an unlit wick: the flame fades up from this so it never pops in
+const smooth = (a: number, b: number, x: number) => {
+  const k = Math.min(Math.max((x - a) / (b - a), 0), 1);
+  return k * k * (3 - 2 * k);
+};
 const _v = new THREE.Vector3();
 const _buf = new THREE.Vector2();
 
@@ -94,7 +101,13 @@ export default function ThemeDriver({
     if (new URLSearchParams(window.location.search).has("debug")) (window as unknown as { __occl?: unknown }).__occl = occlusion.value;
     scene.fog = new THREE.Fog(DAY.fog.clone(), 100, 250);
     scene.background = DAY.fog.clone();
+    // the flowing clock: the shared module advances the minutes (per frame below); the store and the HUD follow once per game-minute
+    initFlow();
+    const off = subscribe(() => {
+      if (!isPaused()) useWorld.getState().setMinutes(Math.floor(currentMinutes()), false);
+    });
     return () => {
+      off();
       scene.fog = null;
     };
   }, [gl, scene, m]);
@@ -102,13 +115,14 @@ export default function ThemeDriver({
   useFrame((state, dtRaw) => {
     const dt = Math.min(dtRaw, 0.1);
     // time of day: ease the shown minutes toward the goal along the shortest way round the clock
+    if (!isPaused()) themeState.minutes = currentMinutes();
     const goal = themeState.minutes;
     if (!themeState.initialised || reducedMotion) {
       themeState.shown = goal;
       themeState.initialised = true;
     } else {
       const diff = ((goal - themeState.shown + DAY_MINUTES * 1.5) % DAY_MINUTES) - DAY_MINUTES / 2;
-      themeState.shown = Math.abs(diff) < 0.05 ? goal : (themeState.shown + diff * (1 - Math.exp(-dt * 7)) + DAY_MINUTES) % DAY_MINUTES;
+      themeState.shown = Math.abs(diff) < 2 ? goal : (themeState.shown + diff * (1 - Math.exp(-dt * 7)) + DAY_MINUTES) % DAY_MINUTES;
     }
     const look = timeToLook(themeState.shown);
     const t = look.t;
@@ -151,14 +165,23 @@ export default function ThemeDriver({
     (m.window as THREE.ShaderMaterial).uniforms.uT.value = t;
     m.gold.emissiveIntensity = L(DAY.gold, NIGHT.gold);
     m.gold.envMapIntensity = L(DAY.env, NIGHT.env);
-    m.flame.color.lerpColors(DAY.flame, NIGHT.flame, t);
+    m.flame.color.lerpColors(DAY.flame, NIGHT.flame, t).lerp(FLAME_DIM, 1 - smooth(0.02, 0.15, t));
     m.flame.visible = t > 0.02;
     for (const h of themeTargets.halos) {
       h.mat.opacity = L(h.day, h.night);
       h.mat.visible = h.mat.opacity > 0.01;
     }
-    for (const o of themeTargets.nightOnly) o.visible = t > 0.5;
-    for (const o of themeTargets.dayOnly) o.visible = t <= 0.5;
+    // night-only / day-only groups shrink away around t = 0.5 instead of popping
+    const nightK = smooth(0.35, 0.5, t);
+    const dayK = 1 - smooth(0.35, 0.5, t);
+    for (const o of themeTargets.nightOnly) {
+      o.visible = nightK > 0.01;
+      o.scale.setScalar(Math.max(nightK, 0.001));
+    }
+    for (const o of themeTargets.dayOnly) {
+      o.visible = dayK > 0.01 && t <= 0.5;
+      o.scale.setScalar(Math.max(dayK, 0.001));
+    }
     if (themeTargets.bloom) themeTargets.bloom.intensity = L(DAY.bloom, NIGHT.bloom);
     for (const g of themeTargets.glows) {
       const k = L(g.day, g.night);

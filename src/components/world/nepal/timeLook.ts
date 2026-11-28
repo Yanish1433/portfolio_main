@@ -112,8 +112,14 @@ export function wrapMinutes(m: number): number {
 /** Sun direction: rises east ~06:00, sets west ~18:30; below the horizon at night. */
 export function sunDirection(minutes: number): RGB {
   const m = wrapMinutes(minutes);
-  const u = (m - h(6)) / (h(18, 30) - h(6)); // 0..1 across the day arc
-  const a = Math.PI * Math.min(Math.max(u, -0.25), 1.25);
+  const span = h(18, 30) - h(6);
+  const lo = h(6) - 0.25 * span; // 03:22: the sun is 45 deg below the east horizon
+  const hi = h(6) + 1.25 * span; // 19:07: 45 deg below the west horizon
+  // 0..1 across the day arc. Through the night the sun keeps turning under the world (hi -> lo next day), so a flowing clock never
+  // sees the old clamp's jump at midnight (the sun used to flip from the west to the east side in one minute).
+  const mm = m < lo ? m + DAY_MINUTES : m;
+  const u = mm > hi ? 1.25 + (0.5 * (mm - hi)) / (lo + DAY_MINUTES - hi) : (mm - h(6)) / span;
+  const a = Math.PI * u;
   const x = Math.cos(a) * 0.8;
   const y = Math.sin(a);
   const z = -0.55;

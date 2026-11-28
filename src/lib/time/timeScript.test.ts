@@ -3,9 +3,10 @@ import assert from "node:assert/strict";
 import vm from "node:vm";
 import { TIME_SCRIPT } from "./timeScript";
 import { resolveMinutes, lookOf, todAt } from "./clock";
+import { resolveStart, resolvePaused, CYCLE_MIN } from "./flow";
 import { paperLook } from "./paperLook";
 
-type Case = { search: string; saved?: string | null; legacy?: string | null; now: number; session?: string | null; hash?: string };
+type Case = { search: string; saved?: string | null; legacy?: string | null; now: number; session?: string | null; hash?: string; flow?: { m: number; at: number } | null; nowMs?: number; paused?: string | null; reduced?: boolean };
 
 function runScript(c: Case) {
   const style: Record<string, string> = {};
@@ -23,9 +24,10 @@ function runScript(c: Case) {
     document: { currentScript: { parentElement: el } },
     location: { search: c.search, hash: c.hash ?? "" },
     URLSearchParams,
-    localStorage: store({ "world-time": c.saved, "world-theme": c.legacy }),
-    sessionStorage: store({ "book-cover": c.session }),
-    Date: DateFake,
+    localStorage: store({ "world-time": c.saved, "world-theme": c.legacy, "world-flow-paused": c.paused }),
+    sessionStorage: store({ "book-cover": c.session, "world-flow": c.flow ? JSON.stringify(c.flow) : null }),
+    matchMedia: () => ({ matches: !!c.reduced }),
+    Date: Object.assign(DateFake, { now: () => c.nowMs ?? 0 }),
     Math,
     isFinite,
   };
@@ -90,4 +92,28 @@ test("paperLook: 0 at day, 1 deep night, blended at dusk and dawn", () => {
   assert.equal(paperLook(12 * 60).paper, "#f6ead0");
   assert.equal(paperLook(23 * 60).paper, "#e6d6b2");
   for (let m = 0; m < 1440; m++) assert.ok(paperLook(m).glow >= 0 && paperLook(m).glow <= 1);
+});
+
+test("inline script continues this session's flow anchor like flow.ts resolveStart", () => {
+  const T0 = 1_700_000_000_000;
+  const msPerMin = (CYCLE_MIN * 60000) / 1440;
+  const flows: Case[] = [
+    { search: "", now: 100, flow: { m: 400, at: T0 }, nowMs: T0 + 100 * msPerMin }, // 100 game minutes later
+    { search: "", now: 100, flow: { m: 1400, at: T0 }, nowMs: T0 + 100 * msPerMin }, // wraps midnight
+    { search: "", now: 100, flow: { m: 400, at: T0 }, nowMs: T0 + 100 * msPerMin, paused: "1" },
+    { search: "", now: 100, flow: { m: 400, at: T0 }, nowMs: T0 + 100 * msPerMin, reduced: true },
+    { search: "", now: 100, flow: { m: 400, at: T0 }, nowMs: T0 + 100 * msPerMin, reduced: true, paused: "0" },
+    { search: "?time=22:00", now: 100, flow: { m: 400, at: T0 }, nowMs: T0 + 5000 }, // URL beats the anchor
+    { search: "", now: 100, saved: "900", flow: { m: 400, at: T0 }, nowMs: T0 }, // anchor beats the saved pick (a pick re-anchors)
+  ];
+  for (const c of flows) {
+    const q = new URLSearchParams(c.search);
+    const paused = resolvePaused(c.paused, !!c.reduced);
+    const m = Math.floor(resolveStart({ time: q.get("time"), theme: q.get("theme"), saved: c.saved, nowMin: c.now, anchor: c.flow, nowMs: c.nowMs ?? 0, paused }));
+    const want = lookOf(m);
+    const got = runScript(c);
+    assert.equal(got.tod, todAt(m), JSON.stringify(c));
+    assert.equal(got.theme, want.theme, JSON.stringify(c));
+    assert.ok(Math.abs(got.glow - want.glow) < 0.001, JSON.stringify(c));
+  }
 });

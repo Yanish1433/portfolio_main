@@ -3,6 +3,7 @@ import type { CharacterId } from "@/components/world/characters";
 import type { SkillCategory } from "@/content/profile";
 import { deriveTheme, parseTime, themeAt, wrapMinutes } from "@/components/world/nepal/timeLook";
 import { themeState } from "@/components/world/nepal/themeState";
+import { initFlow, pick as flowPick } from "@/lib/time/flow";
 import { reduceCamMode } from "@/components/world/cameraRig";
 
 export type Vec2 = [number, number];
@@ -234,6 +235,7 @@ export const useWorld = create<WorldState>((set, get) => ({
   setMinutes: (m, persist = false) => {
     const minutes = wrapMinutes(Math.round(m));
     themeState.minutes = minutes;
+    flowPick(minutes, true); // a manual pick re-anchors the flowing clock (ignored when the flow itself is the caller)
     const cur = get().theme;
     const theme = deriveTheme(minutes, cur);
     if (persist) saveMinutes(persist === "now" ? null : minutes);
@@ -329,7 +331,7 @@ export function isTypingTarget(e: Event): boolean {
 
 /** Apply the starting time of day (no hysteresis, nothing saved). */
 export function initTime() {
-  const minutes = initialMinutes();
+  const minutes = Math.floor(initFlow()); // the shared flowing clock (starts at initialMinutes' rule, or this session's anchor)
   const theme = themeAt(minutes);
   themeState.minutes = minutes;
   applyTheme(theme);
