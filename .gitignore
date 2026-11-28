@@ -12,3 +12,6 @@ media-originals/
 
 blender/export/pagoda/*.blend
 .firstmate/locks/
+
+# static export (Cloudflare Pages builds it)
+/out/

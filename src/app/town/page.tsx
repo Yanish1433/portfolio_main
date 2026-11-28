@@ -10,8 +10,9 @@ export const metadata: Metadata = {
   description: "Walk through Yanish Gurung's portfolio, a 3D Bhaktapur-style town.",
 };
 
-// Check the models and thumbnails on every request so dropping in a .glb / .webp needs no rebuild.
-export const dynamic = "force-dynamic";
+
+// Read at build time (static export for Cloudflare Pages); rebuild after dropping in a new .glb / .webp.
+export const dynamic = "force-static";
 
 /** Project ids with a public/projects/<id>.webp thumbnail (shown on their stand's screen). */
 function projectThumbs(): string[] {
