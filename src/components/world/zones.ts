@@ -88,7 +88,10 @@ export const PATIS = [
 ];
 /** Recruiter tea stall (front faces west toward its ring). */
 export const TEA_STALL = { x: 5, z: 16, w: 3, d: 2.4, rot: -Math.PI / 2 };
-export const HULAK = { x: 12, z: 9 };
+/** Hulak (post box) on the west walk between the school courtyard and the timeline lane, facing the plaza (step27: moved away from the potter's corner). */
+export const HULAK = { x: -13, z: 4.5 };
+/** The Contact ring sits 1.8 m east of the box (toward the plaza), so the two can never drift apart. */
+export const HULAK_RING: [number, number] = [HULAK.x + 1.8, HULAK.z];
 /** "Recruiter Chiya Pasal" sign board (clickable). */
 export const TEA_SIGN = { x: 3.0, y: 1.75, z: 18.2 };
 
@@ -291,7 +294,7 @@ export const zones: Zone[] = [
     label: LABELS.zones.mailbox.en,
     prompt: "Press E or tap to open",
     position: [HULAK.x, HULAK.z],
-    ring: [10, 8.2],
+    ring: HULAK_RING,
     ringRadius: 1.3,
     color: "#ff6b5a",
     labelY: 3.4,

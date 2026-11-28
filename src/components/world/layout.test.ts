@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import { DEFAULT_VIEW, ZONE_PRESETS } from "./cameraRig";
 import { DRUM_Y } from "./wheels/wheelLayout";
-import { GALLERY, GHAR, HOUSES, PAGODA, PATIS, SHRINES, SPAWN, TREES, zoneById } from "./zones";
+import { GALLERY, GHAR, HOUSES, HULAK, PAGODA, PATIS, SHRINES, SPAWN, STATIC_OBSTACLES, TIMELINE_PATH, TREES, zoneById, zones } from "./zones";
 
 test("the Ghar is at the centre, front (+z) to the start, and SPAWN is outside its ring and camera preset", () => {
   assert.equal(GHAR.x, 0);
@@ -77,4 +77,20 @@ test("nothing tall stands between the default camera and the prayer wheels", () 
       }
     }
   }
+});
+
+test("step27: Contact is clear of the pottery corner and every other ring, off all obstacles, (reachability: journey.test.ts)", () => {
+  const mail = zoneById("mailbox")!;
+  const POTTERY_RING = { x: zoneById("pottery")!.ring[0], z: zoneById("pottery")!.ring[1] };
+  assert.ok(Math.hypot(mail.ring[0] - POTTERY_RING.x, mail.ring[1] - POTTERY_RING.z) >= 7, "mailbox ring >= 7 m from the pottery ring");
+  assert.ok(Math.hypot(HULAK.x - POTTERY_RING.x, HULAK.z - POTTERY_RING.z) >= 7, "box >= 7 m from the pottery ring");
+  for (const z of zones) {
+    if (z.id === "mailbox") continue;
+    assert.ok(Math.hypot(mail.ring[0] - z.ring[0], mail.ring[1] - z.ring[1]) >= 4, `mailbox ring too close to ${z.id}`);
+  }
+  for (const o of STATIC_OBSTACLES) {
+    if (o.kind === "rect") assert.ok(Math.abs(HULAK.x - o.x) > o.w / 2 + 0.5 || Math.abs(HULAK.z - o.z) > o.d / 2 + 0.5, "box inside an obstacle");
+    else assert.ok(Math.hypot(HULAK.x - o.x, HULAK.z - o.z) > o.r + 0.5, "box inside an obstacle");
+  }
+  for (const [x, z] of TIMELINE_PATH) assert.ok(Math.hypot(HULAK.x - x, HULAK.z - z) >= 1.5, "box on the lane");
 });

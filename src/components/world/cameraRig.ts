@@ -48,8 +48,8 @@ export const ZONE_PRESETS: Record<string, ZonePreset> = {
   "project-hall": { dist: 14, yaw: 0, pitch: 36 * DEG, enter: 5.5, exit: 8.5 },
   // Yanish's Ghar: front (+z) towards the camera
   about: { dist: 10, yaw: -0.15, pitch: 36 * DEG, enter: 3.6, exit: 5.6 },
-  // the Hulak postbox
-  mailbox: { dist: 11, yaw: -0.3, pitch: 40 * DEG, enter: 3.8, exit: 5.8 },
+  // the Hulak postbox on the west walk: face-on, school and house behind
+  mailbox: { dist: 11, yaw: 0.1, pitch: 40 * DEG, enter: 3.8, exit: 5.8 },
   // step22 potter's corner: a close 3/4 view from the south-east, past the post box (the avatar stands west of the wheel); the game pauses walking, so this is the play view
   pottery: { dist: 6.4, yaw: 1.0, pitch: 37 * DEG, enter: 3.2, exit: 4.6 },
 };
