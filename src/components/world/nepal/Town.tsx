@@ -27,7 +27,8 @@ import {
   WALL,
   zones,
 } from "../zones";
-import { MAT_KEYS, Parts, T, beam, box, lathe, plane, type MatKey } from "./geom";
+import { MAT_KEYS, Parts, T, beam, box, lathe, plane, seeded, type MatKey } from "./geom";
+import { WALL_MID, wallSegments } from "./wallRing";
 import {
   COL,
   buildBell,
@@ -109,44 +110,71 @@ function banner(P: Parts, top: THREE.Vector3, color: string, len = 2.0) {
  * WALL.inner..outer, beyond every roof of the town. The south arc is lower so the 45 deg camera sees over it.
  */
 function buildWall(P: Parts, A: Anchors) {
-  const seg = 80;
-  const mid = (WALL.inner + WALL.outer) / 2;
+  const mid = WALL_MID;
   const thick = WALL.outer - WALL.inner;
-  const gateTheta = (th: number) => GATE_ANGLES.some((g) => Math.abs(Math.atan2(Math.sin(th - g), Math.cos(th - g))) < (WALL.gateHalf + 0.2) / mid);
-  for (let i = 0; i < seg; i++) {
-    const a0 = (i / seg) * Math.PI * 2;
-    const a1 = ((i + 1) / seg) * Math.PI * 2;
-    const am = (a0 + a1) / 2;
-    if (gateTheta(am)) continue;
-    const x0 = Math.sin(a0) * mid;
-    const z0 = Math.cos(a0) * mid;
-    const x1 = Math.sin(a1) * mid;
-    const z1 = Math.cos(a1) * mid;
-    const len = Math.hypot(x1 - x0, z1 - z0) * 1.04;
+  // small screens: no flag strings, a pilaster on every other boundary
+  const lite = typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches;
+  const rnd = seeded(2121);
+  const flagCols = ["#2f6fd0", "#f4f1e8", "#d23a2e", "#3f9a4c", "#f2c01c"];
+  let pil = 0;
+  for (const sg of wallSegments()) {
+    const x0 = Math.sin(sg.a0) * mid;
+    const z0 = Math.cos(sg.a0) * mid;
+    const x1 = Math.sin(sg.a1) * mid;
+    const z1 = Math.cos(sg.a1) * mid;
+    const chord = Math.hypot(x1 - x0, z1 - z0);
+    const len = chord * 1.04;
     const cx = (x0 + x1) / 2;
     const cz = (z0 + z1) / 2;
     const rot = Math.atan2(x1 - x0, z1 - z0);
-    // south (z > 0) stays low; the rest of the circle is a proper 2.6 m curtain
-    const h = 2.6 - 1.45 * Math.min(1, Math.max(0, (Math.cos(am) - 0.25) / 0.6));
-    P.add("brick", box(thick, h + 1.2, len), COL.brickWarm, T(cx, (h - 1.2) / 2, cz, rot));
+    const h = sg.h;
+    // slight per-segment colour variation on the one Newari brick
+    const tint = new THREE.Color(COL.brickWarm).offsetHSL(0, 0, (rnd() - 0.5) * 0.07);
+    P.add("brick", box(thick, h + 1.2, len), tint, T(cx, (h - 1.2) / 2, cz, rot));
     P.add("plain", box(thick + 0.16, 0.34, len), COL.stone, T(cx, 0.17, cz, rot)); // plinth
+    P.add("wood", box(thick + 0.3, 0.14, len), COL.woodDark, T(cx, h - 0.04, cz, rot)); // carved wooden eaves band
     P.add("roof", box(thick + 0.5, 0.16, len), "#ffffff", T(cx, h + 0.1, cz, rot)); // tiled coping
-    if (i % 5 === 2) {
-      // pilaster on the town side
-      const px = Math.sin(am) * (WALL.inner - 0.08);
-      const pz = Math.cos(am) * (WALL.inner - 0.08);
+    if (sg.pilaster && (!lite || pil++ % 2 === 0)) {
+      // pilaster on the town side, a lower buttress on the outer face, at every third boundary
+      const px = Math.sin(sg.a0) * (WALL.inner - 0.08);
+      const pz = Math.cos(sg.a0) * (WALL.inner - 0.08);
       P.add("brick", box(0.7, h + 0.1, 0.7), COL.brick, T(px, h / 2, pz, rot));
       P.add("plain", box(0.86, 0.12, 0.86), COL.stone, T(px, h + 0.12, pz, rot));
+      const ox = Math.sin(sg.a0) * (WALL.outer + 0.06);
+      const oz = Math.cos(sg.a0) * (WALL.outer + 0.06);
+      P.add("brick", box(0.6, h - 0.2, 0.5), COL.brick, T(ox, (h - 0.2) / 2, oz, rot));
+      P.add("plain", box(0.74, 0.1, 0.64), COL.stone, T(ox, h - 0.15, oz, rot));
+    }
+    const mx = Math.sin(sg.am) * mid;
+    const mz = Math.cos(sg.am) * mid;
+    if (sg.lamp) {
+      // a butter lamp on the coping (flickers at night with all the other diyos)
+      A.diyos.push(V(mx, h + 0.2, mz));
+    } else if (sg.flags && !lite) {
+      // a short string of prayer flags above the coping: 2 posts, a cord, 4 cloth flags (the shared cloth flutter)
+      const ux = Math.sin(rot);
+      const uz = Math.cos(rot);
+      const top = h + 1.0;
+      for (const s of [-1, 1]) P.small(() => P.box("wood", 0.06, 0.9, 0.06, cx + ux * s * chord * 0.45, h + 0.5, cz + uz * s * chord * 0.45, COL.woodDark, rot));
+      P.small(() => P.add("wood", beam(V(cx - ux * chord * 0.45, top, cz - uz * chord * 0.45), V(cx + ux * chord * 0.45, top, cz + uz * chord * 0.45), 0.025)));
+      for (let f = 0; f < 4; f++) {
+        const t = (f - 1.5) * chord * 0.22;
+        const g = plane(0.36, 0.42, 4);
+        g.translate(0, -0.21, 0);
+        P.add("cloth", g, flagCols[(sg.index + f) % flagCols.length], T(cx + ux * t, top - 0.01, cz + uz * t, rot + Math.PI / 2));
+      }
     }
   }
   // gates
   for (const g of GATE_ANGLES) {
+    const mid = WALL_MID;
+    const thick = WALL.outer - WALL.inner;
     const gx = Math.sin(g) * mid;
     const gz = Math.cos(g) * mid;
     const place = (lx: number, lz: number) => V(gx + Math.cos(g) * lx + Math.sin(g) * lz, 0, gz - Math.sin(g) * lx + Math.cos(g) * lz);
     const M = T(gx, 0, gz, g);
     const towerX = WALL.gateHalf + 1.5;
-    const th = g === 0 ? 3.0 : 4.8; // the south gate stays low so the camera can see over it
+    const th = g === 0 ? 3.8 : 4.8; // the south gate stays low so the camera can see over it
     const k = th / 4.8;
     for (const s of [-1, 1]) {
       const tx = s * towerX;
@@ -160,17 +188,25 @@ function buildWall(P: Parts, A: Anchors) {
       P.add("roof", roof, "#ffffff", T(0, 0, 0).setPosition(tx, th + 0.7, 0).premultiply(M));
       P.small(() => P.add("gold", lathe([[0, 0], [0.1, 0], [0.05, 0.16], [0, 0.34]], 6), COL.gold, T(0, 0, 0).setPosition(tx, th + 0.7 + 1.9 * Math.max(k, 0.7), 0).premultiply(M)));
     }
-    // lintel across the opening: brick arch band + carved wooden beam, tiled cap
+    // lintel across the opening: a carved wooden beam 2.7 m up (clear for the bigger avatar), a brick band, two small tiers of tiled roof
     const span = WALL.gateHalf * 2 + 0.2;
-    P.add("brick", box(span + 0.4, 1.1, thick + 0.3), COL.brickWarm, T(0, 0, 0).setPosition(0, th - 0.8, 0).premultiply(M));
-    P.add("wood", box(span, 0.3, thick + 0.5), COL.woodDark, T(0, 0, 0).setPosition(0, th - 1.5, 0).premultiply(M));
-    P.add("roof", box(span + 1.2, 0.16, thick + 0.9), "#ffffff", T(0, 0, 0).setPosition(0, th - 0.15, 0).premultiply(M));
+    const at = (x: number, y: number, z: number) => T(0, 0, 0).setPosition(x, y, z).premultiply(M);
+    P.add("wood", box(span, 0.3, thick + 0.5), COL.woodDark, at(0, 2.85, 0));
+    const bandH = th - 0.2 - 3.0;
+    P.add("brick", box(span + 0.4, bandH, thick + 0.3), COL.brickWarm, at(0, 3.0 + bandH / 2, 0));
+    for (const s of [-1, 1]) P.add("wood", box(0.12, 2.7, thick + 0.2), COL.woodDark, at(s * (WALL.gateHalf - 0.04), 1.35, 0)); // carved door jambs
+    P.add("roof", box(span + 1.2, 0.16, thick + 0.9), "#ffffff", at(0, th - 0.15, 0));
+    for (const [w, d, hh, y] of [[5.0, 2.0, 0.55, th - 0.07], [3.0, 1.5, 0.55, th + 0.42]]) {
+      const tier = new THREE.ConeGeometry(Math.SQRT2 / 2, hh, 4, 1).rotateY(Math.PI / 4).translate(0, hh / 2, 0).scale(w, 1, d);
+      P.add("roof", tier, "#ffffff", at(0, y, 0));
+    }
+    P.small(() => P.add("gold", lathe([[0, 0], [0.08, 0], [0.04, 0.14], [0, 0.3]], 6), COL.gold, at(0, th + 0.95, 0)));
     // the gate opens onto the island's rim: a carved-stone sill and a low railing keep the drop from looking like a hole
     P.add("plain", box(span, 0.2, 0.7), COL.stone, T(0, 0, 0).setPosition(0, 0.1, thick / 2 + 0.1).premultiply(M));
     for (const px of [-1.9, -0.95, 0, 0.95, 1.9]) P.add("plain", box(0.2, 0.85, 0.2), COL.stone, T(0, 0, 0).setPosition(px, 0.425, thick / 2 + 0.95).premultiply(M));
     P.add("plain", box(span + 0.2, 0.12, 0.2), COL.stone, T(0, 0, 0).setPosition(0, 0.8, thick / 2 + 0.95).premultiply(M));
     // lamps and a marigold garland across each gate
-    A.garlands.push({ a: place(-WALL.gateHalf - 0.3, 0).setY(th - 1.9), b: place(WALL.gateHalf + 0.3, 0).setY(th - 1.9), drop: 0.35 });
+    for (const lz of [-(thick / 2 + 0.2), thick / 2 + 0.2]) A.garlands.push({ a: place(-WALL.gateHalf - 0.3, lz).setY(3.35), b: place(WALL.gateHalf + 0.3, lz).setY(3.35), drop: 0.35 });
     A.diyos.push(place(-WALL.gateHalf - 0.1, -1.4).setY(0.45), place(WALL.gateHalf + 0.1, -1.4).setY(0.45));
   }
 }

@@ -1,0 +1,97 @@
+/* Passport: crimson leather cover with gold foil, cream pages (Kalam from the town's @font-face). CSS/SVG only. */
+.deskBtn {
+  position: absolute; right: 16px; top: 340px; z-index: 20; min-height: 44px; min-width: 44px; padding: 0 14px;
+  font: 700 15px Kalam, system-ui, sans-serif; color: #fbe9b7; background: #3e2416 url(/textures/ui/lokta-wood.png);
+  border: 1.5px solid #c9a227; border-radius: 12px; box-shadow: 0 2px 0 #1f120a; cursor: pointer;
+}
+.deskBtn:focus-visible, .openBtn:focus-visible, .close:focus-visible, .cell:focus-visible { outline: 3px solid #d12a1a; outline-offset: 2px; }
+
+.backdrop { position: fixed; inset: 0; z-index: 45; display: flex; align-items: center; justify-content: center; background: rgba(0, 0, 0, 0.5); pointer-events: auto; }
+.sheet { position: relative; width: min(560px, 94vw); max-height: 86dvh; outline: none; font-family: Kalam, Mukta, "Nirmala UI", system-ui, cursive; }
+.close {
+  position: absolute; right: -6px; top: -14px; z-index: 5; width: 44px; height: 44px; border-radius: 50%; font-size: 18px;
+  color: #fbe9b7; background: #3e2416; border: 1.5px solid #c9a227; cursor: pointer;
+}
+
+.book { position: relative; perspective: 1600px; }
+.inside {
+  position: relative; overflow: hidden auto; max-height: 86dvh; padding: 18px 20px 20px; border-radius: 6px; color: #2b1d14;
+  background: #f6ead0 url(/textures/ui/lokta-paper.png) repeat; box-shadow: 0 0 0 1.5px #1f120a, 0 12px 30px rgba(0, 0, 0, 0.5);
+}
+.title { margin: 0 0 8px; text-align: center; font-size: 22px; font-weight: 700; color: #8f3320; }
+.grid > li { min-width: 0; }
+.grid { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.cell {
+  display: flex; flex-direction: column; align-items: center; gap: 2px; width: 100%; min-height: 44px; padding: 4px; font: inherit; color: inherit;
+  background: none; border: 0; border-radius: 8px; text-align: center;
+}
+button.cell { cursor: pointer; }
+button.cell:hover { background: rgba(143, 51, 32, 0.08); }
+.date { font-size: 12px; line-height: 1.15; opacity: 0.85; }
+.count { margin: 10px 0 0; text-align: center; font-size: 18px; font-weight: 700; }
+.badge { margin: 6px 0 0; text-align: center; font-size: 20px; font-weight: 700; color: #8f3320; }
+.inked { transform: rotate(-6deg); }
+
+.cover {
+  position: absolute; inset: 0; z-index: 3; transform-origin: left center; transition: transform 0.8s cubic-bezier(0.6, 0, 0.3, 1); backface-visibility: hidden;
+  border-radius: 6px; padding: 12px; background: radial-gradient(ellipse at 30% 20%, #a3182f, #6e0f1f 70%), #7a1224;
+  box-shadow: 0 0 0 1.5px #1f120a, 0 12px 30px rgba(0, 0, 0, 0.55), inset 0 0 40px rgba(0, 0, 0, 0.45);
+}
+.book[data-open] .cover { transform: rotateY(-178deg); pointer-events: none; visibility: hidden; transition: transform 0.8s cubic-bezier(0.6, 0, 0.3, 1), visibility 0s 0.8s; }
+.foil {
+  height: 100%; min-height: 340px; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 18px 12px; text-align: center;
+  color: #e8c25a; border: 3px double #e8c25a; border-radius: 4px; text-shadow: 0 1px 0 rgba(0, 0, 0, 0.5);
+}
+.cap { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: 0.18em; }
+.emblem { color: #e8c25a; filter: drop-shadow(0 1px 1px rgba(0, 0, 0, 0.6)); }
+.sub { margin: 0; font-size: 16px; }
+.openBtn {
+  min-height: 44px; padding: 0 22px; font: 700 17px Kalam, system-ui, sans-serif; color: #3a0a12; background: #e8c25a; border: 0; border-radius: 22px; cursor: pointer;
+  box-shadow: 0 2px 0 #7a5a10;
+}
+
+/* the stamp toast: an ink seal thunks in near the passport button */
+.toast {
+  position: absolute; right: 16px; top: 396px; z-index: 30; display: flex; align-items: center; gap: 6px; pointer-events: none;
+  animation: thunk 0.55s cubic-bezier(0.2, 1.4, 0.4, 1) both, fadeOut 0.4s 2.2s forwards;
+  background: rgba(246, 234, 208, 0.95); border: 1.5px solid #3e2416; border-radius: 14px; padding: 4px 12px 4px 4px; color: #2b1d14; font: 700 15px Kalam, system-ui, sans-serif;
+}
+.toastText { white-space: nowrap; }
+@keyframes thunk {
+  0% { transform: scale(2.4) rotate(-14deg); opacity: 0; }
+  55% { transform: scale(0.92) rotate(2deg); opacity: 1; }
+  68% { transform: translate(2px, 1px) scale(1); }
+  80% { transform: translate(-2px, 0) scale(1); }
+  100% { transform: none; opacity: 1; }
+}
+@keyframes fadeOut { to { opacity: 0; } }
+
+.confetti { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.confetti i { position: absolute; top: -14px; width: 10px; height: 14px; clip-path: polygon(0 0, 100% 0, 50% 100%); animation: fall linear infinite; }
+@keyframes fall { to { transform: translateY(520px) rotate(300deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .toast { animation: none; }
+  .cover, .book[data-open] .cover { transition: none; }
+  .confetti { display: none; }
+}
+
+/* phones: the passport is a bottom sheet (<= 70dvh) and the desktop button steps aside for the action cluster */
+@media (max-width: 480px), (pointer: coarse) and (max-height: 500px) {
+  .deskBtn { display: none; }
+  .backdrop { align-items: flex-end; }
+  .sheet { width: 100%; max-height: 70dvh; padding: 0 max(0px, env(safe-area-inset-right)) max(0px, env(safe-area-inset-bottom)) max(0px, env(safe-area-inset-left)); }
+  .inside { max-height: 70dvh; border-radius: 14px 14px 0 0; }
+  .cover { border-radius: 14px 14px 0 0; }
+  .foil { min-height: 0; padding: 10px 8px; }
+  .cap { font-size: 20px; }
+  .emblem svg { width: 64px; height: 76px; }
+  .grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .date { font-size: 11px; }
+  .toast { top: auto; right: auto; left: 12px; bottom: calc(96px + env(safe-area-inset-bottom)); }
+  .close { right: 8px; top: 6px; }
+}
+@media (pointer: coarse) and (max-height: 500px) {
+  .grid { grid-template-columns: repeat(8, 1fr); }
+  .date { font-size: 10px; }
+}

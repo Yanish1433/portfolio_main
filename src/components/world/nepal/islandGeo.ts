@@ -6,6 +6,7 @@
 // geometry (instanced), the falls + spray + mist ONE mesh.
 import * as THREE from "three";
 import { GATE_ANGLES, WALL } from "../zones";
+import { leafGeometry, tree, type TreeId } from "./trees";
 
 const TAU = Math.PI * 2;
 const SEG = 96;
@@ -387,7 +388,18 @@ export function buildIslandGeometry() {
 
 // --- Floating rocks -------------------------------------------------------------------------------------
 
-/** One small floating rock (unit scale: radius ~1, depth ~1.9) with a little tree on top. Instanced. */
+/** The one tree on every floating rock, in the rock's unit space (rooted on the grass top, y = 0.02). */
+export const FLOAT_TREE = { tree: { kind: "broadleaf" as TreeId, seed: 5 }, x: -0.08, z: 0.04, scale: 0.17, cards: 150 };
+
+/** The tree's leaf cards in the rock's unit space (shares the rock's instance matrices). Lite: half the cards. */
+export function floatLeafGeometry(lite = false) {
+  const { tree: tb, x, z, scale, cards } = FLOAT_TREE;
+  const t = tree(tb.kind, tb.seed);
+  const part = { ...t, cards: t.cards.slice(0, lite ? Math.floor(cards / 2) : cards) };
+  return leafGeometry([{ tree: part, x, y: 0.02, z, rot: 0, scale }]);
+}
+
+/** One small floating rock (unit scale: radius ~1, depth ~1.9) with a little tree (bark only) on top. Instanced. */
 export function buildFloatRockGeometry() {
   const acc = new Acc();
   const rows: [number, number][] = [
@@ -421,10 +433,17 @@ export function buildFloatRockGeometry() {
     const [b] = pt(0, i + 1);
     acc.tri([0, 0.02, 0], [a[0], 0.02, a[2]], [b[0], 0.02, b[2]], GRASS[i % GRASS.length]);
   }
-  // placeholder tree: trunk + two stacked cones, and a couple of tufts
-  addCone(acc, 0.1, 0, 0, 0.07, 0.5, 4, true, ROOT, ROOT, 0, 0, 0, 1);
-  addCone(acc, 0.1, 0.35, 0, 0.42, 0.7, 7, true, LEAF[1], LEAF[0], 0, 0, 0.1, 2);
-  addCone(acc, 0.1, 0.75, 0, 0.3, 0.6, 7, true, LEAF[1], LEAF[2], 0, 0, 0.1, 3);
+  // the tree's bark (leaf cards are a second instanced mesh, see floatLeafGeometry)
+  const { tree: tb, x, z, scale } = FLOAT_TREE;
+  const bark = tree(tb.kind, tb.seed).bark;
+  const bp = bark.attributes.position, bn = bark.attributes.normal, bc = bark.attributes.color, bi = bark.index!;
+  const P = (i: number): V => [bp.getX(i) * scale + x, bp.getY(i) * scale + 0.02, bp.getZ(i) * scale + z];
+  const N = (i: number): V => [bn.getX(i), bn.getY(i), bn.getZ(i)];
+  const K = (i: number) => new THREE.Color(bc.getX(i), bc.getY(i), bc.getZ(i));
+  for (let t = 0; t < bi.count; t += 3) {
+    const [a, b, c] = [bi.getX(t), bi.getX(t + 1), bi.getX(t + 2)];
+    acc.triN(P(a), P(b), P(c), K(a), K(b), K(c), N(a), N(b), N(c));
+  }
   addTuft(acc, -0.55, 0.02, 0.3, 0.8, 7);
   addTuft(acc, 0.5, 0.02, -0.5, 0.7, 9);
   return acc.geometry();

@@ -10,7 +10,7 @@ import { AVATAR_HEIGHT, characterById, GAIT_CLIPS, gaitCycleRate, type Character
 import { avatarMotion, RUN_SPEED, WALK_SPEED } from "./input";
 import { applyLookdev, releaseLookdev } from "./lookdev";
 import { useWorld } from "@/store/world";
-import { createDanceAura, createDanceFlag, type DanceAura, type DanceFlag } from "./dance/danceFx";
+import { createDanceAura, createDanceFlag, prewarmDance, type DanceAura, type DanceFlag } from "./dance/danceFx";
 import { FLAG_HIDE_BEFORE_END, FLAG_SHOW_FROM, HAND_BONE_RE } from "./dance/danceMath";
 import { themeState } from "./nepal/themeState";
 
@@ -327,13 +327,14 @@ function CharacterModel({ url, gait, idleRelax, idleArmDown }: { url: string; ga
     });
     if (hand) f.flag = createDanceFlag(hand);
     else if (process.env.NODE_ENV !== "production") console.warn("[Avatar] no right-hand bone found; the dance flag is off");
-    if (!f.lite) f.aura = createDanceAura(threeScene);
+    f.aura = createDanceAura(threeScene, { sparks: !f.lite });
+    prewarmDance(gl, threeScene, camera); // compile the flag / aura / sparks now, hidden, so the first dance does not hitch
     return () => {
       f.flag?.dispose();
       f.aura?.dispose();
       f.flag = f.aura = null;
     };
-  }, [scene, threeScene]);
+  }, [scene, threeScene, gl, camera]);
 
   const st = useRef({
     rig: null as Rig | null,
@@ -559,7 +560,12 @@ function CharacterModel({ url, gait, idleRelax, idleArmDown }: { url: string; ga
     if (f.aura && root.current) {
       root.current.getWorldPosition(f.centre);
       f.centre.y += 1.1;
-      f.aura.update(dt, fxOn ? s.dw : 0, camera, f.centre, { reduced: f.reduced, night });
+      f.aura.update(dt, fxOn ? s.dw : 0, camera, f.centre, {
+        reduced: f.reduced,
+        night,
+        danceT: dance?.time,
+        duration: dance?.getClip().duration,
+      });
     }
     if (root.current) root.current.position.y = offsetY;
   });

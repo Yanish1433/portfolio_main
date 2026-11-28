@@ -13,6 +13,7 @@ export const SECTIONS: Section[] = [
   { id: "education", label: "Education", icon: "🎓", zone: "education" },
   { id: "journey", label: "Journey", icon: "🛤️", zone: "timeline" },
   { id: "contact", label: "Contact", icon: "✉️", zone: "mailbox" },
+  { id: "pottery", label: "Pottery (corner)", icon: "🏺", zone: "pottery" },
   { id: "workshop", label: "Workshop", icon: "🛠️" },
 ];
 

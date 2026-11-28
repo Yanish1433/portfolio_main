@@ -51,6 +51,13 @@ const ALIAS: Record<string, string> = {
   "gemini api": "googlegemini",
 };
 
+/** Looser spellings (compared with spaces, dots, dashes and "&" removed): "NodeJS", "Node", "Git", "GitHub", "Tailwind", "Framer", "Mongo", "JWT"... */
+const ALIAS_LOOSE: Record<string, string> = {
+  nodejs: "nodedotjs", node: "nodedotjs", git: "git", github: "git", gitgithub: "git", tailwind: "tailwindcss", tailwindcss: "tailwindcss",
+  framer: "framer", framermotion: "framer", mongo: "mongodb", jwt: "jsonwebtokens", jwtauth: "jsonwebtokens", threejs: "threedotjs", three: "threedotjs",
+  expressjs: "express", reactjs: "react", ts: "typescript", gemini: "googlegemini", python: "python", flutter: "flutter", dart: "flutter", gsap: "greensock",
+};
+
 export type SkillLogo = { kind: "brand"; logo: Logo } | { kind: "generic"; icon: GenericIcon };
 export type GenericIcon = "api" | "socket" | "cube" | "code";
 
@@ -67,7 +74,7 @@ const GENERIC_BY_NAME: Record<string, GenericIcon> = { "rest apis": "api", "webs
 /** Pure: a logo for the skill, or a neat generic icon. Never undefined. */
 export function logoFor(name: string): SkillLogo {
   const key = name.trim().toLowerCase();
-  const alias = ALIAS[key];
+  const alias = ALIAS[key] ?? ALIAS_LOOSE[key.replace(/[^a-z0-9]/g, "")];
   if (alias && LOGOS[alias]) return { kind: "brand", logo: LOGOS[alias] };
   return { kind: "generic", icon: GENERIC_BY_NAME[key] ?? "code" };
 }

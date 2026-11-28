@@ -30,6 +30,7 @@ const TOUR_LINES: Record<ZoneId, string> = {
   about: `${profile.name.split(" ")[0]}'s Ghar, the home of the person behind this portfolio. Step up to the doormat to read the story.`,
   mailbox: "The hulak (post box). This is where you can get in touch.",
   kiosk: `Last stop: the chiya pasal. In a hurry? Recruiter Mode (${LABELS.zones.kiosk.ne}) has everything on one page.`,
+  pottery: "The potter's corner: spin a pot on the wheel, fire it, and collect one pot for every skill.",
 };
 
 /** Which zone a reply is "about", so the robot glances at it. */

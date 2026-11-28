@@ -135,7 +135,7 @@ test("navigate verb + zone beats the topic intent and walks", async () => {
 test("every zone can be reached by name", async () => {
   const names: Record<string, string> = {
     plaza: "plaza", "project-hall": "project hall", education: "education", "skills-lab": "skills lab",
-    timeline: "timeline", about: "ghar", mailbox: "mailbox", kiosk: "kiosk",
+    timeline: "timeline", about: "ghar", mailbox: "mailbox", kiosk: "kiosk", pottery: "pottery",
   };
   for (const zone of ZONE_IDS) {
     const r = await ask(`take me to the ${names[zone]}`);

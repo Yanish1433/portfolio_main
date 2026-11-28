@@ -91,7 +91,7 @@ export default function GuideMenu() {
         </ul>
       )}
       {guide && !open && (
-        <div role="status" className="pointer-events-auto absolute left-0 top-12 flex items-center gap-1.5 whitespace-nowrap rounded-lg border-2 border-[#c9a227] bg-[#3e2416] py-1 pl-3 pr-1 text-sm text-[#fbe9b7] shadow">
+        <div role="status" data-ph-chip className="pointer-events-auto absolute left-0 top-12 flex items-center gap-1.5 whitespace-nowrap rounded-lg border-2 border-[#c9a227] bg-[#3e2416] py-1 pl-3 pr-1 text-sm text-[#fbe9b7] shadow">
           <span>Path to {guide.label}</span>
           <button type="button" onClick={walk} className="rounded-full bg-[#c9a227] px-3 py-1 text-xs font-semibold text-[#3a2419] transition hover:brightness-110 focus:outline-none focus-visible:ring-2 focus-visible:ring-white">
             Walk me there

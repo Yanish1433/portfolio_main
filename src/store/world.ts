@@ -3,6 +3,7 @@ import type { CharacterId } from "@/components/world/characters";
 import type { SkillCategory } from "@/content/profile";
 import { deriveTheme, parseTime, themeAt, wrapMinutes } from "@/components/world/nepal/timeLook";
 import { themeState } from "@/components/world/nepal/themeState";
+import { reduceCamMode } from "@/components/world/cameraRig";
 
 export type Vec2 = [number, number];
 export type Theme = "day" | "night";
@@ -180,6 +181,11 @@ type WorldState = {
   setCameraMode: (m: CameraMode) => void;
   /** Eagle (sky) view on / off. Only from follow or eagle; cinema and its return win. */
   toggleEagle: () => void;
+  /** 360 view = eagle view + slow auto-spin (step21a). Only meaningful while cameraMode is "eagle". */
+  eagleSpin: boolean;
+  /** 360 view on / off (O key, button). Esc / moving use exitSpin. */
+  toggleSpin: () => void;
+  exitSpin: () => void;
 
   /** The Ghar hint is on screen (the top-centre "Click anywhere" hint steps aside). */
   gharHint: boolean;
@@ -275,11 +281,26 @@ export const useWorld = create<WorldState>((set, get) => ({
   cameraMode: "follow",
   viewCustom: false,
   setViewCustom: (viewCustom) => set((s) => (s.viewCustom === viewCustom ? s : { viewCustom })),
-  openCinema: (cinema, fly = true) => set((s) => (s.cinema === cinema ? s : { cinema, cinemaFly: fly, cinemaReady: false, cameraMode: "cinema", focusProject: cinema })),
+  openCinema: (cinema, fly = true) => set((s) => (s.cinema === cinema ? s : { cinema, cinemaFly: fly, cinemaReady: false, cameraMode: "cinema", eagleSpin: false, focusProject: cinema })),
   closeCinema: () => set((s) => (s.cinema ? { cinema: null, cinemaReady: false, cameraMode: "returning" } : s)),
   setCinemaReady: (cinemaReady) => set({ cinemaReady }),
   setCameraMode: (cameraMode) => set({ cameraMode }),
-  toggleEagle: () => set((s) => (s.cinema || (s.cameraMode !== "follow" && s.cameraMode !== "eagle") ? s : { cameraMode: s.cameraMode === "eagle" ? "follow" : "eagle" })),
+  toggleEagle: () =>
+    set((s) => {
+      const n = reduceCamMode({ mode: s.cameraMode, spin: s.eagleSpin, cinema: !!s.cinema }, "eagle");
+      return n.mode === s.cameraMode && n.spin === s.eagleSpin ? s : { cameraMode: n.mode, eagleSpin: n.spin };
+    }),
+  eagleSpin: false,
+  toggleSpin: () =>
+    set((s) => {
+      const n = reduceCamMode({ mode: s.cameraMode, spin: s.eagleSpin, cinema: !!s.cinema }, "spin");
+      return n.mode === s.cameraMode && n.spin === s.eagleSpin ? s : { cameraMode: n.mode, eagleSpin: n.spin };
+    }),
+  exitSpin: () =>
+    set((s) => {
+      const n = reduceCamMode({ mode: s.cameraMode, spin: s.eagleSpin, cinema: !!s.cinema }, "exit-spin");
+      return n.mode === s.cameraMode && n.spin === s.eagleSpin ? s : { cameraMode: n.mode, eagleSpin: n.spin };
+    }),
   gharHint: false,
   setGharHint: (gharHint) => set({ gharHint }),
   skillFilter: "all",
@@ -296,7 +317,8 @@ export const useWorld = create<WorldState>((set, get) => ({
 }));
 
 /** Visitor movement (keys, joystick, ground clicks) is off while a project video is open or the camera is flying. */
-export const movementLocked = (s: Pick<WorldState, "cinema" | "cameraMode">) => !!s.cinema || s.cameraMode !== "follow";
+export const movementLocked = (s: Pick<WorldState, "cinema" | "cameraMode"> & Partial<Pick<WorldState, "activeZone" | "panelOpen">>) =>
+  !!s.cinema || s.cameraMode !== "follow" || (s.activeZone === "pottery" && !!s.panelOpen); // step22: walking is paused while the pottery game is open
 
 /** True when a key event comes from a text field (world shortcuts must ignore it). */
 export function isTypingTarget(e: Event): boolean {

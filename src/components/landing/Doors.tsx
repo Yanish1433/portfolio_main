@@ -4,20 +4,17 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef } from "react";
 import type { MouseEvent } from "react";
-import { BOOK_VIDEO_EVENT } from "@/components/recruiter/book/active";
 import { todAt } from "@/lib/time/clock";
 import { RECRUITER_HREF, WORLD_HREF } from "./routes";
 import s from "./landing.module.css";
 
 const reduced = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 const plain = (e: MouseEvent) => e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey;
-const VIDEO = { day: "/recruiter/pagoda-day.mp4", night: "/recruiter/pagoda-night.mp4" } as const;
 
-/** Door 1: the town. Hover plays the loop (desktop only); click zooms the card, then goes. */
+/** Door 1: the town. Hover/focus zooms the picture gently; click zooms the card, then goes. */
 export function ExploreDoor() {
   const router = useRouter();
   const card = useRef<HTMLAnchorElement>(null);
-  const video = useRef<HTMLVideoElement>(null);
   const fade = useRef<HTMLSpanElement>(null);
 
   // The still overview follows the shared clock: when the time-of-day band changes, the old picture fades out.
@@ -40,25 +37,7 @@ export function ExploreDoor() {
     return () => window.removeEventListener("world-time", onTime);
   }, []);
 
-  const canPlay = () =>
-    window.matchMedia("(min-width: 901px) and (hover: hover)").matches &&
-    !reduced() &&
-    !(navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData;
-
-  const enter = () => {
-    router.prefetch(WORLD_HREF);
-    const v = video.current;
-    if (!v || !canPlay()) return;
-    const night = card.current?.closest<HTMLElement>("[data-time-root]")?.dataset.theme === "night";
-    const src = VIDEO[night ? "night" : "day"];
-    if (!v.getAttribute("src")?.endsWith(src)) v.src = src; // loaded on the first hover only
-    window.dispatchEvent(new CustomEvent(BOOK_VIDEO_EVENT, { detail: true })); // pause the backdrop: one decoder at a time
-    void v.play().catch(() => {});
-  };
-  const leave = () => {
-    video.current?.pause();
-    window.dispatchEvent(new CustomEvent(BOOK_VIDEO_EVENT, { detail: false }));
-  };
+  const enter = () => router.prefetch(WORLD_HREF);
   const go = (e: MouseEvent) => {
     if (!plain(e) || reduced()) return;
     e.preventDefault();
@@ -73,14 +52,13 @@ export function ExploreDoor() {
       prefetch={false}
       className={`${s.door} ${s.doorWorld}`}
       onPointerEnter={enter}
-      onPointerLeave={leave}
       onFocus={() => router.prefetch(WORLD_HREF)}
       onTouchStart={() => router.prefetch(WORLD_HREF)}
       onClick={go}
     >
       <span className={s.preview} role="img" aria-label="Overview of the 3D Bhaktapur town">
         <span ref={fade} className={s.fade} aria-hidden="true" />
-        <video aria-hidden="true" ref={video} muted loop playsInline preload="none" tabIndex={-1} />
+        <span className={s.sweep} aria-hidden="true" />
       </span>
       <span className={s.doorTitle}>Explore my 3D world</span>
       <span className={s.doorMeta}>~3 min · fun</span>

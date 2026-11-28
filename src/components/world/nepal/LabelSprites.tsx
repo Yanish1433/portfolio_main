@@ -13,6 +13,7 @@ import { playerPos, pointerClaim, robotPos } from "../input";
 import { labelOpacity } from "./labelFade";
 import { useRobot } from "../robot/robotStore";
 import { occlusion } from "./materials";
+import { useWorld } from "@/store/world";
 
 export const FONT_FAMILY = "Mukta";
 
@@ -39,10 +40,10 @@ export function drawBilingual(en: string, ne: string, opts: { bg?: string; fg?: 
   ctx.font = `600 ${enPx}px "${FONT_FAMILY}", sans-serif`;
   const wEn = ctx.measureText(en).width;
   ctx.font = `600 ${nePx}px "${FONT_FAMILY}", sans-serif`;
-  const wNe = ctx.measureText(ne).width;
+  const wNe = ne ? ctx.measureText(ne).width : 0;
   const pad = (opts.pad ?? 26) * scale;
   c.width = Math.ceil(Math.max(wEn, wNe) + pad * 2);
-  c.height = Math.ceil(enPx * 1.25 + nePx * 1.45 + pad * 1.2);
+  c.height = Math.ceil(enPx * 1.25 + (ne ? nePx * 1.45 : 0) + pad * 1.2);
   const g = c.getContext("2d")!;
   if (opts.bg) {
     g.fillStyle = opts.bg;
@@ -70,7 +71,7 @@ export function drawBilingual(en: string, ne: string, opts: { bg?: string; fg?: 
     g.globalAlpha = 1;
   };
   line(en, enPx, pad * 0.6 + enPx);
-  line(ne, nePx, pad * 0.6 + enPx * 1.25 + nePx * 1.2, 0.95);
+  if (ne) line(ne, nePx, pad * 0.6 + enPx * 1.25 + nePx * 1.2, 0.95);
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   t.anisotropy = 4;
@@ -138,9 +139,11 @@ function TeaSign() {
 /** Suspends until the label font is ready (so the loading screen covers it). */
 export default function Labels() {
   use(loadLabelFonts());
+  // step22: the Potter's Corner label steps aside while its game is open (it would cover the pot)
+  const potting = useWorld((s) => s.activeZone === "pottery" && s.panelOpen);
   return (
     <group>
-      {zones.map((z) => {
+      {zones.filter((z) => !(potting && z.id === "pottery")).map((z) => {
         const l = LABELS.zones[z.id];
         return <ZoneLabel key={z.id} position={[z.position[0], z.labelY, z.position[1]]} en={l.en} ne={l.ne} />;
       })}

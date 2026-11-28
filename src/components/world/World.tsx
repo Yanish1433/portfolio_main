@@ -1,5 +1,6 @@
 "use client";
 
+import { dprCap } from "./touchControls";
 import * as THREE from "three";
 import { Suspense, useEffect, useRef, useState } from "react";
 import { Canvas, useFrame, useThree } from "@react-three/fiber";
@@ -27,6 +28,7 @@ import WheelGallery from "./wheels/WheelGallery";
 import WheelLabels from "./wheels/WheelLabels";
 import Threads from "./wheels/ThreadsLayer";
 import Warmup from "./warmup/Warmup";
+import Pottery from "./pottery/Pottery";
 import Guestbook from "./guestbook/Guestbook";
 import { themeTargets } from "./nepal/themeState";
 import { initTime, useWorld } from "@/store/world";
@@ -133,9 +135,18 @@ export default function World({ characters, thumbs, posters = [], aboutPhoto = n
   // Desktop: never below 1 (jaggies), and capped at 1.5 while the composer's MSAA x4 runs.
   const [minDpr] = useState(() => (coarse ? 0.75 : 1));
   const [maxDpr] = useState(() =>
-    Math.max(minDpr, Math.min(typeof window !== "undefined" ? window.devicePixelRatio : 1, coarse ? 2 : 1.5)),
+    Math.max(minDpr, dprCap(coarse, typeof window !== "undefined" ? window.devicePixelRatio : 1)),
   );
   const [dpr, setDpr] = useState(maxDpr);
+  // step21a: the adaptive-quality monitor only starts after the fly-in. During loading it measured the shader-compile
+  // stalls as a slow machine, declined (bloom off + shadows off) and so re-linked EVERY program in the middle of the fly-in.
+  const loaded = useWorld((w) => w.loaded);
+  const [perfOn, setPerfOn] = useState(false);
+  useEffect(() => {
+    if (!loaded) return;
+    const id = window.setTimeout(() => setPerfOn(true), 6500);
+    return () => window.clearTimeout(id);
+  }, [loaded]);
   // ?tm=aces|agx|neutral: compare tone mappers (debug).
   const [tone, setTone] = useState<ToneName>(DEFAULT_TONE);
   const [exposure, setExposure] = useState(DEFAULT_EXPOSURE);
@@ -168,7 +179,7 @@ export default function World({ characters, thumbs, posters = [], aboutPhoto = n
         style={{ touchAction: "none" }}
         aria-label="Interactive 3D portfolio world: a Newari heritage square. Click or tap the ground to walk."
       >
-        {adaptive && (
+        {adaptive && perfOn && (
           <PerformanceMonitor
             onChange={({ factor }) => {
               // factor is 0..1: scale pixel ratio between 0.75 and the device max.
@@ -197,10 +208,11 @@ export default function World({ characters, thumbs, posters = [], aboutPhoto = n
           <WheelLabels />
           <Threads reducedMotion={reducedMotion} />
           <Guestbook reducedMotion={reducedMotion || !liveVideo} />
+          <Pottery reducedMotion={reducedMotion} lite={coarse || !liveVideo} />
           <CinemaCamera reducedMotion={reducedMotion} />
           <Player characters={characters} reducedMotion={reducedMotion} />
           <Robot reducedMotion={reducedMotion} />
-          <Warmup />
+          <Warmup characters={characters} />
         </Suspense>
         {bloom && <Post tone={tone} />}
         <Stats />

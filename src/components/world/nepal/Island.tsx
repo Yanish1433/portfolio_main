@@ -8,9 +8,9 @@
 import { useLayoutEffect, useMemo, useRef } from "react";
 import { useFrame } from "@react-three/fiber";
 import * as THREE from "three";
-import { timeUniform } from "./materials";
+import { getMaterials, timeUniform } from "./materials";
 import { skyUniforms } from "./Sky";
-import { FALL, FLOAT_ROCKS, buildFallGeometry, buildFloatRockGeometry, buildIslandGeometry } from "./islandGeo";
+import { FALL, FLOAT_ROCKS, buildFallGeometry, buildFloatRockGeometry, floatLeafGeometry, buildIslandGeometry } from "./islandGeo";
 
 /** Falling-water clock: runs at a quarter speed under reduced motion, so the water still reads as water. */
 const flowUniform = { value: 0 };
@@ -178,8 +178,37 @@ function patchRock(m: THREE.MeshStandardMaterial, lite: boolean) {
   m.customProgramCacheKey = () => (lite ? "island-rock-lite" : "island-rock");
 }
 
+/** Bob + orbit of a floating rock, injected into any instanced material (rock and leaves share it, so they cannot drift apart). */
+function applyFloatMotion(sh: { uniforms: Record<string, unknown>; vertexShader: string }) {
+  sh.uniforms.uTime = timeUniform;
+  sh.vertexShader = sh.vertexShader
+    .replace("#include <common>", "#include <common>\nuniform float uTime;")
+    .replace(
+      "#include <begin_vertex>",
+      `#include <begin_vertex>
+      #ifdef USE_INSTANCING
+      vec3 ip = instanceMatrix[3].xyz;
+      float ph = ip.x * 0.37 + ip.z * 0.61;
+      transformed.y += sin(uTime * 0.5 + ph) * 0.1 + sin(uTime * 0.23 + ph * 1.7) * 0.06;
+      transformed.x += sin(uTime * 0.31 + ph * 2.3) * 0.04;
+      #endif`,
+    )
+    .replace(
+      "#include <project_vertex>",
+      `vec4 mvPosition = vec4(transformed, 1.0);
+      #ifdef USE_INSTANCING
+      mvPosition = instanceMatrix * mvPosition;
+      float oa = uTime * (0.012 + 0.012 * fract(ph * 3.1)) * (fract(ph * 7.7) > 0.5 ? 1.0 : -1.0);
+      mvPosition.xz += vec2(ip.x * (cos(oa) - 1.0) - ip.z * sin(oa), ip.x * sin(oa) + ip.z * (cos(oa) - 1.0));
+      #endif
+      mvPosition = modelViewMatrix * mvPosition;
+      gl_Position = projectionMatrix * mvPosition;`,
+    );
+}
+
 export default function Island({ lite, reducedMotion = false }: { lite: boolean; reducedMotion?: boolean }) {
   const rockRef = useRef<THREE.InstancedMesh>(null);
+  const leafRef = useRef<THREE.InstancedMesh>(null);
   const rockGeo = useMemo(buildIslandGeometry, []);
   const floatGeo = useMemo(buildFloatRockGeometry, []);
   const fallGeo = useMemo(() => buildFallGeometry(lite), [lite]);
@@ -192,33 +221,20 @@ export default function Island({ lite, reducedMotion = false }: { lite: boolean;
     const m = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.95, metalness: 0, flatShading: true, side: THREE.DoubleSide, emissive: "#2a1e16" });
     // gentle bobbing: a sum of two slow sines, phase from the instance position (no per-frame matrix uploads);
     // and a slow orbit around the island's axis, each rock at its own speed and direction
-    m.onBeforeCompile = (sh) => {
-      sh.uniforms.uTime = timeUniform;
-      sh.vertexShader = sh.vertexShader
-        .replace("#include <common>", "#include <common>\nuniform float uTime;")
-        .replace(
-          "#include <begin_vertex>",
-          `#include <begin_vertex>
-          #ifdef USE_INSTANCING
-          vec3 ip = instanceMatrix[3].xyz;
-          float ph = ip.x * 0.37 + ip.z * 0.61;
-          transformed.y += sin(uTime * 0.5 + ph) * 0.1 + sin(uTime * 0.23 + ph * 1.7) * 0.06;
-          transformed.x += sin(uTime * 0.31 + ph * 2.3) * 0.04;
-          #endif`,
-        )
-        .replace(
-          "#include <project_vertex>",
-          `vec4 mvPosition = vec4(transformed, 1.0);
-          #ifdef USE_INSTANCING
-          mvPosition = instanceMatrix * mvPosition;
-          float oa = uTime * (0.012 + 0.012 * fract(ph * 3.1)) * (fract(ph * 7.7) > 0.5 ? 1.0 : -1.0);
-          mvPosition.xz += vec2(ip.x * (cos(oa) - 1.0) - ip.z * sin(oa), ip.x * sin(oa) + ip.z * (cos(oa) - 1.0));
-          #endif
-          mvPosition = modelViewMatrix * mvPosition;
-          gl_Position = projectionMatrix * mvPosition;`,
-        );
-    };
+    m.onBeforeCompile = applyFloatMotion;
     m.customProgramCacheKey = () => "float-rock-bob-orbit";
+    return m;
+  }, []);
+  const leafGeo = useMemo(() => floatLeafGeometry(lite), [lite]);
+  const leafMat = useMemo(() => {
+    // the town's leaf material (atlas, sway, translucency) + the same bob/orbit as the rocks
+    const base = getMaterials().leaf as THREE.MeshStandardMaterial;
+    const m = base.clone();
+    m.onBeforeCompile = (sh, r) => {
+      base.onBeforeCompile(sh, r);
+      applyFloatMotion(sh);
+    };
+    m.customProgramCacheKey = () => "float-rock-leaves";
     return m;
   }, []);
   const fallMat = useMemo(() => {
@@ -259,12 +275,18 @@ export default function Island({ lite, reducedMotion = false }: { lite: boolean;
     });
     m.instanceMatrix.needsUpdate = true;
     if (m.instanceColor) m.instanceColor.needsUpdate = true;
+    const l = leafRef.current;
+    if (l) {
+      l.instanceMatrix.copyArray(m.instanceMatrix.array);
+      l.instanceMatrix.needsUpdate = true;
+    }
   }, [rocks]);
 
   return (
     <group>
       <mesh geometry={rockGeo} material={rockMat} frustumCulled={false} />
       <instancedMesh ref={rockRef} args={[floatGeo, floatMat, rocks.length]} frustumCulled={false} />
+      <instancedMesh ref={leafRef} args={[leafGeo, leafMat, rocks.length]} frustumCulled={false} />
       <mesh geometry={fallGeo} material={fallMat} frustumCulled={false} renderOrder={2} />
     </group>
   );

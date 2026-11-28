@@ -5,13 +5,14 @@
 // fixed 45° camera; anything that does get in the way is dithered out.
 import { LABELS } from "./nepal/labels";
 import { JOURNEY, stonePositions } from "./journey";
+import { POTTERY_OBSTACLES, POTTERY_RING } from "./pottery/layout";
 
 export type Obstacle =
   | { kind: "rect"; x: number; z: number; w: number; d: number }
   | { kind: "circle"; x: number; z: number; r: number };
 
 /** Ids shared with the robot engine. Do not rename. */
-export type ZoneId = "plaza" | "project-hall" | "education" | "skills-lab" | "timeline" | "about" | "mailbox" | "kiosk";
+export type ZoneId = "plaza" | "project-hall" | "education" | "skills-lab" | "timeline" | "about" | "mailbox" | "kiosk" | "pottery";
 
 export type Zone = {
   id: ZoneId;
@@ -306,6 +307,18 @@ export const zones: Zone[] = [
     color: "#7fd6b5",
     labelY: 5.0,
     obstacles: [rotRect(TEA_STALL.x, TEA_STALL.z, TEA_STALL.w + 0.2, TEA_STALL.d + 0.4, TEA_STALL.rot)],
+  },
+  {
+    // step22: the potter's corner just south of the prayer wheels (pottery/layout.ts); "Make a pot" starts the wheel game
+    id: "pottery",
+    label: LABELS.zones.pottery.en,
+    prompt: "Press E or tap to make a pot \u{1F3FA}",
+    position: [POTTERY_RING.x, POTTERY_RING.z],
+    ring: [POTTERY_RING.x, POTTERY_RING.z],
+    ringRadius: POTTERY_RING.radius,
+    color: "#e07a4a",
+    labelY: 2.6,
+    obstacles: POTTERY_OBSTACLES,
   },
 ];
 

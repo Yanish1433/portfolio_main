@@ -62,6 +62,7 @@ export default function TimeDial() {
       {open && (
         <div
           role="group"
+          data-time-pop
           aria-label="Time of day"
           className="absolute right-0 top-12 z-30 w-[min(18rem,calc(100vw-32px))] rounded-lg border-2 border-[#c9a227] bg-[#3e2416] p-3 text-[#fbe9b7] shadow-lg"
         >

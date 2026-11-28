@@ -1,18 +1,16 @@
 import type { CSSProperties } from "react";
 import s from "./loading.module.css";
+import { TIME_SCRIPT } from "@/lib/time/timeScript";
+import type { Tod } from "@/lib/time/clock";
 
-/** The loading screen: the town's big pagoda (Blender poster) + a slim bar. `pct` null = unknown (static route fallback).
- *  Day/night is picked in CSS from html[data-theme] (set pre-paint), so it is server-safe. `tip` is kept for API compat. */
-export function LoadingArt({ pct = null, fading = false }: { pct?: number | null; tip?: string; fading?: boolean }) {
+/** The loading screen: the town overview picture (same art as the landing's Explore card) + a slim bar. `pct` null = unknown (static route fallback).
+ *  The picture is a CSS background per [data-tod] on the card, set before first paint by the inline time script (server fallback)
+ *  or passed as `tod` by the client overlay, so only the matching image downloads. `tip` is kept for API compat. */
+export function LoadingArt({ pct = null, fading = false, tod }: { pct?: number | null; tip?: string; fading?: boolean; tod?: Tod }) {
   return (
-    <div className={`${s.card} ${fading ? s.fade : ""}`} role="status" aria-live="polite">
-      <div className={s.stage}>
-        <div className={s.glow} aria-hidden="true" />
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img className={`${s.pagoda} ${s.day}`} src="/recruiter/poster-day.webp" alt="" fetchPriority="high" decoding="async" width={960} height={540} />
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img className={`${s.pagoda} ${s.night}`} src="/recruiter/poster-night.webp" alt="" fetchPriority="high" decoding="async" width={960} height={540} />
-      </div>
+    <div className={`${s.card} ${fading ? s.fade : ""}`} role="status" aria-live="polite" data-tod={tod} suppressHydrationWarning>
+      <script dangerouslySetInnerHTML={{ __html: TIME_SCRIPT }} />
+      <div className={s.pic} aria-hidden="true" />
       <div className={s.text}>
         <p className={s.title}>Building Bhaktapur…</p>
         <div

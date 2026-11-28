@@ -1,7 +1,7 @@
 "use client";
 
 import TimeDial from "./time/TimeDial";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { worldControl } from "./input";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -32,6 +32,9 @@ import GuideMenu from "./guide/GuideMenu";
 import GuestbookButton from "./guestbook/GuestbookUi";
 import MiniMap from "./minimap/MiniMap";
 import { btnClass, cardClass, pillClass, rowClass } from "@/components/book";
+import PotteryHudHost from "./pottery/PotteryHudHost";
+import Passport, { PassportButton, PassportPhoneButton } from "./passport/Passport";
+import "./phone.css";
 import { WheelCard, SkillFilterBar, WheelHint } from "./wheels/WheelUi";
 
 const RECRUITER_HREF = "/recruiter";
@@ -84,6 +87,8 @@ function zoneContent(id: string): { blurb: string; lines: string[]; ids?: string
       };
     case "kiosk":
       return { blurb: "Prefer a fast, no-walking summary? Open Recruiter mode.", lines: [] };
+    case "pottery":
+      return { blurb: "Spin a pot on the wheel, fire it in the kiln and collect one pot for every skill.", lines: [] };
     default:
       return { blurb: "", lines: [] };
   }
@@ -171,7 +176,8 @@ function ZoneCard() {
   }, [router]);
 
   // The info panel replaces the card while it's open.
-  if (!zone || infoOpen || wheelCard) return null;
+  // the pottery game's own HUD replaces the card while it is open
+  if (!zone || infoOpen || wheelCard || (zone.id === "pottery" && panelOpen)) return null;
   const content = zoneContent(zone.id);
   const isKiosk = zone.id === "kiosk";
   const isAbout = zone.id === "about";
@@ -189,9 +195,11 @@ function ZoneCard() {
           <span className="h-3 w-3 shrink-0 rounded-full" style={{ background: zone.color }} />
           <h2 className="min-w-0 text-lg font-semibold">
             {zone.label}
-            <span className="ml-2 font-medium opacity-70" lang="ne" style={{ fontFamily: "Mukta, sans-serif" }}>
-              {LABELS.zones[zone.id].ne}
-            </span>
+            {LABELS.zones[zone.id].ne && (
+              <span className="ml-2 font-medium opacity-70" lang="ne" style={{ fontFamily: "Mukta, sans-serif" }}>
+                {LABELS.zones[zone.id].ne}
+              </span>
+            )}
           </h2>
         </div>
         <p className="mt-1 text-sm opacity-80">{content.blurb}</p>
@@ -241,6 +249,10 @@ function ZoneCard() {
             <button type="button" className={button} onClick={() => { useWorld.getState().clearInfoDismissed(); useWorld.getState().openInfo(ABOUT_INFO); }}>
               Meet {profile.name.split(" ")[0]}
             </button>
+          ) : zone.id === "pottery" ? (
+            <button type="button" className={button} onClick={() => setPanelOpen(true)}>
+              Make a pot 🏺
+            </button>
           ) : content.lines.length > 0 ? (
             <button type="button" className={button} onClick={() => setPanelOpen(!panelOpen)}>
               {panelOpen ? "Close" : "Enter"}
@@ -263,8 +275,8 @@ function Hint() {
       }`}
     >
       <p className="rounded-lg border-2 border-[#c9a227] bg-[#3e2416] px-4 py-2 text-sm text-[#fbe9b7] shadow">
-        Click anywhere to walk
-        <span className="hidden [@media(pointer:coarse)]:inline"> · or use the joystick</span>
+        <span className="[@media(pointer:coarse)]:hidden">Click anywhere to walk</span>
+        <span className="hidden [@media(pointer:coarse)]:inline">Tap to walk · or drag your left thumb</span>
         <span className="[@media(pointer:coarse)]:hidden"> · WASD / arrows to run, Shift to walk</span>
       </p>
     </div>
@@ -352,6 +364,41 @@ function EagleViewButton() {
   );
 }
 
+/** Slow sky orbit of the whole island (also the O key): eagle view + auto-spin. Esc, O again or walking leaves it. */
+function Spin360Button() {
+  const spin = useWorld((s) => s.cameraMode === "eagle" && s.eagleSpin);
+  const toggle = useWorld((s) => s.toggleSpin);
+  return (
+    <button
+      type="button"
+      onClick={toggle}
+      aria-label="360 degree view (O)"
+      aria-pressed={spin}
+      title="360° view (O)"
+      className={pillClass(`h-11 min-w-11 justify-center sm:h-10 ${spin ? "!brightness-150" : ""}`)}
+    >
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <ellipse cx="12" cy="12" rx="9" ry="4" />
+        <path d="M17 9.5l2.5 2.5-3 1" />
+      </svg>
+      <span className="hidden sm:inline">360°</span>
+    </button>
+  );
+}
+
+/** One-line hint while the 360 view is on. */
+function Spin360Hint() {
+  const spin = useWorld((s) => s.cameraMode === "eagle" && s.eagleSpin);
+  if (!spin) return null;
+  return (
+    <div className="pointer-events-none absolute inset-x-0 top-[7.5rem] z-10 flex justify-center px-4 sm:top-16">
+      <p className="rounded-lg border-2 border-[#c9a227] bg-[#3e2416] px-4 py-2 text-sm text-[#fbe9b7] shadow" role="status">
+        360° view · drag to look around · Esc to exit
+      </p>
+    </div>
+  );
+}
+
 /** Is a ground point in the Project Dalan (the gallery in front of the stands)? */
 // the whole frontage counts, including the gate between the two wings
 const inDalan = ([x, z]: [number, number]) =>
@@ -394,6 +441,7 @@ const pill =
 
 /** Dance emote (also the G key). */
 function AvatarControls() {
+  const spin = useWorld((s) => s.cameraMode === "eagle" && s.eagleSpin);
   const character = useWorld((s) => s.character);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -409,7 +457,7 @@ function AvatarControls() {
     <div className="absolute left-4 top-4 z-20 flex items-center gap-2">
       <button
         type="button"
-        className={pill}
+        className={`${pill} [@media(pointer:coarse)]:max-[480px]:hidden`}
         onClick={() => useWorld.getState().dance()}
         aria-label={`${LABELS.ui.dance} (G)`}
         title={`${LABELS.ui.dance} (G)`}
@@ -418,8 +466,92 @@ function AvatarControls() {
         <span className="hidden sm:inline">{LABELS.ui.dance}</span>
         <kbd className="hidden rounded bg-black/10 px-1.5 text-xs sm:inline [@media(pointer:coarse)]:hidden">G</kbd>
       </button>
-      <GuideMenu />
+      {!spin && <GuideMenu />}
       <GuestbookButton />
+    </div>
+  );
+}
+
+/** Phone (<= 480 px, or a touch device in landscape): the pill rows collapse behind one "⋯" button. Elsewhere it renders nothing extra. */
+function PhoneMenu({ children }: { children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const wrap = useRef<HTMLDivElement>(null);
+  const btn = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (!wrap.current?.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setOpen(false);
+      btn.current?.focus();
+    };
+    window.addEventListener("pointerdown", onDown);
+    window.addEventListener("keydown", onKey);
+    return () => {
+      window.removeEventListener("pointerdown", onDown);
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+  return (
+    <div
+      ref={wrap}
+      className="ph-menu"
+      data-open={open ? "" : undefined}
+      onClickCapture={(e) => {
+        // choosing a plain action closes the sheet; buttons that open a popover (Go to, time) keep it open
+        const b = (e.target as HTMLElement).closest("button,a");
+        if (b && b !== btn.current && !b.hasAttribute("aria-haspopup") && !b.hasAttribute("aria-expanded") && !b.closest("[role=menu],[data-time-pop]")) setOpen(false);
+      }}
+    >
+      <button ref={btn} type="button" className="ph-menu-btn" aria-expanded={open} aria-controls="ph-menu-body" aria-label="Menu" onClick={() => setOpen((o) => !o)}>
+        <span aria-hidden="true">⋯</span>
+      </button>
+      <div id="ph-menu-body" className="ph-menu-body">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/** Phone action cluster, bottom right: Dance, 360° and Map call the same store actions as the G / O / M keys. */
+function PhoneActions() {
+  const ready = useWorld((s) => s.loaded && !!s.character && !s.pickerOpen && !s.cinema);
+  const follow = useWorld((s) => s.cameraMode === "follow");
+  const spin = useWorld((s) => s.cameraMode === "eagle" && s.eagleSpin);
+  const toggleSpin = useWorld((s) => s.toggleSpin);
+  if (!ready) return null;
+  return (
+    <div className="ph-actions" role="group" aria-label="Actions">
+      {follow && (
+        <button type="button" onClick={() => useWorld.getState().dance()} aria-label={`${LABELS.ui.dance} (G)`}>
+          <span aria-hidden="true">💃</span>
+        </button>
+      )}
+      <button type="button" onClick={toggleSpin} aria-label="360 degree view (O)" aria-pressed={spin}>
+        <span aria-hidden="true">🔄</span>
+      </button>
+      {follow && <PassportPhoneButton />}
+      {follow && (
+        <button type="button" onClick={() => useWorld.getState().setMinimapBig(!useWorld.getState().minimapBig)} aria-label="Map (M)">
+          <span aria-hidden="true">🗺️</span>
+        </button>
+      )}
+    </div>
+  );
+}
+
+function RightPills() {
+  return (
+    <div className="absolute right-4 top-4 z-20 flex items-center gap-2">
+      <EagleViewButton />
+      <Spin360Button />
+      <ResetViewButton />
+      <TimeDial />
+      <Link href={RECRUITER_HREF} className={pillClass()}>
+        Recruiter mode
+      </Link>
     </div>
   );
 }
@@ -428,6 +560,7 @@ export default function Overlay({ characters, thumbs = [], posters = [], aboutPh
   const files = useMemo(() => ({ thumbs: new Set(thumbs), showcasePosters: new Set(posters) }), [thumbs, posters]);
   const cinema = useWorld((s) => !!s.cinema);
   const eagleMode = useWorld((s) => s.cameraMode === "eagle");
+  const spin360 = useWorld((s) => s.cameraMode === "eagle" && s.eagleSpin);
   return (
     <div className="pointer-events-none absolute inset-0 z-10">
       {/* The world HUD steps aside while a project video is open: invisible (so out of the tab order
@@ -441,26 +574,23 @@ export default function Overlay({ characters, thumbs = [], posters = [], aboutPh
       <ContactLogic />
       <WheelHint />
       <SkillFilterBar />
-      <AvatarControls />
-      <MiniMap />
+      <PhoneMenu>
+        <AvatarControls />
+        <RightPills />
+      </PhoneMenu>
+      <PhoneActions />
+      {!spin360 && <MiniMap />}
+      {!spin360 && <PassportButton />}
+      <Passport />
+      <Spin360Hint />
       <Toast />
       {/* Bottom dock: zone card above the robot chat; on touch screens it sits above the joystick. */}
-      <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-3 p-4 pb-5 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] [@media(pointer:coarse)]:pb-[calc(168px+env(safe-area-inset-bottom))]">
+      <div className="ph-dock pointer-events-none absolute inset-x-0 bottom-0 z-20 flex flex-col items-center gap-3 p-4 pb-5 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
         <ZoneCard />
+        <PotteryHudHost />
         <InfoPanel aboutPhoto={aboutPhoto} />
         <WheelCard />
         <RobotChat />
-      </div>
-      <div className="absolute right-4 top-4 z-20 flex items-center gap-2">
-        <EagleViewButton />
-        <ResetViewButton />
-        <TimeDial />
-        <Link
-          href={RECRUITER_HREF}
-          className={pillClass()}
-        >
-          Recruiter mode
-        </Link>
       </div>
       {!cinema && !eagleMode && <Joystick />}
       </div>

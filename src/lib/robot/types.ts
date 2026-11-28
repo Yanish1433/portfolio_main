@@ -8,7 +8,8 @@ export type ZoneId =
   | "timeline"
   | "about"
   | "mailbox"
-  | "kiosk";
+  | "kiosk"
+  | "pottery";
 
 export const ZONE_IDS: readonly ZoneId[] = [
   "plaza",
@@ -19,6 +20,7 @@ export const ZONE_IDS: readonly ZoneId[] = [
   "about",
   "mailbox",
   "kiosk",
+  "pottery",
 ];
 
 export type RobotAction =

@@ -124,6 +124,7 @@ textarea.field { resize: none; height: auto; background-image: repeating-linear-
 /* wooden HUD pill (the buttons around the town, not on a page) */
 .pill { pointer-events: auto; display: inline-flex; align-items: center; gap: 6px; min-height: 40px; padding: 4px 14px; border-radius: 8px; font: inherit; font-size: 14px; font-weight: 700; color: #fbe9b7; cursor: pointer; background: #3e2416 url(/textures/ui/lokta-wood.png); border: 1.5px solid var(--gold); box-shadow: 0 2px 0 #1f120a; }
 .pill:hover { filter: brightness(1.25); }
+@media (pointer: coarse) { .pill { min-height: 44px; min-width: 44px; } }
 .float { animation: floatUp 520ms cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 
 /* the sealed letter on a successful send */

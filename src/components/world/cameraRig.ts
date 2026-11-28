@@ -50,6 +50,8 @@ export const ZONE_PRESETS: Record<string, ZonePreset> = {
   about: { dist: 10, yaw: -0.15, pitch: 36 * DEG, enter: 3.6, exit: 5.6 },
   // the Hulak postbox
   mailbox: { dist: 11, yaw: -0.3, pitch: 40 * DEG, enter: 3.8, exit: 5.8 },
+  // step22 potter's corner: a close 3/4 view from the south-east, past the post box (the avatar stands west of the wheel); the game pauses walking, so this is the play view
+  pottery: { dist: 6.4, yaw: 1.0, pitch: 37 * DEG, enter: 3.2, exit: 4.6 },
 };
 
 export const viewOfZone = (zone: string | null): View => {
@@ -173,6 +175,11 @@ type Ptr = { x: number; y: number; sx: number; sy: number; type: string; button:
  * A press that landed on a clickable object (claimed) never orbits.
  */
 export class GestureTracker {
+  /** step23: on phones a lone finger that drags past the tap slop orbits the camera (otherwise only two fingers do). */
+  private readonly opts: { touchOrbit?: boolean };
+  constructor(opts: { touchOrbit?: boolean } = {}) {
+    this.opts = opts;
+  }
   private ptrs = new Map<number, Ptr>();
   /** A two-finger gesture happened since the last full release: nothing here is a tap any more. */
   private multi = false;
@@ -213,7 +220,14 @@ export class GestureTracker {
     p.x = x;
     p.y = y;
     if (Math.hypot(x - p.sx, y - p.sy) >= TAP_SLOP_PX) p.far = true;
-    if (this.multi || p.type === "touch") return null; // a lone finger never orbits (it just isn't a tap)
+    if (this.multi) return null;
+    if (p.type === "touch") {
+      if (!this.opts.touchOrbit) return null; // a lone finger never orbits (it just isn't a tap)
+      if (this.dragging.has(id)) return { dx: x - px, dy: y - py, pinch: 1 };
+      if (claimed || !p.far) return null;
+      this.dragging.add(id);
+      return { dx: x - p.sx, dy: y - p.sy, pinch: 1 };
+    }
     if (this.dragging.has(id)) return { dx: x - px, dy: y - py, pinch: 1 };
     if (claimed) return null;
     const right = p.button === 2;
@@ -566,4 +580,106 @@ export function blendPose(a: Pose, b: Pose, t: number): Pose {
   const k = clamp(t, 0, 1);
   const m = (p: V3, q: V3): [number, number, number] => [p[0] + (q[0] - p[0]) * k, p[1] + (q[1] - p[1]) * k, p[2] + (q[2] - p[2]) * k];
   return { pos: m(a.pos, b.pos), look: m(a.look, b.look) };
+}
+
+// --- Camera modes (step21a): dance cam, 360 view, mode transitions ----------------------------------------
+// Everything below is pure (no three.js / React): Player.tsx feeds it and writes the result to the camera.
+
+/** The Dance clip is 450 frames @ 30 fps (step19a). */
+export const DANCE_SECS = 15;
+/** Ease into / out of the dance shot (s). */
+export const DANCE_BLEND_SECS = 0.8;
+/** Dance shot: distance and height of the camera, height of the look target (m), and the orbit sweep over the dance. */
+export const DANCE_CAM = { dist: 5.6, camY: 0.95, lookY: 1.55, yaw0: -0.42, sweep: 50 * DEG, push: 0.45, pushRise: 0.07, pushFall: 0.38 };
+
+/** Camera modes that may show the dance shot: only the plain follow camera (eagle / 360 / cinema never). */
+export const danceCamAllowed = (mode: string, cinema: boolean) => mode === "follow" && !cinema;
+
+/** Blend state of the dance shot: `w` 0..1 (0 = normal follow camera), `latched` = the visitor took the camera. */
+export type DanceCamState = { w: number; latched: boolean; manualTick: number; wasActive: boolean };
+export const newDanceCamState = (manualTick = 0): DanceCamState => ({ w: 0, latched: false, manualTick, wasActive: false });
+
+/**
+ * One frame of the dance-cam blend. A manual orbit / zoom (`manualTick` changed) during the dance latches it off
+ * until the dance is over; a disallowed mode (eagle / cinema) drops it at once (those take the live camera pose,
+ * so there is nothing to jump). Reduced motion: no ease, the shot is static.
+ */
+export function stepDanceCam(s: DanceCamState, i: { active: boolean; allowed: boolean; manualTick: number; reduced: boolean }, dt: number): DanceCamState {
+  if (i.active && !s.wasActive) s.latched = false; // a fresh dance re-arms
+  if (i.manualTick !== s.manualTick) {
+    if (i.active) s.latched = true;
+    s.manualTick = i.manualTick;
+  }
+  s.wasActive = i.active;
+  if (!i.allowed) {
+    s.w = 0;
+    return s;
+  }
+  const want = i.active && !s.latched ? 1 : 0;
+  if (i.reduced) s.w = want;
+  else if (s.w !== want) s.w = clamp(s.w + (want > s.w ? 1 : -1) * (dt / DANCE_BLEND_SECS), 0, 1);
+  return s;
+}
+
+/** Push-in (m, 0..push) at dance time `t`: a quick rise and a slow fall after each impact. */
+export function dancePush(t: number, impacts: readonly number[]): number {
+  let best = 0;
+  for (const it of impacts) {
+    const x = t - (it - DANCE_CAM.pushRise); // starts rising just before the hit
+    if (x < 0) continue;
+    const k = x < DANCE_CAM.pushRise ? smoothstep(x / DANCE_CAM.pushRise) : Math.exp(-(x - DANCE_CAM.pushRise) / DANCE_CAM.pushFall * 2.2);
+    best = Math.max(best, k);
+  }
+  return best * DANCE_CAM.push;
+}
+
+/** The pure dance shot (before blending with the follow pose): in front of Lakhey, slightly low, slowly orbiting. */
+export function danceShotPose(t: number, avatar: { x: number; z: number; heading: number }, impacts: readonly number[], reduced = false): Pose {
+  const u = clamp(t / DANCE_SECS, 0, 1);
+  const yaw = avatar.heading + DANCE_CAM.yaw0 + (reduced ? 0 : DANCE_CAM.sweep * u);
+  const dist = DANCE_CAM.dist - (reduced ? 0 : dancePush(t, impacts));
+  return {
+    pos: [avatar.x + Math.sin(yaw) * dist, DANCE_CAM.camY, avatar.z + Math.cos(yaw) * dist],
+    look: [avatar.x, DANCE_CAM.lookY, avatar.z],
+  };
+}
+
+/** Dance camera pose: the follow pose blended into the dance shot by `weight` (smoothstep; exact at 0 and 1). */
+export function danceCamPose(t: number, weight: number, follow: Pose, avatar: { x: number; z: number; heading: number }, impacts: readonly number[], reduced = false): Pose {
+  if (weight <= 0) return follow;
+  return blendPose(follow, danceShotPose(t, avatar, impacts, reduced), smoothstep(weight));
+}
+
+// 360 degree view = eagle view + auto spin ------------------------------------------------------------------
+/** One full turn takes this long (s). */
+export const SPIN_SECS = 40;
+/** The 360 view's start: high 3/4 view from the south. */
+export const SPIN_VIEW = { pitch: 58 * DEG, dist: 112 };
+
+/** New sky yaw after `dt` seconds of the continuous spin (wrapped). None under reduced motion. */
+export const spinYaw = (yaw: number, dt: number, reduced: boolean) => (reduced ? yaw : wrapEagleYaw(yaw + (dt * Math.PI * 2) / SPIN_SECS));
+
+/** Pose of the 360 view at `yaw` (same orbit as the eagle view, so manual drag / zoom limits apply). */
+export const spinPose = (yaw: number, pitch = SPIN_VIEW.pitch, dist = SPIN_VIEW.dist): Pose => eaglePose(yaw, pitch, dist);
+
+export type CamModeState = { mode: "follow" | "cinema" | "returning" | "eagle"; spin: boolean; cinema: boolean };
+export type CamAction = "eagle" | "spin" | "exit-spin" | "dance";
+
+/**
+ * Mode transitions (store + Player share this). V toggles the eagle view (and drops the spin); O toggles the 360 view
+ * (follow -> 360, eagle -> 360, 360 -> follow); Esc / moving ("exit-spin") leaves the 360 view back to follow.
+ * Cinema and its return win over everything. "dance" never changes the mode (the dance cam just stays off outside follow).
+ */
+export function reduceCamMode(s: CamModeState, a: CamAction): CamModeState {
+  if (s.cinema || (s.mode !== "follow" && s.mode !== "eagle")) return s;
+  switch (a) {
+    case "eagle":
+      return s.mode === "eagle" ? { ...s, mode: "follow", spin: false } : { ...s, mode: "eagle", spin: false };
+    case "spin":
+      return s.mode === "eagle" && s.spin ? { ...s, mode: "follow", spin: false } : { ...s, mode: "eagle", spin: true };
+    case "exit-spin":
+      return s.mode === "eagle" && s.spin ? { ...s, mode: "follow", spin: false } : s;
+    default:
+      return s;
+  }
 }

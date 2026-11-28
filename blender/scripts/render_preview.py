@@ -312,6 +312,59 @@ def shot_mask_closeup(objs):
     render("mask_closeup")
 
 
+BANG_GRIP = dict(centre=(-0.0069, 0.0867, 0.0059), pole_up=(0.4513, 0.2419, 0.859))   # clips.grip_info (hand-local)
+BANG_IMPACT_S = 306 / 30.0
+
+
+def add_pole(arm, below=1.0 / 1.22, above=1.0 / 1.22):
+    """Temporary preview pole (2 m on the web = 1.64 m model), along the grip axis. Not exported."""
+    from mathutils import Vector
+    bpy.context.view_layer.update()
+    M = arm.matrix_world @ arm.pose.bones["mixamorig:RightHand"].matrix
+    c = M @ Vector(BANG_GRIP["centre"])
+    up = (M.to_3x3() @ Vector(BANG_GRIP["pole_up"])).normalized()
+    mid = c + up * (above - below) / 2
+    bpy.ops.mesh.primitive_cylinder_add(radius=0.018, depth=above + below, location=mid)
+    ob = bpy.context.active_object
+    ob.rotation_mode = "QUATERNION"
+    ob.rotation_quaternion = Vector((0, 0, 1)).rotation_difference(up)
+    mat = bpy.data.materials.new("pole")
+    mat.diffuse_color = (0.55, 0.38, 0.2, 1)
+    ob.data.materials.append(mat)
+    bpy.ops.object.shade_smooth()
+
+
+def bang_shot(objs, name, az, seconds, tgt_z=0.8, dist=4.4, el=0.8):
+    arm = armature(objs)
+    set_clip(arm, "Dance", seconds)
+    add_pole(arm)
+    body_shot_cam(objs, name, az, dist, el, tgt_z)
+
+
+def body_shot_cam(objs, name, az, dist, el, tgt_z):
+    cove(floor=0.0, color=(0.03, 0.02, 0.02))
+    tgt = (0, 0, tgt_z)
+    studio(tgt, scale=1.0, warm_rim=True)
+    a = math.radians(az)
+    camera((math.sin(a) * dist, -math.cos(a) * dist, el), tgt, lens=40, fstop=None)
+    s = 640 if args.quick else 960
+    configure(s, s, 16 if args.quick else args.samples)
+    render(name)
+
+
+def shot_bang_side(objs):
+    """Right-side view of the first strike (looks at the character's right, where the pole is)."""
+    bang_shot(objs, "bang_side", -90, BANG_IMPACT_S)
+
+
+def shot_bang_34(objs):
+    bang_shot(objs, "bang_34", -35, BANG_IMPACT_S + 18 / 30.0)
+
+
+def shot_bang_up(objs):
+    bang_shot(objs, "bang_up", -35, (306 - 9) / 30.0)
+
+
 def main():
     for shot in args.shots.split(","):
         C.reset_scene()

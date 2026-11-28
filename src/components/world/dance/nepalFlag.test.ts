@@ -1,31 +1,66 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { FLAG_HEIGHT, flagBounds, flagEmblems, nepalFlagShape } from "./nepalFlag";
+import { flagBounds, flagDesign, flagPolys, nepalFlagShape } from "./nepalFlag";
 
-test("flag height / width is the constitutional 1.219", () => {
+const near = (a: number, b: number, e = 1e-9) => assert.ok(Math.abs(a - b) < e, `${a} vs ${b}`);
+
+test("outer height / width is the constitutional 1.2190", () => {
   const b = flagBounds();
-  assert.ok(Math.abs(b.height / b.width - 1.219) < 0.001);
-  assert.equal(b.minX, 0);
-  assert.equal(b.minY, 0);
+  assert.ok(Math.abs(b.height / b.width - 1.219) < 0.002, String(b.height / b.width));
+  near(b.minX, 0);
+  near(b.minY, 0);
 });
 
-test("outline is two pennants: five vertices, notch inside the fly tip", () => {
-  const p = nepalFlagShape();
-  assert.equal(p.length, 5);
-  const [A, B, E, F, C] = p;
-  assert.deepEqual(A, [0, 0]);
-  assert.deepEqual(B, [1, 0]);
-  assert.equal(C[1], FLAG_HEIGHT);
-  assert.ok(E[0] > 0 && E[0] < B[0]);
-  assert.equal(E[1], F[1]); // horizontal notch edge
-  assert.ok(F[0] > E[0] && F[0] < 1);
-  assert.ok(F[1] > 0 && F[1] < C[1]);
+test("inner tips share x; the outer upper tip reaches further than the lower", () => {
+  const d = flagDesign();
+  const [, iB, , iG] = d.inner;
+  near(iB[0], iG[0]);
+  const [, oB, , oG] = d.outer;
+  assert.ok(oG[0] > oB[0]);
 });
 
-test("moon sits in the upper pennant, sun in the lower, both inside the flag", () => {
-  const { moon, sun } = flagEmblems();
-  const notchY = nepalFlagShape()[2][1];
-  assert.ok(moon.cy > notchY);
-  assert.ok(sun.cy < notchY);
-  for (const e of [moon, sun]) assert.ok(e.cx - e.r > 0 && e.cx + e.r < 1);
+test("lower pennant is taller than the upper (0.707 vs 0.626 of AB)", () => {
+  const [A, , E, , C] = flagDesign().inner;
+  const lower = E[1] - A[1];
+  const upper = C[1] - E[1];
+  assert.ok(lower > upper);
+  near(lower / upper, 0.7071 / 0.6262, 1e-3);
+});
+
+test("border is the same width on every edge (incl. both notch edges)", () => {
+  const d = flagDesign();
+  const n = d.inner.length;
+  for (let i = 0; i < n; i++) {
+    const a = d.outer[i];
+    const b = d.outer[(i + 1) % n];
+    const l = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    // distance of both inner vertices of this edge from the outer edge line
+    for (const q of [d.inner[i], d.inner[(i + 1) % n]]) {
+      const dist = Math.abs((b[0] - a[0]) * (a[1] - q[1]) - (a[0] - q[0]) * (b[1] - a[1])) / l;
+      near(dist, d.border, 1e-9);
+    }
+  }
+});
+
+test("emblems follow the construction; ray counts 8 and 12; both in their pennants", () => {
+  const d = flagDesign();
+  assert.equal(d.moon.half.rays, 8);
+  assert.equal(d.sun.rays, 12);
+  const notchY = d.inner[2][1];
+  assert.ok(d.moon.half.cy > notchY, "moon in the upper pennant");
+  assert.ok(d.sun.cy + d.sun.r < notchY, "sun in the lower pennant");
+  // Construction ratios (AB = inner width): sun radii LN : MN, moon half radii TS : TM.
+  assert.ok(d.sun.r > d.sun.rIn);
+  assert.ok(d.moon.half.r > d.moon.half.rIn);
+  near(d.sun.rIn / d.sun.r, 0.1357 / 0.214, 2e-3);
+  near(d.moon.half.r / d.sun.r, 0.1287 / 0.214, 2e-3);
+  // Everything sits inside the crimson field.
+  for (const e of [d.sun, d.moon.half]) assert.ok(e.cx - e.r > d.border);
+});
+
+test("flagPolys gives blue, crimson and white shapes (lune + 8 + disc + 12 rays + half disc)", () => {
+  const p = flagPolys();
+  assert.equal(p.outer.length, 5);
+  assert.equal(p.white.length, 1 + 1 + 8 + 1 + 12);
+  assert.equal(nepalFlagShape(), p.outer);
 });

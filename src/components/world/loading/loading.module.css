@@ -19,75 +19,49 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 18px;
+  justify-content: flex-end;
   overflow: hidden;
-  padding: env(safe-area-inset-top) max(16px, env(safe-area-inset-right)) env(safe-area-inset-bottom) max(16px, env(safe-area-inset-left));
-  color: #3a2418;
+  padding: env(safe-area-inset-top) max(16px, env(safe-area-inset-right)) max(40px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+  color: #fff;
   font-family: "Mukta", system-ui, "Nirmala UI", sans-serif;
-  background: linear-gradient(180deg, #bfe0f5 0%, #f7e3c2 70%, #f3d9b8 100%);
+  background: #1b120c;
   opacity: 1;
   transition: opacity 400ms ease;
-}
-:global(html[data-theme="dark"]) .card {
-  color: #f1e6d0;
-  background: linear-gradient(180deg, #070b1e 0%, #141c3d 65%, #251f3a 100%);
 }
 .fade {
   opacity: 0;
   pointer-events: none;
 }
-.stage {
-  position: relative;
-  width: min(560px, 100%);
-  aspect-ratio: 16 / 9;
-}
-.pagoda {
+/* the town overview for the time of day: one background per [data-tod], so only that picture downloads */
+.pic {
   position: absolute;
   inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  animation: float 6s ease-in-out infinite alternate;
+  background: center / cover no-repeat;
+  transform-origin: center;
+  animation: kenburns 8s ease-out forwards;
 }
-.night {
-  display: none;
-}
-:global(html[data-theme="dark"]) .day {
-  display: none;
-}
-:global(html[data-theme="dark"]) .night {
-  display: block;
-}
-.glow {
-  display: none;
+.card[data-tod="morning"] .pic { background-image: url("/landing/town-morning.webp"); }
+.card[data-tod="day"] .pic { background-image: url("/landing/town-day.webp"); }
+.card[data-tod="evening"] .pic { background-image: url("/landing/town-evening.webp"); }
+.card[data-tod="night"] .pic { background-image: url("/landing/town-night.webp"); }
+/* soft vignette + a dark band behind the text keeps it readable on all four pictures */
+.card::before {
+  content: "";
   position: absolute;
-  inset: 8% 18%;
-  border-radius: 50%;
-  background: radial-gradient(closest-side, rgba(255, 190, 90, 0.45), rgba(255, 150, 60, 0.12) 60%, transparent);
-  filter: blur(8px);
-  animation: lamp 3.2s ease-in-out infinite alternate;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.45) 100%),
+    linear-gradient(to top, rgba(10, 6, 4, 0.82) 0%, rgba(10, 6, 4, 0.7) 22%, rgba(10, 6, 4, 0) 45%);
 }
-:global(html[data-theme="dark"]) .glow {
-  display: block;
-}
-@keyframes float {
-  from {
-    transform: translateY(0) scale(1);
-  }
-  to {
-    transform: translateY(-6px) scale(1.025);
-  }
-}
-@keyframes lamp {
-  from {
-    opacity: 0.65;
-  }
-  to {
-    opacity: 1;
-  }
+@keyframes kenburns {
+  from { transform: scale(1); }
+  to { transform: scale(1.06); }
 }
 .text {
+  position: relative;
+  z-index: 2;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -96,6 +70,7 @@
 }
 .title {
   margin: 0;
+  text-shadow: 0 1px 6px rgba(0, 0, 0, 0.6);
   font-size: clamp(1.25rem, 5vw, 1.8rem);
   font-weight: 600;
 }
@@ -105,10 +80,7 @@
   margin-top: 6px;
   overflow: hidden;
   border-radius: 999px;
-  background: rgba(58, 36, 24, 0.18);
-}
-:global(html[data-theme="dark"]) .track {
-  background: rgba(241, 230, 208, 0.2);
+  background: rgba(255, 255, 255, 0.22);
 }
 .fill {
   width: var(--pct, 40%);
@@ -139,8 +111,7 @@
   .fill {
     transition: none;
   }
-  .pagoda,
-  .glow {
+  .pic {
     animation: none;
   }
   .indet .fill {

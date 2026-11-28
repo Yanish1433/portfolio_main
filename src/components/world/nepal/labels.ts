@@ -14,6 +14,8 @@ export const LABELS = {
     mailbox: { en: "Contact", ne: "सम्पर्क" },
     // Captain's choice (2026-11-26): "quick introduction".
     kiosk: { en: "Recruiter Mode", ne: "छिटो परिचय" },
+    // step22: the pottery wheel mini-game (English only: an empty ne draws no second line)
+    pottery: { en: "Potter's Corner", ne: "" },
   } satisfies Record<string, BiLabel>,
   /** Extra places (step8c): name tags only, not zones. */
   places: {

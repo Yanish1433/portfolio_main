@@ -7,6 +7,7 @@ import { useKeyboardControls } from "@react-three/drei";
 import * as THREE from "three";
 import Avatar from "./Avatar";
 import { blockedAt, findPath, resolveMove } from "./nav";
+import { joySpeed } from "./touchControls";
 import { avatarMotion, camRig, joystick, navPath, playerPos, pointerClaim, RUN_SPEED, WALK_SPEED, worldControl } from "./input";
 import { SPAWN, zones } from "./zones";
 import { STANDS } from "./halls/layout";
@@ -44,7 +45,14 @@ import {
   shouldFlyIn,
   updateFrame,
   type Ring,
+  SPIN_VIEW,
+  danceCamAllowed,
+  danceCamPose,
+  newDanceCamState,
+  spinYaw,
+  stepDanceCam,
 } from "./cameraRig";
+import { IMPACT_TIMES, danceClock } from "./dance/danceFx";
 import { isTypingTarget, movementLocked, useWorld, type Vec2 } from "@/store/world";
 import { themeState } from "./nepal/themeState";
 
@@ -137,6 +145,11 @@ export default function Player({ characters, reducedMotion }: { characters: Char
     yawTarget: DEFAULT_VIEW.yaw,
     pitchTarget: DEFAULT_VIEW.pitch,
     frame: newFrameState(),
+    /** Dance camera (step21a): clock mirrored from the Avatar's rules, the blend, and a counter bumped by every manual orbit / zoom. */
+    danceCam: newDanceCamState(),
+    manualTick: 0,
+    /** Pointers currently down on the canvas (the 360 spin pauses while the visitor drags). */
+    ptrDown: 0,
     viewCustom: false,
     camTarget: new THREE.Vector3(SPAWN[0], AVATAR_SCALE, SPAWN[1]),
     /** Over-the-shoulder view: the project ring being stood on, and how far the camera has eased into it (0..1). */
@@ -220,7 +233,7 @@ export default function Player({ characters, reducedMotion }: { characters: Char
     if (!shouldFlyIn({ reducedMotion, search })) return;
     const f = s.current.fly;
     f.on = true;
-    f.t = 0;
+    f.t = -0.3; // 0.3 s of near-still camera first: a last hitch at the hand-over is invisible
     f.skip = null;
     f.prev = null;
     f.frozen = frozenFlyT(search);
@@ -243,8 +256,12 @@ export default function Player({ characters, reducedMotion }: { characters: Char
   useEffect(
     () =>
       useWorld.subscribe((w, prev) => {
-        if (w.cameraMode === prev.cameraMode) return;
         const e = s.current.eagle;
+        if (w.cameraMode === "eagle" && w.eagleSpin && !prev.eagleSpin) {
+          e.pitchT = SPIN_VIEW.pitch;
+          e.distT = SPIN_VIEW.dist;
+        }
+        if (w.cameraMode === prev.cameraMode) return;
         const here = (): Pose => ({
           pos: [camera.position.x, camera.position.y, camera.position.z],
           look: [camRig.look.x, camRig.look.y, camRig.look.z],
@@ -337,11 +354,15 @@ export default function Player({ characters, reducedMotion }: { characters: Char
     const raycaster = new THREE.Raycaster();
     const plane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
     const hit = new THREE.Vector3();
-    const gesture = new GestureTracker();
-    const manual = () => noteManual(s.current.frame);
+    const gesture = new GestureTracker({ touchOrbit: true });
+    const manual = () => {
+      noteManual(s.current.frame);
+      s.current.manualTick++;
+    };
 
     const onDown = (e: PointerEvent) => {
       pointerClaim.reset();
+      s.current.ptrDown++;
       gesture.down(e.pointerId, e.clientX, e.clientY, e.pointerType, e.button);
     };
     const onMove = (e: PointerEvent) => {
@@ -377,6 +398,7 @@ export default function Player({ characters, reducedMotion }: { characters: Char
       }
     };
     const onUp = (e: PointerEvent) => {
+      s.current.ptrDown = Math.max(0, s.current.ptrDown - 1);
       // Only a short single-pointer press is a tap; a drag (orbit) or two-finger gesture is not.
       if (!gesture.up(e.pointerId).tap) return;
       // The press landed on a clickable 3D object (stand, book, sign): it handles the walk itself.
@@ -391,7 +413,10 @@ export default function Player({ characters, reducedMotion }: { characters: Char
       raycaster.setFromCamera(ndc, camera);
       if (raycaster.ray.intersectPlane(plane, hit)) walkToRef.current(hit.x, hit.z);
     };
-    const onCancel = (e: PointerEvent) => gesture.cancel(e.pointerId);
+    const onCancel = (e: PointerEvent) => {
+      s.current.ptrDown = Math.max(0, s.current.ptrDown - 1);
+      gesture.cancel(e.pointerId);
+    };
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
       const st = s.current;
@@ -431,17 +456,27 @@ export default function Player({ characters, reducedMotion }: { characters: Char
       st.pitchTarget = DEFAULT_VIEW.pitch;
       st.zoomTarget = DEFAULT_VIEW.dist;
       noteManual(st.frame); // stays on the default view until the next zone
+      st.manualTick++;
     };
     worldControl.resetView = resetView;
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey || isTypingTarget(e)) return;
-      if (e.code === "KeyV") {
+      if (e.code === "KeyO") {
+        if (!e.repeat && !useWorld.getState().pickerOpen) useWorld.getState().toggleSpin();
+      } else if (e.code === "KeyV") {
         if (!e.repeat && !useWorld.getState().pickerOpen) useWorld.getState().toggleEagle();
       } else if (e.code === "KeyR") {
         const w = useWorld.getState();
         if (!e.repeat && !w.pickerOpen && (w.cameraMode === "eagle" || !movementLocked(w))) resetView();
       } else if (CAM_KEYS.has(e.code)) held.add(e.code);
     };
+    // Esc leaves the 360 view.
+    const onEsc = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      const w = useWorld.getState();
+      if (w.cameraMode === "eagle" && w.eagleSpin) w.exitSpin();
+    };
+    window.addEventListener("keydown", onEsc);
     const onKeyUp = (e: KeyboardEvent) => held.delete(e.code);
     const clear = () => held.clear();
     window.addEventListener("keydown", onKey);
@@ -449,6 +484,7 @@ export default function Player({ characters, reducedMotion }: { characters: Char
     window.addEventListener("blur", clear);
     return () => {
       worldControl.resetView = null;
+      window.removeEventListener("keydown", onEsc);
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("keyup", onKeyUp);
       window.removeEventListener("blur", clear);
@@ -502,6 +538,15 @@ export default function Player({ characters, reducedMotion }: { characters: Char
     const keys = world.pickerOpen || locked ? { forward: false, back: false, left: false, right: false, walk: false } : getKeys();
     const px = st.x;
     const pz = st.z;
+    // Dance camera (step21a): reads the shared danceClock (dance/danceWarm.ts); the blend only runs in the plain follow camera.
+    const dClock = danceClock;
+    const dCam = stepDanceCam(st.danceCam, { active: dClock.active, allowed: danceCamAllowed(world.cameraMode, !!world.cinema) && !st.fly.on, manualTick: st.manualTick, reduced: reducedMotion }, dt);
+    // 360 view: walking (movement keys) leaves it; the spin pauses while the visitor drags.
+    if (world.cameraMode === "eagle" && world.eagleSpin) {
+      const k = getKeys();
+      if (k.forward || k.back || k.left || k.right || Math.hypot(joystick.x, joystick.y) > 0.2) world.exitSpin();
+      else if (!st.ptrDown) st.eagle.yawT = spinYaw(st.eagle.yawT, dt, reducedMotion);
+    }
 
     // Keys / joystick are relative to the camera ("up" = away from it); click-to-walk is world-space.
     let [ix, iz] = moveVector(
@@ -539,10 +584,7 @@ export default function Player({ characters, reducedMotion }: { characters: Char
       const keyHeld = keys.forward || keys.back || keys.left || keys.right;
       if (keyHeld) want = keys.walk ? WALK_SPEED : RUN_SPEED;
       else
-        want =
-          push < 0.6
-            ? WALK_SPEED * (push / 0.6)
-            : WALK_SPEED + (RUN_SPEED - WALK_SPEED) * THREE.MathUtils.smoothstep(push, 0.6, 0.95);
+        want = joySpeed(push);
       dirX = ix / push;
       dirZ = iz / push;
       targetHeading = Math.atan2(ix, iz);
@@ -655,7 +697,10 @@ export default function Player({ characters, reducedMotion }: { characters: Char
       const zoomIn = (h.has("Equal") || h.has("NumpadAdd") ? 1 : 0) - (h.has("Minus") || h.has("NumpadSubtract") ? 1 : 0);
       if (turn) st.yawTarget = clampYaw(st.yawTarget + turn * KEY_ORBIT * dt);
       if (zoomIn) st.zoomTarget = clampDist(st.zoomTarget - zoomIn * KEY_ZOOM * dt);
-      if (turn || zoomIn) noteManual(st.frame);
+      if (turn || zoomIn) {
+        noteManual(st.frame);
+        st.manualTick++;
+      }
     }
     // Auto-frame: in a section the camera eases closer and turns to face its content; back in the
     // centre it returns to the wide view. A visitor who has taken the camera is left alone (cameraRig.ts).
@@ -738,7 +783,9 @@ export default function Player({ characters, reducedMotion }: { characters: Char
       endFly(false);
       // Orbit targets ease in; the glide up / down only blends the camera write (camRig keeps the follow pose).
       const ek = reducedMotion ? 1 : 1 - Math.exp(-dt * 6);
-      eg.yawT = wrapEagleYaw(eg.yawT);
+      const wrapped = wrapEagleYaw(eg.yawT);
+      eg.yaw += wrapped - eg.yawT; // shift the eased yaw by the same turn, so the wrap never whirls the camera the long way round
+      eg.yawT = wrapped;
       eg.yaw += (eg.yawT - eg.yaw) * ek;
       eg.pitch += (eg.pitchT - eg.pitch) * ek;
       eg.dist += (eg.distT - eg.dist) * ek;
@@ -764,6 +811,12 @@ export default function Player({ characters, reducedMotion }: { characters: Char
     }
     camera.position.set(camRig.pos.x, camRig.pos.y, camRig.pos.z);
     camera.lookAt(camRig.look.x, camRig.look.y, camRig.look.z);
+    if (dCam.w > 0 && !st.fly.on) {
+      const follow: Pose = { pos: [camRig.pos.x, camRig.pos.y, camRig.pos.z], look: [camRig.look.x, camRig.look.y, camRig.look.z] };
+      const dp = danceCamPose(dClock.t, dCam.w, follow, { x: st.x, z: st.z, heading: st.heading }, IMPACT_TIMES, reducedMotion);
+      camera.position.set(...dp.pos);
+      camera.lookAt(...dp.look);
+    }
     if (st.fly.on) {
       // Only the camera write is blended: camRig keeps the normal pose (cinema flies back to it), and the
       // fly pose ends exactly on it, so landing has no jump. Progress is accumulated frame time (clamped
@@ -787,7 +840,7 @@ export default function Player({ characters, reducedMotion }: { characters: Char
         }
       } else {
         if (f.frozen === null) f.t += dt;
-        const t = f.frozen ?? f.t / CINE_SECS;
+        const t = f.frozen ?? Math.max(0, f.t) / CINE_SECS;
         if (t >= 1) endFly(true);
         else pose = cinematicFlyPose(t, end);
       }

@@ -69,6 +69,7 @@ const ZONE_ALIASES: Record<ZoneId, string[]> = {
   about: ["ghar", "about me", "about page", "about house"],
   mailbox: ["mailbox", "mail box", "mail", "contact", "post", "letterbox"],
   kiosk: ["kiosk", "booth", "terminal", "desk"],
+  pottery: ["pottery", "potter", "pot", "pots", "potters corner", "pottery wheel", "clay"],
 };
 
 const joinedOf = (s: string): string => s.replace(/ /g, "");

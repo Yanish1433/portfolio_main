@@ -326,4 +326,13 @@ test("warm-up gate: needs compiled (or the 1 s cap) plus 3 stable frames", () =>
   assert.equal(warmupReady({ compiled: true, elapsedMs: 200, frames: 2 }), false);
   assert.equal(warmupReady({ compiled: true, elapsedMs: 200, frames: 3 }), true);
   assert.equal(warmupReady({ compiled: false, elapsedMs: 1000, frames: 3 }), true);
+  // the program count must have settled (late-mounting avatar / depth programs), unless the hard cap hits
+  assert.equal(warmupReady({ compiled: true, elapsedMs: 1500, frames: 30, stableFrames: 2 }), false);
+  assert.equal(warmupReady({ compiled: true, elapsedMs: 1500, frames: 30, stableFrames: 8 }), true);
+  assert.equal(warmupReady({ compiled: true, elapsedMs: 3500, frames: 30, stableFrames: 0 }), true);
+  // and the chosen character's avatar must be in the scene (its GLB used to land 2 s into the fly-in)
+  assert.equal(warmupReady({ compiled: true, elapsedMs: 1500, frames: 30, stableFrames: 20, avatarReady: false }), false);
+  assert.equal(warmupReady({ compiled: true, elapsedMs: 1500, frames: 30, stableFrames: 20, avatarReady: true }), true);
+  assert.equal(warmupReady({ compiled: true, elapsedMs: 4000, frames: 30, stableFrames: 20, avatarReady: false }), false);
+  assert.equal(warmupReady({ compiled: true, elapsedMs: 9000, frames: 30, stableFrames: 20, avatarReady: false }), true); // never stuck
 });

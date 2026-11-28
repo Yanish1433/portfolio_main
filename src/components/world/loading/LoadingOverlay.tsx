@@ -5,11 +5,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useProgress } from "@react-three/drei";
 import { useWorld } from "@/store/world";
+import { todAt } from "@/lib/time/clock";
 import { LoadingArt } from "./LoadingArt";
 import { barValue, tipAt, TIPS } from "./progress";
 
 export default function LoadingOverlay() {
   const ready = useWorld((s) => s.loaded);
+  const minutes = useWorld((s) => s.minutes);
   const loaded = useProgress((p) => p.loaded);
   const total = useProgress((p) => p.total);
   const prev = useRef(0);
@@ -35,5 +37,5 @@ export default function LoadingOverlay() {
   }, [ready]);
 
   if (gone) return null;
-  return <LoadingArt pct={pct} tip={tipAt(tip)} fading={ready} />;
+  return <LoadingArt pct={pct} tip={tipAt(tip)} fading={ready} tod={todAt(minutes)} />;
 }

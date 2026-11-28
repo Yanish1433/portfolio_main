@@ -256,19 +256,19 @@ export default function MiniMap() {
   if (hidden) return null;
   return (
     <>
-      <div className="pointer-events-auto absolute right-4 top-[96px] z-20 w-[120px] min-[641px]:top-[68px] min-[641px]:w-[180px]" data-minimap>
+      <div className="ph-minimap pointer-events-auto absolute right-4 top-[96px] z-20 w-[120px] min-[641px]:top-[68px] min-[641px]:w-[180px]" data-minimap>
         <MapView big={false} />
-        <p className="mt-1.5 text-center text-[12px] font-semibold leading-tight text-[#fbe9b7] [text-shadow:0_1px_2px_#000]">{CAPTION}</p>
+        <p className="ph-map-caption mt-1.5 text-center text-[12px] font-semibold leading-tight text-[#fbe9b7] [text-shadow:0_1px_2px_#000]">{CAPTION}</p>
         <button
           type="button"
           onClick={() => setBig(true)}
           aria-label="Open big map (M)"
-          className="mt-1.5 flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-lg border-2 border-[#c9a227] bg-[#3e2416] px-2 text-[12px] font-semibold text-[#fbe9b7] focus:outline-none focus-visible:ring-2 focus-visible:ring-white min-[641px]:min-h-9"
+          className="ph-map-btn mt-1.5 flex min-h-[44px] w-full items-center justify-center gap-1.5 rounded-lg border-2 border-[#c9a227] bg-[#3e2416] px-2 text-[12px] font-semibold text-[#fbe9b7] focus:outline-none focus-visible:ring-2 focus-visible:ring-white min-[641px]:min-h-9"
         >
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7" />
           </svg>
-          Open big map
+          <span className="ph-map-btn-label">Open big map</span>
         </button>
       </div>
       {big && <BigMap onClose={close} />}

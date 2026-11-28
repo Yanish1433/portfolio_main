@@ -3,7 +3,7 @@
   Idle  : 2 s loop, arms relaxed, breathing + slight sway
   Walk  : 1.2 s in-place loop (heel -> toe, hip sway, counter-rotation, arm swing)
   Run   : 0.8 s in-place loop (contact -> down -> passing -> up, flight phases, forward lean)
-  Dance : 15 s flag dance (stomps + half-turn, overhead flag wave, one-foot spin, big flag sweep, step-together
+  Dance : 15 s flag dance (stomps + half-turn, overhead flag wave, one-foot spin, FLAG BANG (3 pole strikes on the beat, frames 306/324/342), step-together
           + deep bow); right hand grips a 3 cm pole throughout; first/last frame = Idle t=0
 
 Poses are WORLD-axis rotations (degrees) of each bone relative to the T-pose rest. A bone's pose is either
@@ -202,6 +202,98 @@ def grip_info(arm):
     up = -K  # pole "up" (thumb side) in hand-local
     return dict(centre=tuple(round(x, 4) for x in centre), radius=round(r, 4), pole_up=tuple(round(x, 4) for x in up),
                 hand_bone_len=round(hand.bone.length, 4))
+
+
+
+# ----------------------------------------------------------------------------- flag-bang phrase
+BANG_IMPACTS = (306, 324, 342)             # frames (30 fps) where the pole tip hits the floor; 18 frames = 100 bpm
+POLE_BELOW = 1.0 / 1.22                    # pole length below the grip in MODEL metres (web: 1.0 m / AVATAR_SCALE)
+BANG_TIP_XY = (-0.45, -0.30)               # planted tip: world X (character's right = -X), Y (-Y = forward)
+BANG_PRIOR = dict(aabR=48, aswR=10, afwR=30, aflR=32)   # relaxed arm the IK stays near
+BANG_W = (278, 290, 362, 374)              # IK weight: 0 at [0], 1 over [1]..[2], back to 0 at [3]
+# tip height above the floor: (frame, metres, ease into the NEXT point)
+BANG_TIPZ = [(278, 0.80, "S"), (297, 0.82, "I"), (306, 0.0, "O"), (310, 0.10, "S"), (315, 0.62, "I"),
+             (324, 0.0, "O"), (328, 0.10, "S"), (333, 0.62, "I"), (342, 0.0, "O"), (346, 0.08, "O"),
+             (351, 0.0, "S"), (374, 0.0, "S")]
+GRIP = {}
+BANG_LOG = {}
+
+
+def _sstep(u):
+    u = min(max(u, 0.0), 1.0)
+    return u * u * (3 - 2 * u)
+
+
+def bang_w(f):
+    a, b, c, d = BANG_W
+    return _sstep((f - a) / (b - a)) if f < c else 1.0 - _sstep((f - c) / (d - c))
+
+
+def bang_tipz(f):
+    pts = BANG_TIPZ
+    for (f0, z0, e), (f1, z1, _) in zip(pts, pts[1:]):
+        if f0 <= f <= f1:
+            u = (f - f0) / (f1 - f0)
+            k = {"I": u * u, "O": 1 - (1 - u) ** 2}.get(e, _sstep(u))
+            return z0 + (z1 - z0) * k
+    return pts[-1][1]
+
+
+def grip_world(arm):
+    """(grip centre, pole-up unit vector) in world metres, from the fist-cavity fit in GRIP."""
+    M = arm.matrix_world @ C.pbone(arm, "RightHand").matrix
+    return M @ Vector(GRIP["centre"]), (M.to_3x3() @ Vector(GRIP["pole_up"])).normalized()
+
+
+_WARM = {}
+
+
+def solve_bang_arm(arm, P, w, posefn):
+    """Move the right-arm params + wrist so the grip centre sits on the planted pole tip (+ POLE_BELOW along the
+    pole) and the GRIP pole axis (what the web draws) points at the wanted tilt, blended by w with the keyed arm
+    pose. Returns (P, tip position, tilt deg, grip error m)."""
+    import numpy as np
+    names = ["aabR", "aswR", "afwR", "aflR", "pside", "pfwd"]
+    nat = [P[n] for n in names]
+    posefn(P)
+    c_nat, _ = grip_world(arm)
+    tz = bang_tipz(P["_f"])
+    fwd = 2.0 + 6.0 * min(tz / 0.82, 1.0)
+    pw = Rm("Z", P["spin"]) @ Vector((0.0, -math.tan(math.radians(fwd)), 1.0)).normalized()
+    tip = Vector((BANG_TIP_XY[0], BANG_TIP_XY[1], _sole_points(arm)[1] + tz))
+    target = c_nat.lerp(tip + pw * POLE_BELOW, w)
+    prior = np.array([(1 - w) * a + w * BANG_PRIOR.get(n, 0.0) for a, n in zip(nat, names)], float)
+    x = np.array(_WARM.get("x", prior), float) if w > 0.5 and "x" in _WARM else prior.copy()
+    wt = np.array([0.0008] * 4 + [0.001] * 2)
+
+    def resid(x):
+        for n, v in zip(names, x):
+            P[n] = float(v)
+        posefn(P)
+        c, up = grip_world(arm)
+        return np.array(list(c - target) + list((up - (pw if w > 0.5 else up)) * 0.6 * w) + list(wt * (x - prior)))
+
+    lam = 1e-3
+    for _ in range(12):
+        r0 = resid(x)
+        J = np.zeros((len(r0), 6))
+        for i in range(6):
+            xi = x.copy()
+            xi[i] += 1.0
+            J[:, i] = resid(xi) - r0
+        dx = -np.linalg.solve(J.T @ J + lam * np.eye(6), J.T @ r0)
+        dx = np.clip(dx, -25, 25)
+        xn = x + dx
+        xn[0], xn[3] = min(max(xn[0], 0), 180), min(max(xn[3], 0), 140)
+        if np.linalg.norm(resid(xn)) < np.linalg.norm(r0):
+            x, lam = xn, lam * 0.5
+        else:
+            lam *= 4
+    r0 = resid(x)
+    _WARM["x"] = x
+    c, up = grip_world(arm)
+    tip_w = c - up * POLE_BELOW
+    return P, tip_w, math.degrees(math.acos(min(up.z, 1.0))), float(np.linalg.norm((c - target)))
 
 
 # ----------------------------------------------------------------------------- Idle
@@ -627,18 +719,24 @@ def dance_keys():
         plant="L")
     key(278, wide(spin=360, knL=62, knR=62, aabR=120, aflR=30, pside=-30, pfwd=8, aabL=60, aflL=22),
         seg=("QUAD", "EASE_OUT"))                                                         # land wide
-    # ---- 4: big FLAG SWEEP side to side (frames 278-348), four strokes, body leans away from the flag
+    # ---- 4: FLAG BANG (frames 278-374): raise the pole, then drive its tip into the floor 3 times on the beat
+    # (impacts at BANG_IMPACTS, 100 bpm = 18 frames). Legs/torso are keyed here; the right arm is solved per frame
+    # by `solve_bang_arm` so the grip follows a planted pole tip (see BANG_TIPZ).
     SW = dict(spin=360)
-    for f, s in ((296, 1), (314, -1), (332, 1), (348, -1)):
-        key(f, wide(aabR=150 + 55 * s, aflR=24, pside=36 * s, pfwd=4, aabL=95 - 50 * s, aflL=20,
-                    aswL=0, aswR=0, thL=-22, thR=-22, knL=58 - 14 * s, knR=58 + 14 * s,
-                    crl=-9 * s, hrl=-4 * s, cyaw=10 * s, cpt=5, nrl=7 * s, nyaw=-12 * s, npt=-3, **SW),
-            sway=0.055 * s)
-    key(358, wide(thL=-34, thR=-34, knL=88, knR=88, lean=12, cpt=14, aabR=60, aabL=40, aflR=30, aflL=30,
-                  pside=10, pfwd=10, npt=-6, **SW), seg=("QUAD", "EASE_IN"), plant="")      # crouch, then jump
-    key(366, flag(thL=-28, thR=-28, knL=66, knR=66, abL=28, abR=28, aabL=150, aabR=168, aflL=16, aflR=18,
-                  npt=4, **SW), lift=0.11, seg=("QUAD", "EASE_OUT"), plant="")            # jump, flag thrust up
-    key(374, flag(knL=60, knR=60, aabR=165, aflR=24, **SW), seg=("QUAD", "EASE_OUT"))   # land
+    dip = dict(thL=-34, thR=-32, knL=84, knR=80, abL=30, abR=28, twL=20, twR=20, lean=20, cpt=16, npt=-9,
+               aabL=64, aflL=30, aswL=0, aswR=0, **SW)
+    for n, F in enumerate(BANG_IMPACTS):
+        key(F - 9, wide(thL=-20, thR=-20, knL=40, knR=40, abL=22, abR=22, twL=14, twR=14, lean=0, cpt=-3,
+                        aabL=125, aflL=18, aswL=0, aswR=0, npt=-4, **SW), plant="L")     # tall, right foot starts up
+        key(F - 5, wide(thR=-58, knR=100, abR=20, thL=-24, knL=50, abL=26, lean=3, cpt=0, aabL=100, aflL=20,
+                        aswL=0, aswR=0, npt=-4, **SW), seg=("QUAD", "EASE_IN"), plant="L")   # right knee up
+        key(F, wide(**dip), seg=("QUAD", "EASE_OUT"))                                       # STRIKE + stomp
+        key(F + 4, wide(thL=-28, thR=-27, knL=66, knR=64, abL=28, abR=26, lean=9, cpt=7, npt=-5, aabL=80,
+                        aflL=24, aswL=0, aswR=0, **SW))                                     # rebound
+    F = BANG_IMPACTS[-1]
+    key(F + 9, wide(**dip), seg=("SINE", "EASE_OUT"))                                      # back on the last strike
+    key(F + 20, wide(**dip), seg=("SINE", "EASE_OUT"))                                     # hold
+    key(374, flag(knL=60, knR=60, aabR=165, aflR=24, **SW), seg=("QUAD", "EASE_OUT"))   # rise: flag up, land
     # ---- 5: two closing steps, then the DEEP BOW
     key(383, flag(knL=56, knR=70, thL=-22, thR=-18, abL=16, abR=20, aabR=90, aflR=50, pside=-20, pfwd=30,
                   aabL=70, **SW), sway=-0.08, plant="R")                                  # weight right, left foot lifts
@@ -765,11 +863,26 @@ def make_dance(arm):
                     drift[s] = max(drift[s], e)
                     if e > 0.012:
                         C.log("lock miss f", f, s, "xy err", round(e, 3), "z err", round(float(r[2]), 3))
-        apply_pose(arm, body_pose(P), sway=sway, lift=lift, drop=drop, off=off)
+        def posefn(Q):
+            apply_pose(arm, body_pose(Q), sway=sway, lift=lift, drop=drop, off=off)
+
+        wb = bang_w(f)
+        if wb > 0.0:
+            P["_f"] = f
+            P, tipw, tilt, err = solve_bang_arm(arm, dict(P), wb, posefn)
+            sw_, z0_ = sole_world(arm)
+            dR = min(math.hypot(q.x - tipw.x, q.y - tipw.y) for q in sw_[3:])
+            dL = min(math.hypot(q.x - tipw.x, q.y - tipw.y) for q in sw_[:3])
+            BANG_LOG[f] = dict(w=wb, tipz=tipw.z - z0_, tipxy=(tipw.x, tipw.y), tilt=tilt, err=err,
+                               gripz=grip_world(arm)[0].z - z0_, dR=dR, dL=dL)
+        posefn(P)
         key_all(arm, f)
     act = arm.animation_data.action
     act.name = "Dance"
     act.use_fake_user = True
+    for f in sorted(BANG_LOG):
+        if f in BANG_IMPACTS or f % 6 == 0:
+            C.log("BANG", f, {k: (round(v, 3) if isinstance(v, float) else v) for k, v in BANG_LOG[f].items()})
     C.log("Dance frames", N, "seconds", N / FPS, "max planted-foot residual (m)", drift)
     return act
 
@@ -805,8 +918,8 @@ def make_clips(arm):
     idle.use_fake_user = True
     walk = make_gait(arm, "Walk", GAITS["Walk"])
     run = make_gait(arm, "Run", GAITS["Run"])
+    GAIT_INFO["Grip"] = GRIP.update(grip_info(arm)) or dict(GRIP)
     dance = make_dance(arm)
-    GAIT_INFO["Grip"] = grip_info(arm)
     C.log("Grip", GAIT_INFO["Grip"])
     bpy.ops.object.mode_set(mode="OBJECT")
     for o in meshes:

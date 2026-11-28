@@ -23,6 +23,7 @@ export const ZONE_LABEL: Record<ZoneId, string> = {
   about: "the Ghar (the About house)",
   mailbox: "the Mailbox",
   kiosk: "the Kiosk",
+  pottery: "the Potter's Corner",
 };
 
 /** Where each zone lives on the recruiter page. Edit here if the recruiter page uses other anchors. */
@@ -35,6 +36,7 @@ export const RECRUITER_ANCHORS: Record<ZoneId, { url: string; label: string }> =
   about: { url: "#about", label: "About" },
   mailbox: { url: "#contact", label: "Contact" },
   kiosk: { url: "#contact", label: "Contact" },
+  pottery: { url: "#skills", label: "Skills" },
 };
 
 export interface Focus {
